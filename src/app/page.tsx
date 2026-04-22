@@ -9,6 +9,7 @@ import {
 } from "@phosphor-icons/react";
 import { ConstellationBackground } from "@/components/landing/constellation-bg";
 import { FeaturesBento } from "@/components/landing/features-bento";
+import { GitHubStarButton } from "@/components/landing/github-star-button";
 import { Hero } from "@/components/landing/hero";
 import { LanguageMarquee } from "@/components/landing/language-marquee";
 import { Logo } from "@/components/brand/logo";
@@ -31,16 +32,14 @@ export default function Home() {
             causalist
           </span>
         </Link>
-        <div className="flex items-center gap-4">
-          <a
-            href="https://github.com/daxaur/causalist"
-            target="_blank"
-            rel="noopener noreferrer"
+        <div className="flex items-center gap-3">
+          <Link
+            href="/library"
             className="hidden text-sm text-neutral-500 transition-colors hover:text-neutral-900 sm:inline"
-            aria-label="Causalist on GitHub"
           >
-            Source
-          </a>
+            Library
+          </Link>
+          <GitHubStarButton />
           <Link
             href="/settings"
             aria-label="Keys and settings"

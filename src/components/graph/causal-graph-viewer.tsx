@@ -136,16 +136,27 @@ export function CausalGraphViewer({ graph }: { graph: CausalGraph }) {
     onNodeClick: (n: VisNode) => setSelected(n),
     onNodeHover: (n: VisNode | null) => setHover(n?.id ?? null),
     onBackgroundClick: () => setSelected(null),
-    backgroundColor: "#0a0a0f",
+    backgroundColor: "#14131a",
     cooldownTicks: 120,
   };
 
   return (
-    <div className="relative flex h-full w-full overflow-hidden rounded-2xl border border-neutral-200 bg-[#0a0a0f] text-white shadow-sm">
+    <div className="relative flex h-full w-full overflow-hidden rounded-3xl border border-neutral-200/70 bg-[#14131a] text-white shadow-[0_4px_40px_-12px_rgba(10,10,20,0.35)] ring-1 ring-black/5">
+      {/* Warm radial vignette — dark core fades at edges so the canvas */}
+      {/* doesn't feel like a black rectangle dropped on a white page. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-[1] rounded-3xl"
+        style={{
+          background:
+            "radial-gradient(120% 80% at 50% 50%, transparent 50%, rgba(250,249,246,0.06) 100%)",
+        }}
+      />
+
       {/* File-tree sidebar */}
       <aside
         className={cn(
-          "flex shrink-0 flex-col border-r border-white/10 bg-[#07070c] transition-all duration-300",
+          "flex shrink-0 flex-col border-r border-white/5 bg-[#0f0e15] transition-all duration-300",
           sidebarOpen ? "w-64" : "w-0",
         )}
       >
