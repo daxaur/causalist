@@ -1,10 +1,32 @@
-# Causalist — build plan
+# Causalist — build plan (v2)
 
 ## Product shape
 
-**One-line.** A web app + CLI + Claude Code plugin that turns any GitHub repository into a 3D causal graph. Paste a URL (or prefix one with `causalist.dev/`) — Claude agents map the codebase, you explore the galaxy.
+**One line.** Paste any GitHub URL → Claude agents map the repository into an interactive 3D causal graph. Every file labeled. Every import traced. Every blast radius visualized. Works in the browser, from the CLI, and inside Claude Code.
 
-## Shared architecture
+## Mental model
+
+```
+causalist.dev/<owner>/<repo>
+             ^ paste your domain before any github.com URL and the graph loads
+```
+
+Every repo is a URL. If a graph already exists (cached, or freshly computed by another user), it loads instantly. If not, you add your Anthropic API key once in /settings and Causalist generates the graph on your device — four agents running in parallel.
+
+## Agent pipeline (Claude Agent SDK)
+
+Four agents, each specialized, running in parallel `query()` calls:
+
+| # | Agent       | System prompt shape                                     | Output         |
+|---|-------------|---------------------------------------------------------|----------------|
+| 1 | Structure   | Walks tree, classifies dirs, detects frameworks         | Node list + layer |
+| 2 | Dependency  | Greps imports/calls, builds edge list                   | Edge list      |
+| 3 | Semantic    | Labels every node in plain English                      | Summaries      |
+| 4 | Oracle      | Merges the three, emits final `CausalGraph`, answers "what if?" | Final graph |
+
+All four use `claude-opus-4-7`. Results stream into the viewer as they arrive — the graph *self-assembles* rather than appearing behind a spinner.
+
+## Surfaces
 
 ```
                   ┌──────────────────────┐
@@ -14,114 +36,88 @@
                   └──────────┬───────────┘
          ┌────────────┬──────┴──────┬────────────────┐
          ▼            ▼             ▼                ▼
-    Next.js app   CLI binary   MCP server      Claude Code
-    (web UI)    (`causalist`) (universal)      plugin (skill
-                                                + mcp + cli)
+    Next.js app   CLI binary   Claude Code       Any agent
+    (web UI)     `causalist`    plugin           via shell-out
+                                (skill + MCP)    to `causalist`
 ```
 
-- **`core/`** — pure TypeScript lib. Given a GitHub URL + caller-supplied keys, returns a `CausalGraph`. Zero UI. Parallel `query()` against Claude Agent SDK (Structure / Dependency / Semantic / Oracle). Cache results by repo + commit SHA.
-- **Web app** (this repo, Next.js) — calls `core` client-side using the user's keys. Renders the graph. No server-held secrets.
-- **CLI** — `causalist map <url>` writes JSON to stdout, optionally opens browser.
-- **MCP server** — wraps `core` tools: `map_repo`, `query_node`, `blast_radius`, `simulate`.
-- **Claude Code plugin** — ships skill + `.mcp.json` + `bin/causalist` in one directory, submittable to the official plugin registry.
+**Universality.** The CLI works with every agent that has shell access: Claude Code, Cursor, Hermes, OpenHands, Aider. Plugin form is a bonus for Claude Code's UX. We never require the plugin.
 
-## Route structure
+## Routes
 
-Every repo becomes a shareable link: `causalist.dev/<owner>/<repo>`.
+| Route              | Behavior                                                                 |
+|--------------------|--------------------------------------------------------------------------|
+| `/`                | Landing — hero, BentoGrid features, language marquee, Claude credit      |
+| `/<owner>/<repo>`  | Graph viewer. Cached → instant. Not cached → analyze prompt with 4-agent staged progress |
+| `/preview/<slug>`  | Hand-curated instant demos: `causalist`, `next-js`, `flask`              |
+| `/dashboard`       | User's GitHub repos (fetched client-side via PAT). Click → `/[owner]/[repo]` |
+| `/settings`        | Anthropic key + GitHub PAT                                               |
 
-| Route | Behavior |
-|---|---|
-| `/` | Landing — hero, preview pills, GitHub URL input |
-| `/<owner>/<repo>` | Graph viewer. If cached, loads instantly. If not, shows "map this repo" state that calls the Agent SDK with user's keys. |
-| `/preview/<slug>` | Canned templates for instant demo (no API calls) |
-| `/dashboard` | User's connected repos (post-GitHub connect) |
-| `/settings` | Anthropic key + GitHub PAT |
+## Auth + data
 
-The legacy `/graph/[owner]/[repo]` route is being folded into the root `[owner]/[repo]` pattern.
+**Phase 1 (now).** Two keys in `localStorage`: Anthropic API key (required for analyze) + GitHub PAT (optional, needed for private repos or the `/dashboard` listing). Keys sent directly to `api.anthropic.com` and `api.github.com` from the browser. Zero server-side auth.
 
-## Data model
+**Phase 2 (post-MVP).** Supabase cache of public-repo graphs — anyone can read, only the generator can write. GitHub OAuth for the "signed in" dashboard view. Plugin-installed users authenticate with the same GitHub session.
 
-```ts
-type CausalGraph = {
-  repo: string           // "owner/repo"
-  commit: string         // sha — unique cache key
-  generatedAt: string    // ISO
-  generatedBy: string    // model id
-  rootLabel: string
-  nodes: CausalNode[]
-  edges: CausalEdge[]
-}
-```
+## Design system
 
-Cache key: `(repo, commit)`. If DB cache present and `commit` matches current HEAD, serve cached. Otherwise prompt user to (re)analyze.
-
-## Cache layer (optional, post-MVP)
-
-Supabase (already installed) with a single table:
-
-```sql
-create table graphs (
-  repo text not null,
-  commit text not null,
-  graph jsonb not null,
-  generated_by text not null,
-  generated_at timestamptz default now(),
-  primary key (repo, commit)
-);
-```
-
-Public reads (anyone viewing a cached graph). Authenticated writes (only the user who generated it). Deferred until core analyze flow is working.
-
-## Agent pipeline (Claude Agent SDK)
-
-Four parallel `query()` calls, each with its own specialized system prompt:
-
-1. **Structure** — walks the file tree via `Read/Glob`, classifies directories (app, test, config, docs), detects frameworks.
-2. **Dependency** — extracts import/call edges via `Grep` over the fetched tree.
-3. **Semantic** — writes plain-English labels + semantic-layer assignment for each node.
-4. **Oracle** — consumes the three outputs, emits final `CausalGraph` JSON, and later handles "what-if?" queries with extended thinking.
-
-All four call `model: "claude-opus-4-7"`. User's key is passed via `ANTHROPIC_API_KEY` env var for CLI, or as a header from the browser for web.
-
-## Authentication
-
-**Phase 1 (now):** Bring-your-own keys stored in `localStorage`. Anthropic key + GitHub PAT. Zero server-side auth.
-
-**Phase 2:** GitHub OAuth app for "see all my repos" dashboard. Supabase for user profiles + cached graphs. Claude Code plugin authenticates via the same GitHub session for its `/<owner>/<repo>` links.
-
-## Loading / perceived-perf strategy
-
-- Previews are **prerendered** at build time. Zero wait.
-- Live analyze: streaming updates. As each agent returns, its nodes/edges fade in. User sees the graph *build itself* in real time rather than a spinner.
-- Loading state: constellation that draws itself edge-by-edge using the final graph's edges, not a generic spinner.
-
-## Work order
-
-Tracked in the task list. Completed items below; the rest are sequenced by blast-radius descending.
-
-- [x] Rename to Causalist, new repo on daxaur
-- [x] Research fonts + logo + Claude integration
-- [x] Graph viewer with 3D/2D toggle, layer colors, side panel
-- [x] Preview templates (`causalist`, `next-js`)
-- [x] Devicon CDN helper for node language icons
-- [x] Bring-your-own-keys settings flow
-- [ ] Replace lucide-react imports with Phosphor (3 shadcn files)
-- [ ] Swap font pipeline to Clash Display + Satoshi + JetBrains Mono
-- [ ] Design + ship the custom `<Logo>` mark (Arc + Terminus)
-- [ ] Restructure routes `/graph/[owner]/[repo]` → `/[owner]/[repo]`
-- [ ] SVG favicon + OG image using the new mark
-- [ ] Fix README — remove localhost-as-demo link
-- [ ] Polish graph visual (glow, bloom, better camera framing)
-- [ ] Streaming analyze flow using `@anthropic-ai/claude-agent-sdk`
-- [ ] Custom loading state (graph self-drawing)
-- [ ] `/dashboard` with real GitHub repo list
-- [ ] `core/` extracted as its own package
-- [ ] `cli/` package — `causalist map <url>`
-- [ ] `plugin/` package — Claude Code plugin bundle
-- [ ] Supabase schema + cached-graph flow
-- [ ] Deploy to Vercel, update README link
-- [ ] Submit plugin to official Claude Code registry
+- **Colors.** Minimalist white → graph on dark. Single accent: `#D97757` (Claude's orange) on badges and one interactive highlight.
+- **Typography.** Clash Display (display) + Satoshi (body) + JetBrains Mono (code). All free via Fontshare + Google.
+- **Brand mark.** Custom Arc+Terminus logo — 270° "C" arc between a filled and hollow terminus. Favicon, header, OG, footer.
+- **Icons.** Phosphor, duotone for emphasis. No Lucide anywhere.
+- **Composition.** shadcn base + Magic UI for motion (BentoGrid, AnimatedBeam, Marquee, NumberTicker, Terminal, AnimatedShinyText).
+- **Motion.** Framer Motion for entrance animations. Graph self-draws edge-by-edge on analyze. Shiny text pass on eyebrow. No bouncy easings — everything is slow, deliberate, instrument-panel-confident.
 
 ## Hackathon framing
 
-Prize categories confirmed (4.6 precedent, 4.7 is the same shape): 1st/2nd/3rd placement + "Keep Thinking" + "Creative Exploration." **No "Managed Agents" prize.** Pitch as *agentic repo cartographer built on Opus 4.7 + Agent SDK subagents.* Hits Lydia (visual communication), Boris (Claude Code plugin integration), Thariq (agents pushed to a new domain), Cat (functional + shippable).
+**Built with Opus 4.7** — Anthropic × Cerebral Valley (Apr 21–27 2026).
+
+Confirmed prize categories (from Opus 4.6 precedent): 1st / 2nd / 3rd + **Keep Thinking** + **Creative Exploration**. No "Managed Agents" category this round. Our pitch hits all four judges:
+
+- **Boris Cherny** (Claude Code) — Causalist ships as a first-class Claude Code plugin
+- **Cat Wu** (PM) — functional, end-to-end, shippable Vercel URL
+- **Thariq Shihipar** (Skills) — 4-agent SDK pipeline is agents pushed to a novel domain
+- **Lydia Hallie** (DX, ex-Vercel) — visual communication making complex systems legible
+
+## Work order
+
+### ✅ Done
+- Renamed to Causalist, fresh repo on `daxaur`
+- Custom Arc+Terminus logomark + favicon + OG
+- Clash Display + Satoshi + JetBrains Mono via Fontshare
+- Phosphor icons everywhere (lucide purged)
+- `/[owner]/[repo]` canonical route
+- BYO keys flow at `/settings`
+- 3D + 2D graph viewer with layer colors + side panel
+- Canned previews: causalist (toy), next-js (toy)
+- Magic UI installed: BentoGrid, AnimatedBeam, Marquee, NumberTicker, Terminal, AnimatedShinyText
+- Claude wordmark + Claude mark in `/public`
+- `PLAN.md` + README cleanup
+
+### 🟡 In flight
+- Massively flesh out previews — every file, every edge
+- Homepage rebuild with Magic UI components + Claude credit + embedded graph demo
+- `/dashboard` — real GitHub repo list via PAT
+- Anthropic SDK install + stub analyze endpoint
+
+### 🔜 Next
+- Live analyze flow (four parallel `query()` calls, streaming to viewer)
+- Custom loading — graph self-draws
+- `core/` extracted library
+- `cli/` package — `causalist map <url>`
+- `plugin/` package — Claude Code plugin submittable to registry
+- Supabase cache schema + read-through
+- Vercel deploy → live URL replaces localhost in README
+
+### ⏸ Blocked on user
+- Delete `CTRLabs/cartograph` — needs `gh auth refresh -h github.com -s delete_repo`
+- Vercel deploy — needs a Vercel account + domain approval
+
+## Scoping discipline
+
+This is a 6-day hackathon build. Discipline ruthless scope-cuts:
+
+- **Skip** pure visual sugar that doesn't read in a 90-second demo
+- **Skip** MCP-without-plugin until plugin story is working
+- **Skip** database until the client-only flow is working end-to-end
+- **Ship** the thing a judge would click on first: paste URL → graph appears

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -10,7 +11,10 @@ import {
   Sparkle,
 } from "@phosphor-icons/react";
 import { ConstellationBackground } from "@/components/landing/constellation-bg";
+import { FeaturesBento } from "@/components/landing/features-bento";
+import { LanguageMarquee } from "@/components/landing/language-marquee";
 import { Logo } from "@/components/brand/logo";
+import { AnimatedShinyText } from "@/components/ui/animated-shiny-text";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSettings } from "@/lib/settings";
@@ -20,6 +24,7 @@ const GITHUB_URL = /github\.com\/([^/\s]+)\/([^/\s?#]+)/;
 const PREVIEW_LINKS = [
   { slug: "causalist", label: "causalist" },
   { slug: "next-js", label: "next.js" },
+  { slug: "flask", label: "flask" },
 ];
 
 export default function Home() {
@@ -58,6 +63,12 @@ export default function Home() {
           </span>
         </Link>
         <div className="flex items-center gap-5">
+          <Link
+            href="/dashboard"
+            className="text-sm text-neutral-500 transition-colors hover:text-neutral-900"
+          >
+            Projects
+          </Link>
           <a
             href="https://github.com/daxaur/causalist"
             target="_blank"
@@ -84,10 +95,12 @@ export default function Home() {
         </div>
       </nav>
 
-      <section className="relative z-10 flex flex-col items-center justify-center px-8 pt-20 pb-32">
-        <div className="mb-8 flex items-center gap-2 rounded-full border border-neutral-200 bg-white/80 px-4 py-1.5 text-xs text-neutral-500 backdrop-blur-sm">
-          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-          Built with Claude Opus 4.7
+      <section className="relative z-10 flex flex-col items-center justify-center px-8 pt-16 pb-24">
+        <div className="mb-8 rounded-full border border-neutral-200 bg-white/80 px-4 py-1.5 backdrop-blur-sm">
+          <AnimatedShinyText className="inline-flex items-center gap-2 text-xs">
+            <Sparkle size={11} weight="duotone" />
+            Built with Claude Opus 4.7
+          </AnimatedShinyText>
         </div>
 
         <h1 className="mb-6 max-w-3xl text-center font-display text-5xl font-medium leading-[1] tracking-[-0.03em] sm:text-6xl lg:text-[5.25rem]">
@@ -162,25 +175,55 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="relative z-10 px-8 pb-24">
-        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 md:grid-cols-3">
-          <FeatureCard
-            title="3D causal graph"
-            description="Navigate your codebase like Google Earth. Zoom from architecture overview down to individual functions."
+      {/* Features BentoGrid with AnimatedBeam */}
+      <section className="relative z-10 px-8 pb-20">
+        <div className="mx-auto mb-8 max-w-5xl">
+          <p className="font-mono text-[11px] uppercase tracking-wider text-neutral-400">
+            How it works
+          </p>
+          <h2 className="mt-2 font-display text-3xl font-medium tracking-[-0.02em] text-neutral-900">
+            Ingest · Analyze · Visualize
+          </h2>
+        </div>
+        <FeaturesBento />
+      </section>
+
+      {/* Language marquee */}
+      <section className="relative z-10 border-t border-neutral-100 bg-white/60 py-10 backdrop-blur-sm">
+        <p className="mb-6 text-center font-mono text-[11px] uppercase tracking-wider text-neutral-400">
+          Causalist speaks every language in your repo
+        </p>
+        <LanguageMarquee />
+      </section>
+
+      {/* Claude credit */}
+      <section className="relative z-10 border-t border-neutral-100 px-8 py-14">
+        <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 text-center">
+          <div className="flex items-center gap-3">
+            <div className="h-px w-12 bg-neutral-200" />
+            <span className="font-mono text-[11px] uppercase tracking-wider text-neutral-400">
+              Powered by
+            </span>
+            <div className="h-px w-12 bg-neutral-200" />
+          </div>
+          <Image
+            src="/claude-wordmark.svg"
+            alt="Claude"
+            width={180}
+            height={40}
+            priority={false}
+            className="opacity-90"
           />
-          <FeatureCard
-            title="PR blast radius"
-            description="See what a pull request actually affects — not just the diff, but the full cascade through your system."
-          />
-          <FeatureCard
-            title="Ask anything"
-            description='Click any node. Ask "what does this do?" or "what breaks if I change this?" Claude answers with graph context.'
-          />
+          <p className="mt-1 max-w-md text-xs text-neutral-500">
+            Four Claude Opus 4.7 agents run in parallel on every repo you map.
+            They share their findings over context handoffs — Structure feeds
+            Dependency, Dependency feeds Semantic, Semantic feeds Oracle.
+          </p>
         </div>
       </section>
 
       <footer className="relative z-10 border-t border-neutral-100 px-8 py-6">
-        <div className="mx-auto flex max-w-5xl items-center justify-between text-xs text-neutral-400">
+        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-2 text-xs text-neutral-400 sm:flex-row">
           <span className="flex items-center gap-2">
             <Logo size={12} />
             causalist · built for the Opus 4.7 hackathon
@@ -191,22 +234,5 @@ export default function Home() {
         </div>
       </footer>
     </main>
-  );
-}
-
-function FeatureCard({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <div className="group rounded-xl border border-neutral-200 bg-white/60 p-6 backdrop-blur-sm transition-all hover:border-neutral-300 hover:shadow-sm">
-      <h3 className="mb-2 font-display text-base font-medium tracking-tight transition-colors group-hover:text-neutral-900">
-        {title}
-      </h3>
-      <p className="text-sm leading-relaxed text-neutral-500">{description}</p>
-    </div>
   );
 }
