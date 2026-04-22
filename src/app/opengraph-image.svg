@@ -1,0 +1,11 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#fafafa"/>
+  <g stroke="#0a0a0a" stroke-width="4" stroke-linecap="round">
+    <path d="M780 220 A 170 170 0 1 0 780 450" fill="none"/>
+    <circle cx="780" cy="450" r="38" fill="#0a0a0a" stroke="none"/>
+    <circle cx="780" cy="220" r="38" fill="none"/>
+  </g>
+  <text x="120" y="320" font-family="-apple-system, system-ui, sans-serif" font-weight="500" font-size="84" fill="#0a0a0a" letter-spacing="-2">causalist</text>
+  <text x="120" y="380" font-family="-apple-system, system-ui, sans-serif" font-weight="400" font-size="30" fill="#737373">See what your code actually means. In 3D.</text>
+  <text x="120" y="560" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#a3a3a3">built with claude code  ·  opus 4.7</text>
+</svg>

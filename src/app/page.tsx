@@ -7,11 +7,10 @@ import {
   ArrowRight,
   GearSix,
   GithubLogo,
-  Graph,
   Sparkle,
-  Star,
 } from "@phosphor-icons/react";
 import { ConstellationBackground } from "@/components/landing/constellation-bg";
+import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSettings } from "@/lib/settings";
@@ -38,14 +37,10 @@ export default function Home() {
       setError("Enter a valid GitHub URL — github.com/owner/repo");
       return;
     }
-    if (!settings.anthropicKey) {
-      setError("Add your Anthropic API key in settings first.");
-      return;
-    }
     const [, owner, repo] = match;
     setError(null);
     setIsLoading(true);
-    router.push(`/graph/${owner}/${repo.replace(/\.git$/, "")}`);
+    router.push(`/${owner}/${repo.replace(/\.git$/, "")}`);
   };
 
   return (
@@ -53,27 +48,25 @@ export default function Home() {
       <ConstellationBackground />
 
       <nav className="relative z-10 flex items-center justify-between px-8 py-6">
-        <div className="flex items-center gap-2">
-          <Graph size={22} weight="duotone" className="text-neutral-900" />
-          <span className="text-lg font-semibold tracking-tight">
+        <Link
+          href="/"
+          className="flex items-center gap-2.5 text-neutral-900 transition-opacity hover:opacity-80"
+        >
+          <Logo size={20} />
+          <span className="font-display text-[17px] font-medium tracking-tight">
             causalist
           </span>
-        </div>
+        </Link>
         <div className="flex items-center gap-5">
           <a
             href="https://github.com/daxaur/causalist"
             target="_blank"
             rel="noopener noreferrer"
-            className="group flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-neutral-900"
-            aria-label="Star causalist on GitHub"
+            className="flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-neutral-900"
+            aria-label="Causalist on GitHub"
           >
             <GithubLogo size={18} weight="fill" />
-            <span>Star</span>
-            <Star
-              size={12}
-              weight="fill"
-              className="text-amber-400 transition-transform group-hover:scale-110"
-            />
+            <span>Source</span>
           </a>
           <Link
             href="/settings"
@@ -94,18 +87,18 @@ export default function Home() {
       <section className="relative z-10 flex flex-col items-center justify-center px-8 pt-20 pb-32">
         <div className="mb-8 flex items-center gap-2 rounded-full border border-neutral-200 bg-white/80 px-4 py-1.5 text-xs text-neutral-500 backdrop-blur-sm">
           <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-          Built for the Claude Opus 4.7 Hackathon
+          Built with Claude Opus 4.7
         </div>
 
-        <h1 className="mb-6 max-w-3xl text-center font-display text-5xl font-medium leading-[1.02] tracking-[-0.02em] sm:text-6xl lg:text-7xl">
+        <h1 className="mb-6 max-w-3xl text-center font-display text-5xl font-medium leading-[1] tracking-[-0.03em] sm:text-6xl lg:text-[5.25rem]">
           See what your code{" "}
-          <span className="italic text-neutral-500">actually means</span>
+          <em className="font-normal text-neutral-500">actually means</em>
         </h1>
 
-        <p className="mb-12 max-w-xl text-center text-lg leading-relaxed text-neutral-500">
-          Paste a GitHub URL. Claude agents map your entire codebase into a 3D
-          causal graph. Explore the architecture, understand connections, review
-          PRs visually.
+        <p className="mb-12 max-w-xl text-center text-[15px] leading-relaxed text-neutral-500">
+          Paste a GitHub URL. Claude agents map your entire codebase into an
+          interactive 3D causal graph — a galaxy of files, connected by what
+          actually imports, calls, and depends on what.
         </p>
 
         <div className="flex w-full max-w-lg flex-col gap-2">
@@ -132,10 +125,10 @@ export default function Home() {
               className="h-12 bg-neutral-900 px-6 text-white hover:bg-neutral-800"
             >
               {isLoading ? (
-                <span className="animate-pulse">Mapping…</span>
+                <span className="animate-pulse">Loading…</span>
               ) : (
                 <>
-                  Explore
+                  Map it
                   <ArrowRight size={18} className="ml-2" />
                 </>
               )}
@@ -187,9 +180,14 @@ export default function Home() {
       </section>
 
       <footer className="relative z-10 border-t border-neutral-100 px-8 py-6">
-        <div className="mx-auto flex max-w-5xl items-center justify-between text-sm text-neutral-400">
-          <span>causalist — built for the Opus 4.7 hackathon</span>
-          <span>Built with Claude Code</span>
+        <div className="mx-auto flex max-w-5xl items-center justify-between text-xs text-neutral-400">
+          <span className="flex items-center gap-2">
+            <Logo size={12} />
+            causalist · built for the Opus 4.7 hackathon
+          </span>
+          <span className="font-mono">
+            Claude and Anthropic are trademarks of Anthropic PBC
+          </span>
         </div>
       </footer>
     </main>
@@ -205,7 +203,7 @@ function FeatureCard({
 }) {
   return (
     <div className="group rounded-xl border border-neutral-200 bg-white/60 p-6 backdrop-blur-sm transition-all hover:border-neutral-300 hover:shadow-sm">
-      <h3 className="mb-2 text-base font-semibold transition-colors group-hover:text-neutral-900">
+      <h3 className="mb-2 font-display text-base font-medium tracking-tight transition-colors group-hover:text-neutral-900">
         {title}
       </h3>
       <p className="text-sm leading-relaxed text-neutral-500">{description}</p>

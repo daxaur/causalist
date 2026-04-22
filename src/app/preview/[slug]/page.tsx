@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Sparkle } from "@phosphor-icons/react/dist/ssr";
+import { Logo } from "@/components/brand/logo";
 import { PREVIEWS, previewBySlug } from "@/lib/graph/previews";
 import { CausalGraphViewer } from "@/components/graph/causal-graph-viewer";
 
@@ -27,10 +28,11 @@ export default async function PreviewPage({
           <ArrowLeft size={16} />
           <span>back</span>
         </Link>
-        <div className="flex items-center gap-3">
-          <Sparkle size={14} weight="duotone" className="text-neutral-400" />
+        <div className="flex items-center gap-2 text-neutral-900">
+          <Logo size={16} />
           <span className="font-mono text-xs text-neutral-500">
-            preview · {preview.subtitle}
+            <span className="text-neutral-400">preview · </span>
+            {preview.subtitle}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -55,7 +57,10 @@ export default async function PreviewPage({
         <h1 className="font-display text-4xl font-medium tracking-[-0.02em] text-neutral-900">
           {preview.title}
         </h1>
-        <p className="mt-2 text-sm text-neutral-500">{preview.tagline}</p>
+        <p className="mt-2 flex items-center gap-2 text-sm text-neutral-500">
+          <Sparkle size={12} weight="duotone" className="text-neutral-400" />
+          {preview.tagline}
+        </p>
       </header>
 
       <div className="flex-1 px-8 pb-8">

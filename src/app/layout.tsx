@@ -1,30 +1,20 @@
 import type { Metadata } from "next";
-import { Fraunces, Geist, Geist_Mono } from "next/font/google";
+import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const geist = Geist({
-  variable: "--font-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
+const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
 });
 
-const fraunces = Fraunces({
-  variable: "--font-display",
-  subsets: ["latin"],
-  axes: ["SOFT", "opsz"],
-});
-
 export const metadata: Metadata = {
-  title: "Causalist — See what your code means",
+  title: "Causalist — See what your code actually means",
   description:
-    "Paste a GitHub URL. Claude agents map your codebase into a 3D causal graph. Explore, understand, review.",
+    "Paste a GitHub URL. Claude agents map your codebase into an interactive 3D causal graph. Explore architecture, understand connections, review PRs visually.",
+  applicationName: "Causalist",
   openGraph: {
     title: "Causalist",
-    description: "Paste a GitHub URL. See what your code means. In 3D.",
+    description: "Paste a GitHub URL. See what your code actually means. In 3D.",
     type: "website",
   },
 };
@@ -35,10 +25,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geist.variable} ${geistMono.variable} ${fraunces.variable}`}
-    >
+    <html lang="en" className={jetbrainsMono.variable}>
+      <head>
+        <link
+          rel="preconnect"
+          href="https://api.fontshare.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          rel="stylesheet"
+          href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600&f[]=satoshi@300,400,500,700&display=swap"
+        />
+      </head>
       <body className="min-h-screen bg-white text-neutral-900 antialiased font-sans">
         {children}
       </body>

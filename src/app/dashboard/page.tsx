@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, GithubLogo } from "@phosphor-icons/react/dist/ssr";
+import { Logo } from "@/components/brand/logo";
 
 export default function DashboardPage() {
   return (
@@ -12,7 +13,15 @@ export default function DashboardPage() {
           <ArrowLeft size={16} />
           <span>back</span>
         </Link>
-        <span className="text-sm font-semibold tracking-tight">dashboard</span>
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-neutral-900 transition-opacity hover:opacity-80"
+        >
+          <Logo size={18} />
+          <span className="font-display text-sm font-medium tracking-tight">
+            dashboard
+          </span>
+        </Link>
         <div className="w-16" />
       </nav>
 

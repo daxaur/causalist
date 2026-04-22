@@ -10,11 +10,11 @@ import {
   GithubLogo,
   Key,
   Shield,
-  Sparkle,
   Trash,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Logo } from "@/components/brand/logo";
 import {
   clearSettings,
   saveSettings,
@@ -61,7 +61,15 @@ export default function SettingsPage() {
           <ArrowLeft size={16} />
           <span>back</span>
         </Link>
-        <span className="text-sm font-semibold tracking-tight">settings</span>
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-neutral-900 transition-opacity hover:opacity-80"
+        >
+          <Logo size={18} />
+          <span className="font-display text-sm font-medium tracking-tight">
+            settings
+          </span>
+        </Link>
         <div className="w-16" />
       </nav>
 
@@ -82,8 +90,8 @@ export default function SettingsPage() {
         <section className="mb-10 rounded-2xl border border-neutral-200 p-6">
           <div className="mb-4 flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-200">
-                <Sparkle size={18} weight="duotone" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-200 text-neutral-900">
+                <Logo size={18} />
               </div>
               <div>
                 <h2 className="font-display text-lg font-medium">
