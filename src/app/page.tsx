@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   ArrowRight,
   GithubLogo,
   Graph,
+  Sparkle,
   Star,
 } from "@phosphor-icons/react";
 import { ConstellationBackground } from "@/components/landing/constellation-bg";
@@ -14,10 +16,9 @@ import { Input } from "@/components/ui/input";
 
 const GITHUB_URL = /github\.com\/([^/\s]+)\/([^/\s?#]+)/;
 
-const TRY_REPOS = [
-  { slug: "vercel/next.js", label: "next.js" },
-  { slug: "pallets/flask", label: "flask" },
-  { slug: "CTRLabs/tracey", label: "tracey" },
+const PREVIEW_LINKS = [
+  { slug: "causalist", label: "causalist" },
+  { slug: "next-js", label: "next.js" },
 ];
 
 export default function Home() {
@@ -134,24 +135,19 @@ export default function Home() {
           )}
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-neutral-400">
-          <span>Try</span>
-          {TRY_REPOS.map((repo, i) => (
-            <span key={repo.slug} className="flex items-center gap-3">
-              {i > 0 && (
-                <span className="text-neutral-300" aria-hidden="true">
-                  ·
-                </span>
-              )}
-              <button
-                onClick={() =>
-                  setRepoUrl(`https://github.com/${repo.slug}`)
-                }
-                className="font-mono underline underline-offset-4 transition-colors hover:text-neutral-700"
-              >
-                {repo.label}
-              </button>
-            </span>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-2 text-sm">
+          <span className="mr-1 flex items-center gap-1.5 text-neutral-400">
+            <Sparkle size={13} weight="duotone" />
+            Instant preview
+          </span>
+          {PREVIEW_LINKS.map((p) => (
+            <Link
+              key={p.slug}
+              href={`/preview/${p.slug}`}
+              className="rounded-full border border-neutral-200 bg-white/80 px-3 py-1 font-mono text-xs text-neutral-700 backdrop-blur-sm transition-all hover:border-neutral-400 hover:shadow-sm"
+            >
+              {p.label}
+            </Link>
           ))}
         </div>
       </section>
