@@ -1,121 +1,163 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowRight, GithubLogo, Graph, Star } from "@phosphor-icons/react";
+import {
+  ArrowRight,
+  GithubLogo,
+  Graph,
+  Star,
+} from "@phosphor-icons/react";
 import { ConstellationBackground } from "@/components/landing/constellation-bg";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+const GITHUB_URL = /github\.com\/([^/\s]+)\/([^/\s?#]+)/;
+
+const TRY_REPOS = [
+  { slug: "vercel/next.js", label: "next.js" },
+  { slug: "pallets/flask", label: "flask" },
+  { slug: "CTRLabs/tracey", label: "tracey" },
+];
+
 export default function Home() {
+  const router = useRouter();
   const [repoUrl, setRepoUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleExplore = () => {
-    if (!repoUrl.trim()) return;
-    setIsLoading(true);
-    const match = repoUrl.match(/github\.com\/([^/]+)\/([^/\s?#]+)/);
-    if (match) {
-      window.location.href = `/graph/${match[1]}/${match[2]}`;
+    const trimmed = repoUrl.trim();
+    if (!trimmed) return;
+    const match = trimmed.match(GITHUB_URL);
+    if (!match) {
+      setError("Enter a valid GitHub URL — github.com/owner/repo");
+      return;
     }
+    const [, owner, repo] = match;
+    setError(null);
+    setIsLoading(true);
+    router.push(`/graph/${owner}/${repo.replace(/\.git$/, "")}`);
   };
 
   return (
     <main className="relative min-h-screen overflow-hidden">
       <ConstellationBackground />
 
-      {/* Nav */}
       <nav className="relative z-10 flex items-center justify-between px-8 py-6">
         <div className="flex items-center gap-2">
-          <Graph size={24} weight="duotone" className="text-neutral-900" />
+          <Graph size={22} weight="duotone" className="text-neutral-900" />
           <span className="text-lg font-semibold tracking-tight">
-            cartograph
+            causalist
           </span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-5">
           <a
-            href="https://github.com/CTRLabs/cartograph"
+            href="https://github.com/daxaur/causalist"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900 transition-colors"
+            className="group flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-neutral-900"
+            aria-label="Star causalist on GitHub"
           >
-            <GithubLogo size={20} weight="fill" />
+            <GithubLogo size={18} weight="fill" />
             <span>Star</span>
-            <Star size={14} weight="fill" className="text-amber-400" />
+            <Star
+              size={12}
+              weight="fill"
+              className="text-amber-400 transition-transform group-hover:scale-110"
+            />
           </a>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="h-8">
             Sign in
           </Button>
         </div>
       </nav>
 
-      {/* Hero */}
-      <section className="relative z-10 flex flex-col items-center justify-center px-8 pt-24 pb-32">
-        <div className="mb-8 rounded-full border border-neutral-200 bg-white/80 backdrop-blur-sm px-4 py-1.5 text-xs text-neutral-500 flex items-center gap-2">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+      <section className="relative z-10 flex flex-col items-center justify-center px-8 pt-20 pb-32">
+        <div className="mb-8 flex items-center gap-2 rounded-full border border-neutral-200 bg-white/80 px-4 py-1.5 text-xs text-neutral-500 backdrop-blur-sm">
+          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
           Built for the Claude Opus 4.7 Hackathon
         </div>
 
-        <h1 className="max-w-3xl text-center text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1] mb-6">
+        <h1 className="mb-6 max-w-3xl text-center font-display text-5xl font-medium leading-[1.02] tracking-[-0.02em] sm:text-6xl lg:text-7xl">
           See what your code{" "}
-          <span className="bg-gradient-to-r from-neutral-900 via-neutral-600 to-neutral-400 bg-clip-text text-transparent">
-            actually means
-          </span>
+          <span className="italic text-neutral-500">actually means</span>
         </h1>
 
-        <p className="max-w-xl text-center text-lg text-neutral-500 mb-12 leading-relaxed">
+        <p className="mb-12 max-w-xl text-center text-lg leading-relaxed text-neutral-500">
           Paste a GitHub URL. Claude agents map your entire codebase into a 3D
           causal graph. Explore the architecture, understand connections, review
           PRs visually.
         </p>
 
-        <div className="flex w-full max-w-lg gap-3">
-          <Input
-            type="url"
-            placeholder="https://github.com/owner/repo"
-            value={repoUrl}
-            onChange={(e) => setRepoUrl(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleExplore()}
-            className="h-12 text-base bg-white/80 backdrop-blur-sm border-neutral-200 placeholder:text-neutral-400"
-          />
-          <Button
-            onClick={handleExplore}
-            disabled={isLoading || !repoUrl.trim()}
-            className="h-12 px-6 bg-neutral-900 hover:bg-neutral-800 text-white"
-          >
-            {isLoading ? (
-              <span className="animate-pulse">Mapping...</span>
-            ) : (
-              <>
-                Explore
-                <ArrowRight size={18} className="ml-2" />
-              </>
-            )}
-          </Button>
+        <div className="flex w-full max-w-lg flex-col gap-2">
+          <div className="flex gap-3">
+            <Input
+              type="url"
+              inputMode="url"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="https://github.com/owner/repo"
+              value={repoUrl}
+              onChange={(e) => {
+                setRepoUrl(e.target.value);
+                if (error) setError(null);
+              }}
+              onKeyDown={(e) => e.key === "Enter" && handleExplore()}
+              className="h-12 border-neutral-200 bg-white/80 font-mono text-sm text-neutral-900 placeholder:text-neutral-400 backdrop-blur-sm"
+              aria-invalid={error ? "true" : "false"}
+              aria-describedby={error ? "repo-error" : undefined}
+            />
+            <Button
+              onClick={handleExplore}
+              disabled={isLoading || !repoUrl.trim()}
+              className="h-12 bg-neutral-900 px-6 text-white hover:bg-neutral-800"
+            >
+              {isLoading ? (
+                <span className="animate-pulse">Mapping…</span>
+              ) : (
+                <>
+                  Explore
+                  <ArrowRight size={18} className="ml-2" />
+                </>
+              )}
+            </Button>
+          </div>
+          {error && (
+            <p
+              id="repo-error"
+              role="alert"
+              className="px-1 text-xs text-red-500"
+            >
+              {error}
+            </p>
+          )}
         </div>
 
-        <div className="mt-6 flex items-center gap-3 text-sm text-neutral-400">
-          <span>Try:</span>
-          {["vercel/next.js", "pallets/flask", "CTRLabs/tracey"].map(
-            (repo, i) => (
-              <span key={repo}>
-                {i > 0 && <span className="mr-3">·</span>}
-                <button
-                  onClick={() =>
-                    setRepoUrl(`https://github.com/${repo}`)
-                  }
-                  className="underline underline-offset-2 hover:text-neutral-600 transition-colors"
-                >
-                  {repo.split("/")[1]}
-                </button>
-              </span>
-            )
-          )}
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm text-neutral-400">
+          <span>Try</span>
+          {TRY_REPOS.map((repo, i) => (
+            <span key={repo.slug} className="flex items-center gap-3">
+              {i > 0 && (
+                <span className="text-neutral-300" aria-hidden="true">
+                  ·
+                </span>
+              )}
+              <button
+                onClick={() =>
+                  setRepoUrl(`https://github.com/${repo.slug}`)
+                }
+                className="font-mono underline underline-offset-4 transition-colors hover:text-neutral-700"
+              >
+                {repo.label}
+              </button>
+            </span>
+          ))}
         </div>
       </section>
 
-      {/* Features */}
       <section className="relative z-10 px-8 pb-24">
-        <div className="mx-auto max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="mx-auto grid max-w-5xl grid-cols-1 gap-6 md:grid-cols-3">
           <FeatureCard
             title="3D causal graph"
             description="Navigate your codebase like Google Earth. Zoom from architecture overview down to individual functions."
@@ -131,10 +173,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="relative z-10 border-t border-neutral-100 px-8 py-6">
-        <div className="mx-auto max-w-5xl flex items-center justify-between text-sm text-neutral-400">
-          <span>cartograph — by CTRLabs</span>
+        <div className="mx-auto flex max-w-5xl items-center justify-between text-sm text-neutral-400">
+          <span>causalist — built for the Opus 4.7 hackathon</span>
           <span>Built with Claude Code</span>
         </div>
       </footer>
@@ -150,11 +191,11 @@ function FeatureCard({
   description: string;
 }) {
   return (
-    <div className="group rounded-xl border border-neutral-200 bg-white/60 backdrop-blur-sm p-6 hover:border-neutral-300 hover:shadow-sm transition-all">
-      <h3 className="font-semibold text-base mb-2 group-hover:text-neutral-900 transition-colors">
+    <div className="group rounded-xl border border-neutral-200 bg-white/60 p-6 backdrop-blur-sm transition-all hover:border-neutral-300 hover:shadow-sm">
+      <h3 className="mb-2 text-base font-semibold transition-colors group-hover:text-neutral-900">
         {title}
       </h3>
-      <p className="text-sm text-neutral-500 leading-relaxed">{description}</p>
+      <p className="text-sm leading-relaxed text-neutral-500">{description}</p>
     </div>
   );
 }
