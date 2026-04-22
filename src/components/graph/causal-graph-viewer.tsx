@@ -33,11 +33,11 @@ const ForceGraph2D = dynamic(
 type GraphLink = { source: string; target: string; kind: string };
 type VisNode = CausalNode & { iconUrl: string | null };
 
-const CLAUDE_ORANGE = "#D97757";
+const ACCENT = "#3DD6D0";
 
 const KIND_COLOR: Record<string, string> = {
   imports: "rgba(255,255,255,0.55)",
-  calls: "rgba(217,119,87,0.75)",
+  calls: "rgba(251,191,36,0.75)",
   reads: "rgba(96,165,250,0.65)",
   writes: "rgba(248,113,113,0.65)",
   extends: "rgba(192,132,252,0.65)",
@@ -120,13 +120,13 @@ export function CausalGraphViewer({
       n.summary ? `${n.label}\n${n.summary}` : n.label,
     nodeVal: (n: VisNode) => (n.size ?? 4) + (n.kind === "external" ? 2 : 0),
     nodeColor: (n: VisNode) =>
-      isHighlighted(n) ? CLAUDE_ORANGE : LAYER_COLORS[n.layer],
+      isHighlighted(n) ? ACCENT : LAYER_COLORS[n.layer],
     nodeOpacity: 0.95,
     linkColor: (l: GraphLink) => {
       const s = typeof l.source === "string" ? l.source : (l.source as VisNode).id;
       const t = typeof l.target === "string" ? l.target : (l.target as VisNode).id;
       if (selected && (selected.id === s || selected.id === t)) {
-        return CLAUDE_ORANGE;
+        return ACCENT;
       }
       return "rgba(200,200,210,0.18)";
     },
@@ -147,12 +147,12 @@ export function CausalGraphViewer({
     onNodeClick: (n: VisNode) => setSelected(n),
     onNodeHover: (n: VisNode | null) => setHover(n?.id ?? null),
     onBackgroundClick: () => setSelected(null),
-    backgroundColor: "#14131a",
+    backgroundColor: "#0e1416",
     cooldownTicks: 120,
   };
 
   return (
-    <div className="relative flex h-full w-full overflow-hidden rounded-3xl border border-neutral-200/70 bg-[#14131a] text-white shadow-[0_4px_40px_-12px_rgba(10,10,20,0.35)] ring-1 ring-black/5">
+    <div className="relative flex h-full w-full overflow-hidden rounded-3xl border border-neutral-200/70 bg-[#0e1416] text-white shadow-[0_4px_40px_-12px_rgba(10,10,20,0.35)] ring-1 ring-black/5">
       {/* Warm radial vignette — dark core fades at edges so the canvas */}
       {/* doesn't feel like a black rectangle dropped on a white page. */}
       <div
@@ -167,7 +167,7 @@ export function CausalGraphViewer({
       {/* File-tree sidebar */}
       <aside
         className={cn(
-          "flex shrink-0 flex-col border-r border-white/5 bg-[#0f0e15] transition-all duration-300",
+          "flex shrink-0 flex-col border-r border-white/5 bg-[#0e1416] transition-all duration-300",
           sidebarOpen ? "w-64" : "w-0",
         )}
       >
@@ -208,7 +208,7 @@ export function CausalGraphViewer({
                 const selectedNear = selected?.id === node.id;
                 const hovered = hover === node.id;
                 ctx.fillStyle = selectedNear
-                  ? CLAUDE_ORANGE
+                  ? ACCENT
                   : hovered
                     ? "#ffffff"
                     : "rgba(229,231,235,0.55)";

@@ -64,7 +64,7 @@ export function NodePanel({
   };
 
   return (
-    <aside className="flex h-full flex-col border-l border-white/10 bg-[#0a0a0f]/95 backdrop-blur-xl">
+    <aside className="flex h-full flex-col border-l border-white/10 bg-[#0a0d0f]/95 backdrop-blur-xl">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 border-b border-white/5 p-5">
         <div className="flex min-w-0 flex-col gap-2.5">

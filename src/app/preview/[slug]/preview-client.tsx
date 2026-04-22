@@ -28,11 +28,11 @@ export function PreviewClient({ preview }: { preview: PreviewMeta }) {
   const commits = commitsFor(preview.slug);
 
   return (
-    <main className="relative flex min-h-screen flex-col bg-[#faf9f6]">
+    <main className="relative flex min-h-screen flex-col bg-[#ffffff]">
       {/* Soft cream-to-white gradient backdrop — unifies the whole page */}
       <div
         aria-hidden
-        className="pointer-events-none fixed inset-0 -z-0 bg-gradient-to-b from-white via-[#faf9f6] to-[#f4f1ea]"
+        className="pointer-events-none fixed inset-0 -z-0 bg-gradient-to-b from-white via-[#ffffff] to-[#f5f5f5]"
       />
 
       <nav className="relative z-10 flex items-center justify-between px-6 py-4">
@@ -79,7 +79,7 @@ export function PreviewClient({ preview }: { preview: PreviewMeta }) {
               <Sparkle
                 size={11}
                 weight="duotone"
-                className="text-[#D97757]"
+                className="text-[#3DD6D0]"
               />
               {preview.tagline}
             </p>

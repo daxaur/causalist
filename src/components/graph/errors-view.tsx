@@ -22,7 +22,7 @@ export function ErrorsView({ graph }: { graph: CausalGraph }) {
           <TypingAnimation delay={1600} className="text-white/70">
             Scanned 0 tool failures in the last 24h.
           </TypingAnimation>
-          <TypingAnimation delay={2200} className="text-[#D97757]">
+          <TypingAnimation delay={2200} className="text-[#3DD6D0]">
             ✓ clean — ship it.
           </TypingAnimation>
         </Terminal>

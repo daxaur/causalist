@@ -187,7 +187,7 @@ export function AskView({
             <Sparkle
               size={22}
               weight="duotone"
-              className="mx-auto mb-4 text-[#D97757]"
+              className="mx-auto mb-4 text-[#3DD6D0]"
             />
             <h2 className="mb-2 font-display text-3xl font-medium tracking-[-0.02em]">
               Ask anything about{" "}
@@ -303,8 +303,8 @@ function Message({
   }
   return (
     <div className="flex items-start gap-3">
-      <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#d97757]/30 bg-[#fff7f0]">
-        <Sparkle size={11} weight="duotone" className="text-[#D97757]" />
+      <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#3dd6d0]/30 bg-[#eafaf9]">
+        <Sparkle size={11} weight="duotone" className="text-[#3DD6D0]" />
       </div>
       <div className="flex-1 text-[15px] leading-[1.75] text-neutral-800">
         <RenderWithCitations
@@ -313,7 +313,7 @@ function Message({
           onNodeClick={onNodeClick}
         />
         {streaming && (
-          <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-[#D97757] align-middle" />
+          <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-[#3DD6D0] align-middle" />
         )}
       </div>
     </div>

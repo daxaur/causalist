@@ -112,7 +112,7 @@ export function ExplainerView({ graph }: { graph: CausalGraph }) {
           <Sparkle
             size={22}
             weight="duotone"
-            className="mb-4 text-[#D97757]"
+            className="mb-4 text-[#3DD6D0]"
           />
           <h2 className="mb-2 font-display text-3xl font-medium tracking-[-0.02em]">
             A plain-English walkthrough
@@ -143,7 +143,7 @@ export function ExplainerView({ graph }: { graph: CausalGraph }) {
         <article className="prose prose-neutral prose-sm max-w-none font-[var(--font-sans)] text-[15px] leading-[1.8] text-neutral-800">
           <RenderedExplainer text={text} />
           {status === "streaming" && (
-            <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-[#D97757] align-middle" />
+            <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-[#3DD6D0] align-middle" />
           )}
         </article>
       )}
@@ -264,7 +264,7 @@ function renderInline(text: string): React.ReactNode {
       parts.push(
         <code
           key={idx}
-          className="rounded-md bg-[#fff7f0] px-1.5 py-0.5 font-mono text-[0.85em] text-[#D97757]"
+          className="rounded-md bg-[#eafaf9] px-1.5 py-0.5 font-mono text-[0.85em] text-[#3DD6D0]"
         >
           {tok.slice(1, -1)}
         </code>,

@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { LAYER_COLORS, type CausalEdge, type CausalNode } from "@/lib/graph/types";
 
-const CLAUDE_ORANGE = "#D97757";
+const ACCENT = "#3DD6D0";
 const W = 300;
 const H = 180;
 const CENTER_X = W / 2;
@@ -128,10 +128,10 @@ export function NodeNeighborhood({
             cx={CENTER_X}
             cy={CENTER_Y}
             r={12}
-            fill={CLAUDE_ORANGE}
+            fill={ACCENT}
             opacity={0.2}
           />
-          <circle cx={CENTER_X} cy={CENTER_Y} r={6} fill={CLAUDE_ORANGE} />
+          <circle cx={CENTER_X} cy={CENTER_Y} r={6} fill={ACCENT} />
         </g>
       </svg>
     </div>
@@ -153,7 +153,7 @@ function EdgeCurve({
   return (
     <path
       d={d}
-      stroke={CLAUDE_ORANGE}
+      stroke={ACCENT}
       strokeWidth={0.8}
       strokeOpacity={0.35}
       fill="none"

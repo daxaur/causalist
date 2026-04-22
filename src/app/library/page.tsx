@@ -172,7 +172,7 @@ function Card({ entry }: { entry: LibraryIndexEntry }) {
         <Link href={`/${entry.owner}/${entry.repo}`} className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 font-mono text-sm text-neutral-900">
             {entry.pinned && (
-              <PushPin size={11} weight="fill" className="text-[#D97757]" />
+              <PushPin size={11} weight="fill" className="text-[#3DD6D0]" />
             )}
             <span className="truncate">
               {entry.nickname ?? `${entry.owner}/${entry.repo}`}

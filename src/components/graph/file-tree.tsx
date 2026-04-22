@@ -99,7 +99,7 @@ export function FileTree({
                 className={cn(
                   "group flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors",
                   selectedId === n.id
-                    ? "bg-[#d97757]/15 text-white"
+                    ? "bg-[#3dd6d0]/15 text-white"
                     : "text-white/60 hover:bg-white/5 hover:text-white",
                 )}
               >
@@ -141,7 +141,7 @@ function TreeRow({
         className={cn(
           "flex w-full items-center gap-2 rounded-md py-1 pr-2 text-left transition-colors",
           isSelected
-            ? "bg-[#d97757]/15 text-white"
+            ? "bg-[#3dd6d0]/15 text-white"
             : "text-white/60 hover:bg-white/5 hover:text-white",
         )}
       >

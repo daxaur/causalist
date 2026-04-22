@@ -86,7 +86,7 @@ export function FeaturesBento() {
           toRef={agentsRef}
           pathColor="#e5e5e5"
           gradientStartColor="#0a0a0a"
-          gradientStopColor="#d97757"
+          gradientStopColor="#3dd6d0"
           pathOpacity={0.35}
           pathWidth={1}
           duration={4}
@@ -96,7 +96,7 @@ export function FeaturesBento() {
           fromRef={agentsRef}
           toRef={graphRef}
           pathColor="#e5e5e5"
-          gradientStartColor="#d97757"
+          gradientStartColor="#3dd6d0"
           gradientStopColor="#0a0a0a"
           pathOpacity={0.35}
           pathWidth={1}
@@ -132,7 +132,7 @@ function Card({
       ref={innerRef}
       className={cn(
         "group relative flex flex-col justify-between overflow-hidden rounded-2xl border bg-white/70 p-5 backdrop-blur-sm transition-all hover:border-neutral-300 hover:shadow-sm",
-        accent ? "border-[#d97757]/40 bg-[#fff7f0]/80" : "border-neutral-200",
+        accent ? "border-[#3dd6d0]/40 bg-[#eafaf9]/80" : "border-neutral-200",
         className,
       )}
     >
@@ -142,7 +142,7 @@ function Card({
             className={cn(
               "flex h-8 w-8 items-center justify-center rounded-md border",
               accent
-                ? "border-[#d97757]/40 bg-white text-[#d97757]"
+                ? "border-[#3dd6d0]/40 bg-white text-[#3dd6d0]"
                 : "border-neutral-200 bg-white text-neutral-700",
             )}
           >
@@ -151,7 +151,7 @@ function Card({
           <span
             className={cn(
               "font-mono text-[10px] uppercase tracking-wider",
-              accent ? "text-[#d97757]" : "text-neutral-400",
+              accent ? "text-[#3dd6d0]" : "text-neutral-400",
             )}
           >
             {eyebrow}
@@ -182,7 +182,7 @@ function Card({
         <Logo
           size={110}
           aria-label=""
-          className="pointer-events-none absolute -bottom-6 -right-6 text-[#d97757]/10"
+          className="pointer-events-none absolute -bottom-6 -right-6 text-[#3dd6d0]/10"
         />
       )}
     </div>
