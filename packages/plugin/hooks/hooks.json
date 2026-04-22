@@ -1,0 +1,70 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "https://causalist.dev/api/ingest/$CAUSALIST_SESSION",
+            "headers": {
+              "Authorization": "Bearer $CAUSALIST_TOKEN",
+              "X-Causalist-Event": "SessionStart"
+            },
+            "allowedEnvVars": ["CAUSALIST_SESSION", "CAUSALIST_TOKEN"],
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|Bash",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "https://causalist.dev/api/ingest/$CAUSALIST_SESSION",
+            "headers": {
+              "Authorization": "Bearer $CAUSALIST_TOKEN",
+              "X-Causalist-Event": "PreToolUse"
+            },
+            "allowedEnvVars": ["CAUSALIST_SESSION", "CAUSALIST_TOKEN"],
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|Read|Bash|Grep|Glob",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "https://causalist.dev/api/ingest/$CAUSALIST_SESSION",
+            "headers": {
+              "Authorization": "Bearer $CAUSALIST_TOKEN",
+              "X-Causalist-Event": "PostToolUse"
+            },
+            "allowedEnvVars": ["CAUSALIST_SESSION", "CAUSALIST_TOKEN"],
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "https://causalist.dev/api/ingest/$CAUSALIST_SESSION",
+            "headers": {
+              "Authorization": "Bearer $CAUSALIST_TOKEN",
+              "X-Causalist-Event": "Stop"
+            },
+            "allowedEnvVars": ["CAUSALIST_SESSION", "CAUSALIST_TOKEN"],
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

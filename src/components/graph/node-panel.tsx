@@ -10,6 +10,7 @@ import {
   type CausalEdge,
   type CausalNode,
 } from "@/lib/graph/types";
+import { NodeNeighborhood } from "./node-neighborhood";
 
 const EDGE_KIND_LABELS: Record<string, string> = {
   imports: "imports",
@@ -129,9 +130,24 @@ export function NodePanel({
           </p>
         )}
 
-        {/* Edges */}
+        {/* Visual neighborhood — a mini graph of just this node + neighbors */}
         {(incoming.length > 0 || outgoing.length > 0) && (
-          <div className="mt-6 grid grid-cols-2 gap-4 text-xs">
+          <div className="mt-5">
+            <div className="mb-2 font-mono text-[9px] uppercase tracking-wider text-white/40">
+              neighborhood
+            </div>
+            <NodeNeighborhood
+              node={node}
+              allNodes={allNodes}
+              allEdges={allEdges}
+              onSelect={onSelect}
+            />
+          </div>
+        )}
+
+        {/* Edges as lists */}
+        {(incoming.length > 0 || outgoing.length > 0) && (
+          <div className="mt-5 grid grid-cols-2 gap-4 text-xs">
             <EdgeList
               title="Depends on"
               description="What this node imports or calls"
