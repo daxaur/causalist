@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Thin shim — the real CLI is published as `causalist` on npm.
+# This lets Claude Code find the binary by name inside the plugin directory
+# even before the user has run `npm install -g causalist`.
+exec npx -y causalist "$@"

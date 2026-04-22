@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "causalist": {
+      "command": "npx",
+      "args": ["-y", "causalist-mcp@latest"],
+      "env": {}
+    }
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "name": "causalist",
+  "version": "0.1.0",
+  "description": "Paste a GitHub URL, get a 3D causal graph. CLI for the Causalist web app and MCP server.",
+  "bin": {
+    "causalist": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "causal-graph",
+    "codebase-visualization",
+    "claude",
+    "anthropic",
+    "mcp",
+    "cli"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.36.0",
+    "@octokit/rest": "^22.0.0",
+    "commander": "^12.1.0",
+    "kleur": "^4.1.5",
+    "open": "^10.1.0",
+    "ora": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "^4.19.0",
+    "typescript": "^5"
+  }
+}

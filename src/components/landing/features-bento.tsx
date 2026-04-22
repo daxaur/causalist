@@ -23,7 +23,7 @@ export function FeaturesBento() {
   return (
     <div
       ref={containerRef}
-      className="relative mx-auto grid w-full max-w-5xl grid-cols-1 gap-4 md:grid-cols-3 md:grid-rows-[14rem_14rem]"
+      className="relative isolate mx-auto grid w-full max-w-5xl grid-cols-1 gap-4 md:grid-cols-3 md:grid-rows-[14rem_14rem]"
     >
       {/* Top-left: Ingest */}
       <Card
@@ -79,27 +79,31 @@ export function FeaturesBento() {
         />
       </div>
 
-      <AnimatedBeam
-        containerRef={containerRef}
-        fromRef={ingestRef}
-        toRef={agentsRef}
-        pathColor="#d4d4d4"
-        gradientStartColor="#0a0a0a"
-        gradientStopColor="#d97757"
-        pathOpacity={0.25}
-        duration={4}
-      />
-      <AnimatedBeam
-        containerRef={containerRef}
-        fromRef={agentsRef}
-        toRef={graphRef}
-        pathColor="#d4d4d4"
-        gradientStartColor="#d97757"
-        gradientStopColor="#0a0a0a"
-        pathOpacity={0.25}
-        duration={4}
-        delay={0.5}
-      />
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <AnimatedBeam
+          containerRef={containerRef}
+          fromRef={ingestRef}
+          toRef={agentsRef}
+          pathColor="#e5e5e5"
+          gradientStartColor="#0a0a0a"
+          gradientStopColor="#d97757"
+          pathOpacity={0.35}
+          pathWidth={1}
+          duration={4}
+        />
+        <AnimatedBeam
+          containerRef={containerRef}
+          fromRef={agentsRef}
+          toRef={graphRef}
+          pathColor="#e5e5e5"
+          gradientStartColor="#d97757"
+          gradientStopColor="#0a0a0a"
+          pathOpacity={0.35}
+          pathWidth={1}
+          duration={4}
+          delay={0.5}
+        />
+      </div>
     </div>
   );
 }

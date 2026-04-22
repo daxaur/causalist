@@ -1,0 +1,15 @@
+{
+  "name": "causalist",
+  "description": "Map any GitHub repository into an interactive 3D causal graph. Four Claude agents (Structure, Dependency, Semantic, Oracle) run in parallel and stream a navigable codebase map.",
+  "version": "0.1.0",
+  "author": "daxaur",
+  "homepage": "https://github.com/daxaur/causalist",
+  "license": "MIT",
+  "keywords": [
+    "causal-graph",
+    "codebase-visualization",
+    "repository-map",
+    "code-understanding",
+    "3d-visualization"
+  ]
+}
