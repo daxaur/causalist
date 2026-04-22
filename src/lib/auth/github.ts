@@ -20,8 +20,9 @@ export function clientId(): string {
 
 export function appBaseUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_APP_URL;
-  if (explicit) return explicit.replace(/\/$/, "");
-  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  if (explicit) return explicit.trim().replace(/\/$/, "");
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (vercelUrl) return `https://${vercelUrl}`;
   return "http://localhost:4141";
 }
 
