@@ -41,6 +41,12 @@ export default function Home() {
         </Link>
         <div className="flex items-center gap-3">
           <Link
+            href="/docs/foundations"
+            className="hidden text-sm text-neutral-500 transition-colors hover:text-neutral-900 sm:inline"
+          >
+            Docs
+          </Link>
+          <Link
             href="/library"
             className="hidden text-sm text-neutral-500 transition-colors hover:text-neutral-900 sm:inline"
           >

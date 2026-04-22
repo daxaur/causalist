@@ -2,10 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowRight,
+  CaretDown,
+  CaretRight,
+  CircleNotch,
   Key,
+  MagicWand,
   PaperPlaneRight,
   Sparkle,
   Stop,
@@ -14,29 +18,50 @@ import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/settings";
 import type { CausalGraph, CausalNode } from "@/lib/graph/types";
 import { LAYER_COLORS } from "@/lib/graph/types";
+import {
+  TOOL_SCHEMAS,
+  runTool,
+  type ToolResult,
+} from "@/lib/analyze/tools";
 
 const MODEL = "claude-opus-4-7";
 
-const ASK_SYSTEM = `You are the **Oracle** for Causalist — a tool that maps code repositories into causal graphs.
+const ORACLE_SYSTEM = `You are the **Oracle** for Causalist — a tool that maps code repositories into causal graphs.
 
-You receive a CausalGraph for the current repository and a user question. Use the graph as authoritative context — its nodes are every file/module/function, its edges are every import/call/read/write/extends relationship.
+You receive a CausalGraph summary (the node list, no edges) plus a user question. You have six tools to navigate the graph yourself: \`query_node\`, \`get_neighbors\`, \`find_path\`, \`verify_edge\`, \`find_nodes_by_layer\`, \`blast_radius\`. **Use them.** Do not answer from memory alone — call the tools to verify what the graph actually says, then cite specific node ids wrapped in backticks so the UI can turn them into clickable chips.
 
-## Answering rules
-- Be concrete. Name specific nodes by their \`id\` wrapped in backticks — the UI turns them into clickable chips that highlight the node on the graph.
-- Trace consequences through outgoing edges when the question is "what if I delete X" or "what breaks if...". Use extended reasoning for multi-hop traces.
-- When the question is "what does X do", summarize by reading X's summary field + its neighbors.
-- Keep paragraphs short. 2–4 sentences each.
-- If the graph doesn't contain enough information to answer, say so rather than inventing.
-- Prefer plural voice ("files that depend on X are ...") over first person.
-- Do NOT restate the full graph. Answer the question.
+## Guidelines
+- For "what does X do?" — call query_node(X), then get_neighbors(X) to see context.
+- For "what would break if I delete X?" — call blast_radius(X, depth=4).
+- For "how does A reach B?" — call find_path(A, B).
+- For "find all API files" — call find_nodes_by_layer(api).
+- Verify with verify_edge when claiming an edge exists.
 
-Output plain Markdown. No JSON, no code fences around the answer.`;
+When you have enough evidence, write the final answer. Keep paragraphs short (2–4 sentences). Wrap node ids in \`backticks\` so they become clickable chips. End your turn after the final answer.
+
+Do NOT restate the tool outputs verbatim — synthesize them into insight. Be concrete, not generic.`;
 
 const SUGGESTIONS = [
-  "What does this codebase actually do?",
-  "What would break if I deleted the most-imported file?",
-  "Which files are safest to refactor?",
+  "What does this codebase do?",
+  "Which files break most if I delete them?",
+  "Show me all the API-layer files",
 ];
+
+// ── Message types ────────────────────────────────────────────────────
+
+type UserMsg = { role: "user"; text: string };
+type OracleTurn = {
+  role: "oracle";
+  content: AssistantBlock[];
+  stopReason?: string;
+};
+type AssistantBlock =
+  | { type: "text"; text: string }
+  | { type: "tool_use"; id: string; name: string; input: unknown; result?: ToolResult };
+
+type Message = UserMsg | OracleTurn;
+
+// ── Component ────────────────────────────────────────────────────────
 
 export function AskView({
   graph,
@@ -47,11 +72,9 @@ export function AskView({
 }) {
   const settings = useSettings();
   const [question, setQuestion] = useState("");
-  const [history, setHistory] = useState<
-    { role: "user" | "oracle"; text: string; cited: string[] }[]
-  >([]);
-  const [streaming, setStreaming] = useState(false);
-  const [currentAnswer, setCurrentAnswer] = useState("");
+  const [history, setHistory] = useState<Message[]>([]);
+  const [streamingBlocks, setStreamingBlocks] = useState<AssistantBlock[]>([]);
+  const [busy, setBusy] = useState<null | "thinking" | "tooling">(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -69,14 +92,18 @@ export function AskView({
       top: scrollRef.current.scrollHeight,
       behavior: "smooth",
     });
-  }, [history, currentAnswer]);
+  }, [history, streamingBlocks]);
 
-  // Notify the graph of citations as streaming progresses
+  // Highlight cited nodes as they stream in
   useEffect(() => {
     if (!onHighlightNodes) return;
-    const ids = extractCitations(currentAnswer, nodeIds);
+    const text = streamingBlocks
+      .filter((b): b is Extract<AssistantBlock, { type: "text" }> => b.type === "text")
+      .map((b) => b.text)
+      .join("\n");
+    const ids = extractCitations(text, nodeIds);
     if (ids.length) onHighlightNodes(ids);
-  }, [currentAnswer, nodeIds, onHighlightNodes]);
+  }, [streamingBlocks, nodeIds, onHighlightNodes]);
 
   const canAsk = Boolean(settings.anthropicKey);
 
@@ -85,10 +112,10 @@ export function AskView({
     const trimmed = q.trim();
     if (!trimmed) return;
 
-    setHistory((h) => [...h, { role: "user", text: trimmed, cited: [] }]);
+    setHistory((h) => [...h, { role: "user", text: trimmed }]);
     setQuestion("");
-    setStreaming(true);
-    setCurrentAnswer("");
+    setBusy("thinking");
+    setStreamingBlocks([]);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -99,53 +126,167 @@ export function AskView({
         apiKey: settings.anthropicKey,
         dangerouslyAllowBrowser: true,
       });
-      const stream = await client.messages.stream({
-        model: MODEL,
-        max_tokens: 2048,
-        system: ASK_SYSTEM,
-        messages: [
-          {
-            role: "user",
-            content: `Graph for ${graph.repo}:\n\n\`\`\`json\n${JSON.stringify(
-              { nodes: graph.nodes, edges: graph.edges },
-              null,
-              2,
-            )}\n\`\`\`\n\nQuestion: ${trimmed}`,
-          },
-        ],
-      });
 
-      let acc = "";
-      for await (const event of stream) {
+      // Build the initial conversation. Send node list (no edges) to
+      // keep the prompt light; Oracle pulls edges via tools as needed.
+      const nodeSummary = graph.nodes.map((n) => ({
+        id: n.id,
+        label: n.label,
+        layer: n.layer,
+        kind: n.kind,
+      }));
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const messages: any[] = [
+        {
+          role: "user",
+          content: `Graph for ${graph.repo}. ${graph.nodes.length} nodes, ${graph.edges.length} edges.\n\nNode index (id, label, layer, kind):\n\`\`\`json\n${JSON.stringify(nodeSummary)}\n\`\`\`\n\nQuestion: ${trimmed}`,
+        },
+      ];
+
+      // Tool-use loop — max 8 iterations to bound latency / cost.
+      const allBlocks: AssistantBlock[] = [];
+      let stopReason: string | undefined;
+
+      for (let iter = 0; iter < 8; iter++) {
         if (controller.signal.aborted) break;
-        if (
-          event.type === "content_block_delta" &&
-          event.delta.type === "text_delta"
-        ) {
-          acc += event.delta.text;
-          setCurrentAnswer(acc);
+
+        const turnBlocks: AssistantBlock[] = [];
+        setBusy(iter === 0 ? "thinking" : "tooling");
+
+        const stream = await client.messages.stream({
+          model: MODEL,
+          max_tokens: 2048,
+          system: ORACLE_SYSTEM,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          tools: TOOL_SCHEMAS as any,
+          messages,
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const currentBlocksForDisplay = (arr: AssistantBlock[]) =>
+          setStreamingBlocks([...allBlocks, ...arr]);
+
+        let textAcc = "";
+        let textIdx = -1;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let toolUseAcc: { id: string; name: string; inputJson: string; idx: number } | null =
+          null;
+
+        for await (const event of stream) {
+          if (controller.signal.aborted) break;
+          if (event.type === "content_block_start") {
+            if (event.content_block.type === "text") {
+              textAcc = "";
+              textIdx = turnBlocks.length;
+              turnBlocks.push({ type: "text", text: "" });
+            } else if (event.content_block.type === "tool_use") {
+              toolUseAcc = {
+                id: event.content_block.id,
+                name: event.content_block.name,
+                inputJson: "",
+                idx: turnBlocks.length,
+              };
+              turnBlocks.push({
+                type: "tool_use",
+                id: event.content_block.id,
+                name: event.content_block.name,
+                input: {},
+              });
+            }
+          } else if (event.type === "content_block_delta") {
+            if (event.delta.type === "text_delta" && textIdx >= 0) {
+              textAcc += event.delta.text;
+              turnBlocks[textIdx] = { type: "text", text: textAcc };
+              currentBlocksForDisplay(turnBlocks);
+            } else if (
+              event.delta.type === "input_json_delta" &&
+              toolUseAcc
+            ) {
+              toolUseAcc.inputJson += event.delta.partial_json;
+            }
+          } else if (event.type === "content_block_stop") {
+            if (toolUseAcc) {
+              let input: unknown = {};
+              try {
+                input = JSON.parse(toolUseAcc.inputJson || "{}");
+              } catch {
+                /* leave as {} */
+              }
+              turnBlocks[toolUseAcc.idx] = {
+                type: "tool_use",
+                id: toolUseAcc.id,
+                name: toolUseAcc.name,
+                input,
+              };
+              toolUseAcc = null;
+              currentBlocksForDisplay(turnBlocks);
+            }
+            textIdx = -1;
+          } else if (event.type === "message_delta") {
+            if (event.delta.stop_reason)
+              stopReason = event.delta.stop_reason;
+          }
         }
+
+        // Execute any tool_use blocks
+        const toolUses = turnBlocks.filter(
+          (b): b is Extract<AssistantBlock, { type: "tool_use" }> =>
+            b.type === "tool_use",
+        );
+
+        allBlocks.push(...turnBlocks);
+        setStreamingBlocks([...allBlocks]);
+
+        if (toolUses.length === 0) break;
+
+        // Run tools locally
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const assistantBlockForApi: any[] = turnBlocks.map((b) =>
+          b.type === "text"
+            ? { type: "text", text: b.text }
+            : { type: "tool_use", id: b.id, name: b.name, input: b.input },
+        );
+        messages.push({ role: "assistant", content: assistantBlockForApi });
+
+        const toolResults = toolUses.map((t) => {
+          const res = runTool(graph, t.name, t.input);
+          t.result = res;
+          return {
+            type: "tool_result",
+            tool_use_id: t.id,
+            content: JSON.stringify(res),
+          };
+        });
+
+        setStreamingBlocks([...allBlocks]);
+        messages.push({ role: "user", content: toolResults });
+
+        if (stopReason === "end_turn") break;
       }
 
-      const cited = extractCitations(acc, nodeIds);
-      setHistory((h) => [...h, { role: "oracle", text: acc, cited }]);
-      setCurrentAnswer("");
+      setHistory((h) => [
+        ...h,
+        { role: "oracle", content: allBlocks, stopReason },
+      ]);
+      setStreamingBlocks([]);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setHistory((h) => [
         ...h,
-        { role: "oracle", text: `⚠ ${msg}`, cited: [] },
+        {
+          role: "oracle",
+          content: [{ type: "text", text: `⚠ ${msg}` }],
+        },
       ]);
-      setCurrentAnswer("");
+      setStreamingBlocks([]);
     } finally {
-      setStreaming(false);
+      setBusy(null);
       abortRef.current = null;
     }
   };
 
-  const stop = () => {
-    abortRef.current?.abort();
-  };
+  const stop = () => abortRef.current?.abort();
 
   if (!canAsk) {
     return (
@@ -157,8 +298,8 @@ export function AskView({
           Ask needs your Anthropic key
         </h2>
         <p className="mb-6 max-w-md text-sm text-neutral-500">
-          Oracle answers from the graph as context. Your key stays in your
-          browser — calls go directly to Anthropic.
+          Oracle navigates the graph with tools; you provide the compute.
+          Keys stay in your browser.
         </p>
         <Link
           href="/settings"
@@ -171,13 +312,16 @@ export function AskView({
     );
   }
 
+  const isStreaming = busy !== null;
+  const liveTurn: OracleTurn | null =
+    streamingBlocks.length > 0
+      ? { role: "oracle", content: streamingBlocks }
+      : null;
+
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col px-6 pt-6">
-      <div
-        ref={scrollRef}
-        className="flex-1 space-y-6 overflow-y-auto pb-32 pr-2"
-      >
-        {history.length === 0 && !streaming && (
+      <div ref={scrollRef} className="flex-1 space-y-6 overflow-y-auto pb-40 pr-2">
+        {history.length === 0 && !isStreaming && (
           <motion.div
             initial={{ opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
@@ -190,14 +334,13 @@ export function AskView({
               className="mx-auto mb-4 text-[#3DD6D0]"
             />
             <h2 className="mb-2 font-display text-3xl font-medium tracking-[-0.02em]">
-              Ask anything about{" "}
-              <span className="font-mono text-[0.8em] text-neutral-500">
-                {graph.repo}
-              </span>
+              Oracle has six tools
             </h2>
             <p className="mx-auto mb-7 max-w-md text-sm text-neutral-500">
-              Oracle traces through the graph to answer. File names in the
-              answer become clickable chips that highlight nodes.
+              Ask anything about{" "}
+              <span className="font-mono text-neutral-700">{graph.repo}</span>
+              . Oracle calls tools to navigate the graph, then cites the
+              exact nodes it found.
             </p>
             <div className="mx-auto flex max-w-lg flex-wrap justify-center gap-2">
               {SUGGESTIONS.map((s) => (
@@ -213,28 +356,41 @@ export function AskView({
           </motion.div>
         )}
 
-        {history.map((msg, i) => (
-          <Message
-            key={i}
-            role={msg.role}
-            text={msg.text}
-            nodesById={nodesById}
-            onNodeClick={(id) => onHighlightNodes?.([id])}
-          />
-        ))}
+        {history.map((msg, i) =>
+          msg.role === "user" ? (
+            <div key={i} className="flex justify-end">
+              <div className="max-w-[85%] rounded-2xl bg-neutral-900 px-4 py-2.5 text-sm text-white">
+                {msg.text}
+              </div>
+            </div>
+          ) : (
+            <OracleTurnView
+              key={i}
+              turn={msg}
+              nodesById={nodesById}
+              onNodeClick={(id) => onHighlightNodes?.([id])}
+            />
+          ),
+        )}
 
-        {streaming && currentAnswer && (
-          <Message
-            role="oracle"
-            text={currentAnswer}
+        {liveTurn && (
+          <OracleTurnView
+            turn={liveTurn}
             streaming
             nodesById={nodesById}
             onNodeClick={(id) => onHighlightNodes?.([id])}
           />
         )}
+
+        {isStreaming && liveTurn === null && (
+          <div className="flex items-center gap-2 text-xs text-neutral-500">
+            <CircleNotch size={12} className="animate-spin" />
+            {busy === "thinking" ? "thinking…" : "running tools…"}
+          </div>
+        )}
       </div>
 
-      {/* Composer, pinned relative to the viewport bottom */}
+      {/* Composer, pinned */}
       <div className="pointer-events-none fixed inset-x-0 bottom-20 z-20 flex justify-center px-4">
         <div className="pointer-events-auto w-full max-w-2xl">
           <div className="flex items-center gap-2 rounded-2xl border border-neutral-200 bg-white/95 p-2 shadow-lg shadow-black/5 backdrop-blur">
@@ -243,18 +399,22 @@ export function AskView({
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !streaming) {
+                if (e.key === "Enter" && !e.shiftKey && !isStreaming) {
                   e.preventDefault();
                   submit(question);
                 }
               }}
               placeholder={
-                streaming ? "thinking…" : "Ask Oracle anything about the graph"
+                isStreaming
+                  ? busy === "thinking"
+                    ? "thinking…"
+                    : "running tools…"
+                  : "Ask anything about the graph"
               }
-              disabled={streaming}
+              disabled={isStreaming}
               className="w-full bg-transparent px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none disabled:opacity-70"
             />
-            {streaming ? (
+            {isStreaming ? (
               <button
                 onClick={stop}
                 aria-label="Stop generation"
@@ -279,44 +439,107 @@ export function AskView({
   );
 }
 
-function Message({
-  role,
-  text,
+// ── Rendering ──────────────────────────────────────────────────────
+
+function OracleTurnView({
+  turn,
   streaming,
   nodesById,
   onNodeClick,
 }: {
-  role: "user" | "oracle";
-  text: string;
+  turn: OracleTurn;
   streaming?: boolean;
   nodesById: Map<string, CausalNode>;
   onNodeClick: (id: string) => void;
 }) {
-  if (role === "user") {
-    return (
-      <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl bg-neutral-900 px-4 py-2.5 text-sm text-white">
-          {text}
-        </div>
-      </div>
-    );
-  }
   return (
     <div className="flex items-start gap-3">
-      <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#3dd6d0]/30 bg-[#eafaf9]">
+      <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#3DD6D0]/30 bg-[#eafaf9]">
         <Sparkle size={11} weight="duotone" className="text-[#3DD6D0]" />
       </div>
-      <div className="flex-1 text-[15px] leading-[1.75] text-neutral-800">
-        <RenderWithCitations
-          text={text}
-          nodesById={nodesById}
-          onNodeClick={onNodeClick}
-        />
-        {streaming && (
-          <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-[#3DD6D0] align-middle" />
-        )}
+      <div className="flex-1 space-y-3">
+        <AnimatePresence initial={false}>
+          {turn.content.map((block, i) =>
+            block.type === "text" ? (
+              <motion.div
+                key={`t-${i}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-[15px] leading-[1.75] text-neutral-800"
+              >
+                <RenderWithCitations
+                  text={block.text}
+                  nodesById={nodesById}
+                  onNodeClick={onNodeClick}
+                />
+                {streaming && i === turn.content.length - 1 && (
+                  <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-[#3DD6D0] align-middle" />
+                )}
+              </motion.div>
+            ) : (
+              <ToolCall key={`u-${i}`} block={block} />
+            ),
+          )}
+        </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+function ToolCall({
+  block,
+}: {
+  block: Extract<AssistantBlock, { type: "tool_use" }>;
+}) {
+  const [open, setOpen] = useState(false);
+  const hasResult = Boolean(block.result);
+  const success = block.result?.ok ?? null;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className="overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50/70"
+    >
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs"
+      >
+        {open ? (
+          <CaretDown size={10} className="text-neutral-400" />
+        ) : (
+          <CaretRight size={10} className="text-neutral-400" />
+        )}
+        <MagicWand size={11} weight="duotone" className="text-[#3DD6D0]" />
+        <span className="font-mono text-neutral-700">{block.name}</span>
+        <span className="truncate font-mono text-[11px] text-neutral-400">
+          {formatToolArgs(block.input)}
+        </span>
+        {hasResult && (
+          <span
+            className={cn(
+              "ml-auto shrink-0 rounded-full px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider",
+              success
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-red-50 text-red-600",
+            )}
+          >
+            {block.result?.summary ?? (success ? "ok" : "error")}
+          </span>
+        )}
+        {!hasResult && (
+          <CircleNotch
+            size={10}
+            className="ml-auto shrink-0 animate-spin text-neutral-400"
+          />
+        )}
+      </button>
+      {open && block.result && (
+        <pre className="max-h-64 overflow-auto border-t border-neutral-200 bg-white px-3 py-2 font-mono text-[10.5px] leading-relaxed text-neutral-700">
+          {JSON.stringify(block.result.data ?? block.result, null, 2)}
+        </pre>
+      )}
+    </motion.div>
   );
 }
 
@@ -329,7 +552,6 @@ function RenderWithCitations({
   nodesById: Map<string, CausalNode>;
   onNodeClick: (id: string) => void;
 }) {
-  // Split on paragraphs
   const paragraphs = text.split(/\n\n+/);
   return (
     <>
@@ -352,9 +574,7 @@ function RenderWithCitations({
               <button
                 key={j}
                 onClick={() => onNodeClick(node.id)}
-                className={cn(
-                  "mx-0.5 inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 align-baseline font-mono text-[0.85em] text-neutral-800 transition-all hover:border-neutral-400 hover:shadow-sm",
-                )}
+                className="mx-0.5 inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 align-baseline font-mono text-[0.85em] text-neutral-800 transition-all hover:border-[#3DD6D0] hover:shadow-sm"
                 title={node.label}
               >
                 <span
@@ -393,4 +613,14 @@ function extractCitations(text: string, validIds: Set<string>): string[] {
     if (validIds.has(m[1])) ids.add(m[1]);
   }
   return [...ids];
+}
+
+function formatToolArgs(input: unknown): string {
+  if (!input || typeof input !== "object") return "";
+  const entries = Object.entries(input as Record<string, unknown>);
+  if (entries.length === 0) return "";
+  return entries
+    .slice(0, 2)
+    .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
+    .join(", ");
 }
