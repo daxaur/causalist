@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   ArrowRight,
+  GearSix,
   GithubLogo,
   Graph,
   Sparkle,
@@ -13,6 +14,7 @@ import {
 import { ConstellationBackground } from "@/components/landing/constellation-bg";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useSettings } from "@/lib/settings";
 
 const GITHUB_URL = /github\.com\/([^/\s]+)\/([^/\s?#]+)/;
 
@@ -23,6 +25,7 @@ const PREVIEW_LINKS = [
 
 export default function Home() {
   const router = useRouter();
+  const settings = useSettings();
   const [repoUrl, setRepoUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +36,10 @@ export default function Home() {
     const match = trimmed.match(GITHUB_URL);
     if (!match) {
       setError("Enter a valid GitHub URL — github.com/owner/repo");
+      return;
+    }
+    if (!settings.anthropicKey) {
+      setError("Add your Anthropic API key in settings first.");
       return;
     }
     const [, owner, repo] = match;
@@ -68,9 +75,19 @@ export default function Home() {
               className="text-amber-400 transition-transform group-hover:scale-110"
             />
           </a>
-          <Button variant="outline" size="sm" className="h-8">
-            Sign in
-          </Button>
+          <Link
+            href="/settings"
+            aria-label="Keys and settings"
+            className="relative flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 bg-white/80 text-neutral-500 backdrop-blur-sm transition-colors hover:border-neutral-300 hover:text-neutral-900"
+          >
+            <GearSix size={15} />
+            {!settings.anthropicKey && (
+              <span
+                aria-hidden="true"
+                className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-amber-400 ring-2 ring-white"
+              />
+            )}
+          </Link>
         </div>
       </nav>
 
