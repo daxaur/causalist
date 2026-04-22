@@ -1,0 +1,7 @@
+packages/
+PLAN.md
+DEPLOY.md
+.env.local
+.env.*.local
+.next/
+node_modules/

@@ -13,10 +13,17 @@ import { GitHubStarButton } from "@/components/landing/github-star-button";
 import { Hero } from "@/components/landing/hero";
 import { LanguageMarquee } from "@/components/landing/language-marquee";
 import { Logo } from "@/components/brand/logo";
+import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useSettings } from "@/lib/settings";
 
 export default function Home() {
   const settings = useSettings();
+  const auth = useGithubAuth();
+  const isConnected = auth.authenticated || Boolean(settings.githubToken);
+  const connectHref = isConnected
+    ? "/dashboard"
+    : // Try OAuth first; the route falls back to /settings if unconfigured
+      "/api/auth/github/login";
 
   return (
     <main className="relative min-h-screen overflow-hidden">
@@ -53,24 +60,29 @@ export default function Home() {
               />
             )}
           </Link>
-          {settings.githubToken ? (
-            <Link
-              href="/dashboard"
-              className="inline-flex h-9 items-center gap-2 rounded-md bg-neutral-900 px-4 text-sm text-white transition-colors hover:bg-neutral-800"
-            >
+          <a
+            href={connectHref}
+            className="inline-flex h-9 items-center gap-2 rounded-md bg-neutral-900 px-4 text-sm text-white transition-colors hover:bg-neutral-800"
+          >
+            {auth.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={auth.avatar_url}
+                alt=""
+                width={16}
+                height={16}
+                className="rounded-full"
+              />
+            ) : (
               <GithubLogo size={15} weight="fill" />
-              Your repos
-              <ArrowRight size={13} />
-            </Link>
-          ) : (
-            <Link
-              href="/settings"
-              className="inline-flex h-9 items-center gap-2 rounded-md bg-neutral-900 px-4 text-sm text-white transition-colors hover:bg-neutral-800"
-            >
-              <GithubLogo size={15} weight="fill" />
-              Connect GitHub
-            </Link>
-          )}
+            )}
+            {isConnected
+              ? auth.login
+                ? `${auth.login}'s repos`
+                : "Your repos"
+              : "Connect GitHub"}
+            <ArrowRight size={13} />
+          </a>
         </div>
       </nav>
 

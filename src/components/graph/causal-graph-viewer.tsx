@@ -43,11 +43,22 @@ const KIND_COLOR: Record<string, string> = {
   extends: "rgba(192,132,252,0.65)",
 };
 
-export function CausalGraphViewer({ graph }: { graph: CausalGraph }) {
+export function CausalGraphViewer({
+  graph,
+  highlightedIds,
+}: {
+  graph: CausalGraph;
+  /** External highlight set — e.g., from Ask citations or Changes scrub. */
+  highlightedIds?: string[];
+}) {
   const [mode, setMode] = useState<"3d" | "2d">("3d");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selected, setSelected] = useState<CausalNode | null>(null);
   const [hover, setHover] = useState<string | null>(null);
+  const externalHighlight = useMemo(
+    () => new Set(highlightedIds ?? []),
+    [highlightedIds],
+  );
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<any>(null);
 
@@ -99,7 +110,7 @@ export function CausalGraphViewer({ graph }: { graph: CausalGraph }) {
   const layers = Array.from(new Set(graph.nodes.map((n) => n.layer))) as SemanticLayer[];
 
   const isHighlighted = (n: VisNode) =>
-    hover === n.id || selected?.id === n.id;
+    hover === n.id || selected?.id === n.id || externalHighlight.has(n.id);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sharedProps: any = {

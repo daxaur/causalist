@@ -10,7 +10,9 @@ import {
   Sparkle,
 } from "@phosphor-icons/react";
 import { Logo } from "@/components/brand/logo";
+import { AskView } from "@/components/graph/ask-view";
 import { CausalGraphViewer } from "@/components/graph/causal-graph-viewer";
+import { ChangesView } from "@/components/graph/changes-view";
 import { ErrorsView } from "@/components/graph/errors-view";
 import { ExplainerView } from "@/components/graph/explainer";
 import {
@@ -18,13 +20,16 @@ import {
   type PreviewMode,
 } from "@/components/graph/mode-switcher";
 import { PREVIEWS, type PreviewMeta } from "@/lib/graph/previews";
+import { commitsFor } from "@/lib/graph/previews/commits";
 
 export function PreviewClient({ preview }: { preview: PreviewMeta }) {
   const [mode, setMode] = useState<PreviewMode>("graph");
+  const [highlighted, setHighlighted] = useState<string[]>([]);
+  const commits = commitsFor(preview.slug);
 
   return (
     <main className="relative flex min-h-screen flex-col bg-[#faf9f6]">
-      {/* Soft cream-to-white gradient backdrop — unifies the whole page, no more "widget island" graph */}
+      {/* Soft cream-to-white gradient backdrop — unifies the whole page */}
       <div
         aria-hidden
         className="pointer-events-none fixed inset-0 -z-0 bg-gradient-to-b from-white via-[#faf9f6] to-[#f4f1ea]"
@@ -48,17 +53,15 @@ export function PreviewClient({ preview }: { preview: PreviewMeta }) {
             {preview.subtitle}
           </span>
         </Link>
-        <div className="flex items-center gap-2">
-          <a
-            href={`https://github.com/${preview.graph.repo}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white/80 px-2.5 py-1.5 text-[11px] text-neutral-600 backdrop-blur-sm transition-colors hover:border-neutral-300 hover:text-neutral-900"
-          >
-            <GithubLogo size={12} weight="fill" />
-            source
-          </a>
-        </div>
+        <a
+          href={`https://github.com/${preview.graph.repo}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white/80 px-2.5 py-1.5 text-[11px] text-neutral-600 backdrop-blur-sm transition-colors hover:border-neutral-300 hover:text-neutral-900"
+        >
+          <GithubLogo size={12} weight="fill" />
+          source
+        </a>
       </nav>
 
       <motion.header
@@ -118,17 +121,31 @@ export function PreviewClient({ preview }: { preview: PreviewMeta }) {
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 flex-1 px-6 pb-24"
+        className="relative z-10 flex-1 px-6 pb-28"
       >
         {mode === "graph" && (
           <div className="h-[calc(100vh-260px)] min-h-[560px] w-full">
-            <CausalGraphViewer graph={preview.graph} />
+            <CausalGraphViewer
+              graph={preview.graph}
+              highlightedIds={highlighted}
+            />
           </div>
         )}
         {mode === "explainer" && <ExplainerView graph={preview.graph} />}
         {mode === "errors" && <ErrorsView graph={preview.graph} />}
-        {mode === "changes" && <ChangesComingSoon />}
-        {mode === "ask" && <AskComingSoon />}
+        {mode === "changes" && (
+          <ChangesView
+            graph={preview.graph}
+            commits={commits}
+            onHighlightNodes={setHighlighted}
+          />
+        )}
+        {mode === "ask" && (
+          <AskView
+            graph={preview.graph}
+            onHighlightNodes={setHighlighted}
+          />
+        )}
       </motion.div>
 
       {/* Floating mode switcher */}
@@ -146,46 +163,6 @@ function Stat({ label, value }: { label: string; value: number }) {
         {value.toLocaleString()}
       </span>
       <span className="uppercase tracking-wider text-neutral-400">{label}</span>
-    </div>
-  );
-}
-
-function ChangesComingSoon() {
-  return (
-    <div className="mx-auto flex min-h-[50vh] max-w-md flex-col items-center justify-center text-center">
-      <GitBranch
-        size={22}
-        weight="duotone"
-        className="mb-4 text-[#D97757]"
-      />
-      <h2 className="mb-2 font-display text-2xl font-medium tracking-tight">
-        Changes timeline
-      </h2>
-      <p className="max-w-sm text-sm text-neutral-500">
-        Scrub through commits to watch the graph rearrange itself —
-        added files fade in green, removed files fade out red. Ships with
-        the live analyze flow.
-      </p>
-    </div>
-  );
-}
-
-function AskComingSoon() {
-  return (
-    <div className="mx-auto flex min-h-[50vh] max-w-md flex-col items-center justify-center text-center">
-      <Sparkle
-        size={22}
-        weight="duotone"
-        className="mb-4 text-[#D97757]"
-      />
-      <h2 className="mb-2 font-display text-2xl font-medium tracking-tight">
-        Ask the Oracle
-      </h2>
-      <p className="max-w-sm text-sm text-neutral-500">
-        &quot;What breaks if I delete this module?&quot; Oracle traces the
-        blast radius across every outgoing edge and answers in plain
-        English. Click any node first, then switch to Ask.
-      </p>
     </div>
   );
 }
