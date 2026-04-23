@@ -77,14 +77,26 @@ function SiteHeaderVisible({ pathname }: { pathname: string }) {
       </div>
 
       <nav className="flex items-center gap-1 justify-self-center">
-        <NavLink href="/dashboard" label="Repos" active={pathname.startsWith("/dashboard")} />
-        <NavLink href="/library" label="Library" active={pathname.startsWith("/library")} />
-        <NavLink href="/reference" label="Reference" active={pathname.startsWith("/reference")} />
-        <NavLink href="/agents" label="Agents" active={pathname.startsWith("/agents")} />
+        <NavLink
+          href="/dashboard"
+          label="Browse"
+          active={
+            pathname.startsWith("/dashboard") ||
+            pathname.startsWith("/library") ||
+            pathname.startsWith("/reference") ||
+            pathname.startsWith("/preview") ||
+            pathname.match(/^\/[^/]+\/[^/]+/) !== null
+          }
+        />
         <NavLink
           href="/docs/foundations"
           label="Docs"
           active={pathname.startsWith("/docs")}
+        />
+        <NavLink
+          href="/agents"
+          label="Agents"
+          active={pathname.startsWith("/agents")}
         />
       </nav>
 

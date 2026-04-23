@@ -18,22 +18,18 @@ const MODES: {
 }[] = [
   { key: "graph", label: "Graph", icon: <Cube size={13} weight="duotone" /> },
   {
-    key: "explainer",
-    label: "Explainer",
-    icon: <Article size={13} weight="duotone" />,
-  },
-  {
-    key: "errors",
-    label: "Errors",
-    icon: <Warning size={13} weight="duotone" />,
-  },
-  {
     key: "changes",
     label: "Changes",
     icon: <GitBranch size={13} weight="duotone" />,
   },
   { key: "ask", label: "Ask", icon: <Chat size={13} weight="duotone" /> },
 ];
+
+// Unused modes intentionally suppressed from the default switcher —
+// Explainer and Errors felt incoherent alongside Graph and Ask. Kept
+// as a type so other call sites can still render them standalone.
+void Article;
+void Warning;
 
 export function ModeSwitcher({
   mode,

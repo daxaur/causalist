@@ -4,8 +4,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
+  BookOpen,
   CircleNotch,
+  Cube,
+  Folders,
   GithubLogo,
+  Graph,
   Key,
   MagnifyingGlass,
   Star,
@@ -15,6 +19,12 @@ import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { Input } from "@/components/ui/input";
 import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useSettings } from "@/lib/settings";
+import { PREVIEWS } from "@/lib/graph/previews";
+import { REFERENCES } from "@/lib/graph/references";
+import { useLibrary } from "@/lib/library/store";
+import { cn } from "@/lib/utils";
+
+type Tab = "repos" | "previews" | "reference" | "library";
 
 interface Repo {
   id: number;
@@ -30,20 +40,40 @@ export default function DashboardPage() {
   const settings = useSettings();
   const auth = useGithubAuth();
   const [repos, setRepos] = useState<Repo[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loadingRepos, setLoadingRepos] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [tab, setTab] = useState<Tab>("previews");
+  const { entries: libraryEntries, loading: loadingLib } = useLibrary();
 
-  // Prefer the OAuth token from the signed-in session; fall back to a
-  // personal access token saved in /settings.
   const githubToken = auth.token ?? settings.githubToken;
   const isConnected = auth.authenticated || Boolean(settings.githubToken);
 
   useEffect(() => {
-    if (!githubToken) return;
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const t = sp.get("tab") as Tab | null;
+    if (t && ["repos", "previews", "reference", "library"].includes(t)) {
+      setTab(t);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    sp.set("tab", tab);
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}?${sp}${window.location.hash}`,
+    );
+  }, [tab]);
+
+  useEffect(() => {
+    if (!githubToken || tab !== "repos") return;
     let cancelled = false;
     const load = async () => {
-      setLoading(true);
+      setLoadingRepos(true);
       setError(null);
       try {
         const { Octokit } = await import("@octokit/rest");
@@ -69,16 +99,16 @@ export default function DashboardPage() {
         if (cancelled) return;
         setError(e instanceof Error ? e.message : "Failed to load repos");
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoadingRepos(false);
       }
     };
     load();
     return () => {
       cancelled = true;
     };
-  }, [githubToken]);
+  }, [githubToken, tab]);
 
-  const filtered = useMemo(() => {
+  const filteredRepos = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return repos;
     return repos.filter(
@@ -88,51 +118,277 @@ export default function DashboardPage() {
     );
   }, [repos, query]);
 
+  const filteredPreviews = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return PREVIEWS;
+    return PREVIEWS.filter(
+      (p) =>
+        p.title.toLowerCase().includes(q) ||
+        p.subtitle.toLowerCase().includes(q) ||
+        p.tagline.toLowerCase().includes(q),
+    );
+  }, [query]);
+
+  const filteredReferences = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return REFERENCES;
+    return REFERENCES.filter(
+      (r) =>
+        r.title.toLowerCase().includes(q) ||
+        r.subtitle.toLowerCase().includes(q) ||
+        r.slug.toLowerCase().includes(q),
+    );
+  }, [query]);
+
+  const filteredLibrary = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return libraryEntries;
+    return libraryEntries.filter(
+      (e) =>
+        `${e.owner}/${e.repo}`.toLowerCase().includes(q) ||
+        (e.nickname ?? "").toLowerCase().includes(q),
+    );
+  }, [libraryEntries, query]);
+
+  const TABS: { key: Tab; label: string; count: number; icon: React.ReactNode }[] =
+    [
+      {
+        key: "previews",
+        label: "Live demos",
+        count: PREVIEWS.length,
+        icon: <Cube size={12} weight="duotone" />,
+      },
+      {
+        key: "reference",
+        label: "Reference",
+        count: REFERENCES.length,
+        icon: <BookOpen size={12} weight="duotone" />,
+      },
+      {
+        key: "repos",
+        label: "Your repos",
+        count: repos.length || (isConnected ? 0 : 0),
+        icon: <GithubLogo size={12} weight="fill" />,
+      },
+      {
+        key: "library",
+        label: "Saved",
+        count: libraryEntries.length,
+        icon: <Folders size={12} weight="duotone" />,
+      },
+    ];
+
   return (
-    <PageShell width="prose">
+    <PageShell width="docs">
       <PageHeader
-        eyebrow="Repositories"
-        title="Your repositories"
-        description={
-          isConnected
-            ? `Pick any repo to map it into a 3D causal graph${auth.login ? ` — signed in as ${auth.login}` : ""}.`
-            : "Connect GitHub to see the repos you can map."
-        }
+        eyebrow="Dashboard"
+        title="Browse everything"
+        description="One place for every graph — your repos, the live demos, language/framework references, and your saved library."
       />
 
-      {!isConnected ? (
-        <MissingTokenCard />
-      ) : (
-        <>
-          <div className="relative mb-6">
-            <MagnifyingGlass
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
-            />
-            <Input
-              placeholder="Search your repos"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="h-11 pl-9"
-            />
-          </div>
+      {/* Tabs */}
+      <div className="mb-5 flex items-center gap-1 overflow-x-auto border-b border-neutral-200">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={cn(
+              "relative flex items-center gap-1.5 whitespace-nowrap px-3 py-2.5 text-sm transition-colors",
+              tab === t.key
+                ? "text-neutral-900"
+                : "text-neutral-500 hover:text-neutral-900",
+            )}
+          >
+            <span
+              className={cn(
+                tab === t.key ? "text-accent-magenta" : "text-neutral-400",
+              )}
+            >
+              {t.icon}
+            </span>
+            {t.label}
+            <span className="font-mono text-[10px] text-neutral-400">
+              {t.count}
+            </span>
+            {tab === t.key && (
+              <span className="absolute inset-x-0 -bottom-px h-0.5 bg-accent-magenta" />
+            )}
+          </button>
+        ))}
+      </div>
 
-          {loading && <LoadingList />}
-          {error && <ErrorCard message={error} />}
-          {!loading && !error && filtered.length === 0 && (
-            <div className="rounded-xl border border-dashed border-neutral-200 p-8 text-center text-sm text-neutral-500">
-              No repositories match {query ? `"${query}"` : "this view"}.
+      {/* Search */}
+      <div className="relative mb-5">
+        <MagnifyingGlass
+          size={15}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
+        />
+        <Input
+          placeholder={`Search ${TABS.find((t) => t.key === tab)?.label.toLowerCase() ?? tab}`}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="h-10 pl-9"
+        />
+      </div>
+
+      {/* Content */}
+      {tab === "previews" && (
+        <PreviewsGrid items={filteredPreviews} />
+      )}
+
+      {tab === "reference" && <ReferenceGrid items={filteredReferences} />}
+
+      {tab === "repos" && (
+        <>
+          {!isConnected ? (
+            <MissingTokenCard />
+          ) : loadingRepos ? (
+            <LoadingList />
+          ) : error ? (
+            <ErrorCard message={error} />
+          ) : filteredRepos.length === 0 ? (
+            <EmptyHint message={query ? "No repos match." : "No repositories found."} />
+          ) : (
+            <ul className="space-y-2">
+              {filteredRepos.map((r) => (
+                <RepoRow key={r.id} repo={r} />
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+
+      {tab === "library" && (
+        <>
+          {loadingLib ? (
+            <div className="rounded-xl border border-dashed border-neutral-200 p-10 text-center text-sm text-neutral-400">
+              Loading…
+            </div>
+          ) : filteredLibrary.length === 0 ? (
+            <EmptyHint message="Nothing saved yet. Analyze a repo to build your first graph." />
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredLibrary.map((e) => (
+                <Link
+                  key={e.id}
+                  href={`/${e.owner}/${e.repo}`}
+                  className="group rounded-xl border border-neutral-200 bg-white p-4 transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-sm"
+                >
+                  <div className="font-mono text-[13px] text-neutral-900">
+                    {e.nickname ?? `${e.owner}/${e.repo}`}
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-3 text-[11px] text-neutral-400">
+                    <Metric label="nodes" value={e.nodeCount} />
+                    <Metric label="edges" value={e.edgeCount} />
+                  </div>
+                </Link>
+              ))}
             </div>
           )}
-
-          <ul className="space-y-2">
-            {filtered.map((r) => (
-              <RepoRow key={r.id} repo={r} />
-            ))}
-          </ul>
         </>
       )}
     </PageShell>
+  );
+}
+
+function PreviewsGrid({
+  items,
+}: {
+  items: { slug: string; title: string; subtitle: string; tagline: string; graph: { nodes: unknown[]; edges: unknown[] } }[];
+}) {
+  if (items.length === 0)
+    return <EmptyHint message="No demos match that search." />;
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {items.map((p) => (
+        <Link
+          key={p.slug}
+          href={`/preview/${p.slug}`}
+          className="group relative flex flex-col gap-4 overflow-hidden rounded-xl border border-neutral-200 bg-white p-5 transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-[0_2px_14px_rgba(0,0,0,0.05)]"
+        >
+          <div
+            className="absolute inset-x-0 top-0 h-[2px] origin-left scale-x-0 bg-accent-magenta transition-transform group-hover:scale-x-100"
+            aria-hidden
+          />
+          <div className="flex items-center justify-between">
+            <span className="rounded-full border border-accent-magenta/30 bg-accent-magenta/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-accent-magenta">
+              live demo
+            </span>
+            <span className="flex items-center gap-1 font-mono text-[10px] text-neutral-400">
+              <Graph size={10} weight="duotone" />
+              {p.graph.nodes.length}n · {p.graph.edges.length}e
+            </span>
+          </div>
+          <div>
+            <h3 className="font-display text-lg font-medium tracking-tight text-neutral-900">
+              {p.title}
+            </h3>
+            <p className="mt-1 font-mono text-[11px] text-neutral-400">
+              {p.subtitle}
+            </p>
+            <p className="mt-3 text-[13px] leading-relaxed text-neutral-500">
+              {p.tagline}
+            </p>
+          </div>
+          <div className="flex items-center justify-between pt-1 text-[11px] text-neutral-400">
+            <span className="font-mono">{p.slug}</span>
+            <ArrowRight
+              size={13}
+              className="text-neutral-300 transition-transform group-hover:translate-x-0.5 group-hover:text-accent-magenta"
+            />
+          </div>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+function ReferenceGrid({
+  items,
+}: {
+  items: { slug: string; title: string; subtitle: string; graph: { nodes: unknown[]; edges: unknown[] } }[];
+}) {
+  if (items.length === 0)
+    return <EmptyHint message="No references match." />;
+  return (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {items.map((r) => (
+        <Link
+          key={r.slug}
+          href={`/reference/${r.slug}`}
+          className="group relative flex flex-col gap-4 overflow-hidden rounded-xl border border-neutral-200 bg-white p-5 transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-[0_2px_14px_rgba(0,0,0,0.05)]"
+        >
+          <div
+            className="absolute inset-x-0 top-0 h-[2px] origin-left scale-x-0 bg-accent-magenta transition-transform group-hover:scale-x-100"
+            aria-hidden
+          />
+          <div className="flex items-center justify-between">
+            <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-neutral-500">
+              reference
+            </span>
+            <span className="flex items-center gap-1 font-mono text-[10px] text-neutral-400">
+              <Graph size={10} weight="duotone" />
+              {r.graph.nodes.length}n · {r.graph.edges.length}e
+            </span>
+          </div>
+          <div>
+            <h3 className="font-display text-lg font-medium leading-snug tracking-tight text-neutral-900">
+              {r.title}
+            </h3>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-neutral-500">
+              {r.subtitle}
+            </p>
+          </div>
+          <div className="flex items-center justify-between pt-1 text-[11px] text-neutral-400">
+            <span className="font-mono">{r.slug}</span>
+            <ArrowRight
+              size={13}
+              className="text-neutral-300 transition-transform group-hover:translate-x-0.5 group-hover:text-accent-magenta"
+            />
+          </div>
+        </Link>
+      ))}
+    </div>
   );
 }
 
@@ -238,6 +494,27 @@ function MissingTokenCard() {
         Add token
         <ArrowRight size={14} />
       </Link>
+    </div>
+  );
+}
+
+function EmptyHint({ message }: { message: string }) {
+  return (
+    <div className="rounded-xl border border-dashed border-neutral-200 p-8 text-center text-sm text-neutral-500">
+      {message}
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex items-baseline gap-1.5">
+      <span className="font-mono text-sm text-neutral-700">
+        {value.toLocaleString()}
+      </span>
+      <span className="font-mono text-[9px] uppercase tracking-wider text-neutral-400">
+        {label}
+      </span>
     </div>
   );
 }

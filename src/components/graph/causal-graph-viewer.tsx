@@ -869,6 +869,18 @@ export function CausalGraphViewer({
           </div>
         </div>
 
+        {/* Always-visible keyboard hint strip — makes the viewer feel
+            controllable at a glance without requiring a modal open. */}
+        <div className="pointer-events-none absolute bottom-4 right-4 z-10 hidden items-center gap-3 rounded-full border border-white/10 bg-black/40 px-3 py-1.5 font-mono text-[10px] text-white/55 backdrop-blur md:flex">
+          <Hint keys={["j", "k"]} label="walk" />
+          <span className="text-white/15">·</span>
+          <Hint keys={["."]} label="focus" />
+          <span className="text-white/15">·</span>
+          <Hint keys={["⌘", "K"]} label="cmd" />
+          <span className="text-white/15">·</span>
+          <Hint keys={["?"]} label="help" />
+        </div>
+
         {/* Selection toolbar — sits well above the mode switcher (which
             lives at fixed bottom-6) and above the node panel footer. */}
         <div className="pointer-events-none absolute bottom-20 left-1/2 z-30 -translate-x-1/2">
@@ -920,6 +932,22 @@ export function CausalGraphViewer({
         />
       </div>
     </div>
+  );
+}
+
+function Hint({ keys, label }: { keys: string[]; label: string }) {
+  return (
+    <span className="flex items-center gap-1">
+      {keys.map((k) => (
+        <kbd
+          key={k}
+          className="rounded border border-white/15 bg-white/5 px-1 py-[1px] text-[9px] text-white/75"
+        >
+          {k}
+        </kbd>
+      ))}
+      <span className="text-white/50">{label}</span>
+    </span>
   );
 }
 
