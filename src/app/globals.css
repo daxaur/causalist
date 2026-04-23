@@ -47,6 +47,15 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --color-accent-magenta: #E838A4;
+  --color-accent-magenta-soft: #F472B6;
+  --color-accent-magenta-ink: #BE185D;
+  --color-tier-hot: #E838A4;
+  --color-tier-core: #2563EB;
+  --color-tier-leaf: #94A3B8;
+  --color-diff-added: #3FB950;
+  --color-diff-removed: #F85149;
+  --color-diff-modified: #D29922;
   --animate-marquee: marquee var(--duration) infinite linear;
   --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
   --animate-shiny-text: shiny-text 8s infinite;

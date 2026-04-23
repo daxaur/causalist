@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
-  ArrowLeft,
   ArrowRight,
   Clock,
   DotsThree,
@@ -15,7 +14,7 @@ import {
   Trash,
   Upload,
 } from "@phosphor-icons/react";
-import { Logo } from "@/components/brand/logo";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { Input } from "@/components/ui/input";
 import {
   exportEntryToFile,
@@ -49,80 +48,43 @@ export default function LibraryPage() {
   }, [entries, query]);
 
   return (
-    <main className="min-h-screen bg-white text-neutral-900">
-      <nav className="flex items-center justify-between border-b border-neutral-100 px-8 py-4">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-neutral-900"
-        >
-          <ArrowLeft size={16} />
-          <span>back</span>
-        </Link>
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-neutral-900 transition-opacity hover:opacity-80"
-        >
-          <Logo size={18} />
-          <span className="font-display text-sm font-medium tracking-tight">
-            library
-          </span>
-        </Link>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/dashboard"
-            className="text-xs text-neutral-500 transition-colors hover:text-neutral-900"
-          >
-            All repos
-          </Link>
-        </div>
-      </nav>
+    <PageShell width="gallery">
+      <PageHeader
+        eyebrow="Library"
+        title="Your library"
+        description={`${entries.length} saved ${entries.length === 1 ? "graph" : "graphs"}${pinned.length > 0 ? ` · ${pinned.length} pinned` : ""}`}
+        actions={<ImportButton />}
+      />
 
-      <div className="mx-auto max-w-5xl px-8 pt-12 pb-24">
-        <header className="mb-10 flex items-end justify-between gap-6">
-          <div>
-            <h1 className="font-display text-4xl font-medium tracking-[-0.02em]">
-              Your library
-            </h1>
-            <p className="mt-2 text-sm text-neutral-500">
-              {entries.length} saved {entries.length === 1 ? "graph" : "graphs"}
-              {pinned.length > 0 && ` · ${pinned.length} pinned`}
-            </p>
-          </div>
-          <ImportButton />
-        </header>
-
-        <div className="relative mb-6">
-          <MagnifyingGlass
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
-          />
-          <Input
-            placeholder="Search your library"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="h-11 pl-9"
-          />
-        </div>
-
-        {loading && (
-          <div className="rounded-xl border border-dashed border-neutral-200 p-10 text-center text-sm text-neutral-400">
-            Loading…
-          </div>
-        )}
-
-        {!loading && entries.length === 0 && <EmptyState />}
-
-        {pinned.length > 0 && (
-          <Section title="Pinned" entries={pinned} />
-        )}
-        {rest.length > 0 && (
-          <Section
-            title={pinned.length > 0 ? "All" : "Recently generated"}
-            entries={rest}
-          />
-        )}
+      <div className="relative mb-6">
+        <MagnifyingGlass
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
+        />
+        <Input
+          placeholder="Search your library"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="h-11 pl-9"
+        />
       </div>
-    </main>
+
+      {loading && (
+        <div className="rounded-xl border border-dashed border-neutral-200 p-10 text-center text-sm text-neutral-400">
+          Loading…
+        </div>
+      )}
+
+      {!loading && entries.length === 0 && <EmptyState />}
+
+      {pinned.length > 0 && <Section title="Pinned" entries={pinned} />}
+      {rest.length > 0 && (
+        <Section
+          title={pinned.length > 0 ? "All" : "Recently generated"}
+          entries={rest}
+        />
+      )}
+    </PageShell>
   );
 }
 
@@ -172,7 +134,7 @@ function Card({ entry }: { entry: LibraryIndexEntry }) {
         <Link href={`/${entry.owner}/${entry.repo}`} className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 font-mono text-sm text-neutral-900">
             {entry.pinned && (
-              <PushPin size={11} weight="fill" className="text-[#E838A4]" />
+              <PushPin size={11} weight="fill" className="text-accent-magenta" />
             )}
             <span className="truncate">
               {entry.nickname ?? `${entry.owner}/${entry.repo}`}

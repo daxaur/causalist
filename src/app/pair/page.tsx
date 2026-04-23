@@ -4,13 +4,12 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
-  ArrowLeft,
   CheckCircle,
   CircleNotch,
   Copy,
   Terminal as TerminalIcon,
 } from "@phosphor-icons/react";
-import { Logo } from "@/components/brand/logo";
+import { PageShell } from "@/components/layout/page-shell";
 
 type Phase = "loading" | "awaiting" | "paired" | "expired";
 
@@ -18,7 +17,7 @@ export default function PairPage() {
   const [phase, setPhase] = useState<Phase>("loading");
   const [code, setCode] = useState<string>("");
   const [sessionId, setSessionId] = useState<string>("");
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"curl" | "cli" | null>(null);
   const esRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
@@ -33,8 +32,6 @@ export default function PairPage() {
         setSessionId(data.sessionId);
         setPhase("awaiting");
 
-        // Subscribe to the stream — when the CLI claims the code, the
-        // server publishes a "paired" event.
         const es = new EventSource(`/api/stream/${data.sessionId}`);
         esRef.current = es;
         es.addEventListener("tool", (e) => {
@@ -59,36 +56,24 @@ export default function PairPage() {
     };
   }, []);
 
-  const copy = async () => {
+  const copyCurl = async () => {
     if (!code) return;
-    await navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    const cmd = `curl -sSL 'https://causalist.xyz/api/pair/setup?code=${code}' | sh`;
+    await navigator.clipboard.writeText(cmd);
+    setCopied("curl");
+    setTimeout(() => setCopied(null), 1500);
+  };
+
+  const copyCli = async () => {
+    if (!code) return;
+    await navigator.clipboard.writeText(`causalist pair ${code}`);
+    setCopied("cli");
+    setTimeout(() => setCopied(null), 1500);
   };
 
   return (
-    <main className="min-h-screen bg-white text-neutral-900">
-      <nav className="flex items-center justify-between border-b border-neutral-100 px-8 py-4">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-neutral-900"
-        >
-          <ArrowLeft size={16} />
-          <span>back</span>
-        </Link>
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-neutral-900 transition-opacity hover:opacity-80"
-        >
-          <Logo size={18} />
-          <span className="font-display text-sm font-medium tracking-tight">
-            pair
-          </span>
-        </Link>
-        <div className="w-16" />
-      </nav>
-
-      <div className="mx-auto flex min-h-[80vh] max-w-2xl flex-col items-center justify-center px-6 py-12 text-center">
+    <PageShell width="form">
+      <div className="flex min-h-[70vh] flex-col items-center justify-center text-center">
         <AnimatePresence mode="wait">
           {phase === "loading" && (
             <motion.div
@@ -109,64 +94,75 @@ export default function PairPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className="flex max-w-lg flex-col items-center gap-6"
+              className="flex w-full max-w-xl flex-col items-center gap-6"
             >
               <div>
-                <p className="font-mono text-[11px] uppercase tracking-wider text-neutral-400">
-                  Pair this tab with your CLI
+                <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-400">
+                  Pair this tab with your terminal
                 </p>
-                <h1 className="mt-3 font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-neutral-900 sm:text-4xl">
-                  Run this in your terminal
+                <h1 className="mt-3 font-display text-3xl font-medium leading-tight tracking-[-0.02em] sm:text-4xl">
+                  One command. No install.
                 </h1>
                 <p className="mt-3 text-[15px] leading-relaxed text-neutral-500">
-                  Claude Code and any agent with shell access will be able to
-                  stream tool-use events into this browser tab. Your session
-                  id stays on your device.
+                  Claude Code tool-use events stream into this tab the moment
+                  the command below runs. The 6-char code expires in 10 minutes
+                  and works once.
                 </p>
               </div>
 
               <button
-                onClick={copy}
-                className="group flex items-center gap-3 rounded-xl border border-neutral-900 bg-neutral-900 px-5 py-3 font-mono text-white transition-all hover:bg-neutral-800"
-                title="Copy command"
+                onClick={copyCurl}
+                className="group w-full overflow-hidden rounded-xl border-2 border-accent-magenta/60 bg-white p-5 text-left transition-all hover:border-accent-magenta hover:shadow-[0_0_0_4px_rgba(232,56,164,0.08)]"
               >
-                <TerminalIcon
-                  size={15}
-                  weight="duotone"
-                  className="text-[#E838A4]"
-                />
-                <span className="text-sm">
+                <div className="mb-2 flex items-center justify-between text-[11px]">
+                  <span className="font-mono uppercase tracking-wider text-accent-magenta">
+                    Recommended · no install
+                  </span>
+                  <span className="font-mono text-neutral-400">
+                    {copied === "curl" ? "copied" : "click to copy"}
+                  </span>
+                </div>
+                <pre className="overflow-x-auto font-mono text-[13px] leading-relaxed text-neutral-800">
                   <span className="text-neutral-400">$ </span>
-                  causalist pair{" "}
-                  <span className="text-[#FF9CD9]">{code}</span>
-                </span>
-                {copied ? (
-                  <CheckCircle
-                    size={13}
-                    weight="fill"
-                    className="text-emerald-400"
-                  />
-                ) : (
-                  <Copy
-                    size={13}
-                    className="text-neutral-400 transition-colors group-hover:text-white"
-                  />
-                )}
+                  curl -sSL &apos;https://causalist.xyz/api/pair/setup?code=
+                  <span className="text-accent-magenta">{code}</span>
+                  &apos; | sh
+                </pre>
               </button>
 
               <div className="flex items-center gap-2 font-mono text-[11px] text-neutral-500">
                 <CircleNotch size={10} className="animate-spin" />
-                Waiting for pair… expires in 10 minutes.
+                Waiting for pair…
               </div>
 
-              <details className="text-left text-xs text-neutral-500">
+              <details className="w-full text-left text-xs text-neutral-500">
                 <summary className="cursor-pointer hover:text-neutral-700">
-                  Don&rsquo;t have the CLI yet?
+                  Or use the Causalist CLI
                 </summary>
-                <pre className="mt-3 overflow-x-auto rounded-md border border-neutral-200 bg-neutral-50 p-3 font-mono text-[11px] text-neutral-700">
-{`npm install -g causalist
-causalist pair ${code}`}
-                </pre>
+                <button
+                  onClick={copyCli}
+                  className="mt-3 flex w-full items-center justify-between rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 font-mono text-[12px] text-neutral-700 hover:border-neutral-300"
+                >
+                  <span>
+                    <TerminalIcon
+                      size={11}
+                      className="mr-1.5 inline-block align-[-1px] text-accent-magenta"
+                    />
+                    causalist pair {code}
+                  </span>
+                  {copied === "cli" ? (
+                    <CheckCircle
+                      size={12}
+                      weight="fill"
+                      className="text-emerald-500"
+                    />
+                  ) : (
+                    <Copy size={11} className="text-neutral-400" />
+                  )}
+                </button>
+                <p className="mt-2 text-[11px] text-neutral-400">
+                  Requires <code className="font-mono">npm install -g causalist</code>.
+                </p>
               </details>
             </motion.div>
           )}
@@ -187,22 +183,22 @@ causalist pair ${code}`}
                 />
               </div>
               <div>
-                <h1 className="font-display text-3xl font-medium tracking-[-0.02em] text-neutral-900">
+                <h1 className="font-display text-3xl font-medium tracking-[-0.02em]">
                   Paired
                 </h1>
                 <p className="mx-auto mt-2 max-w-sm text-sm text-neutral-500">
-                  Claude Code tool-use events from this terminal session will
-                  now stream into the browser tab that opens next.
+                  Tool-use events from this terminal session will stream here
+                  automatically.
                 </p>
                 <p className="mt-3 font-mono text-[11px] text-neutral-400">
                   session · {sessionId.slice(0, 8)}…
                 </p>
               </div>
               <Link
-                href="/"
+                href="/dashboard"
                 className="inline-flex h-10 items-center gap-1.5 rounded-md bg-neutral-900 px-4 text-sm text-white transition-colors hover:bg-neutral-800"
               >
-                Back to home
+                Open dashboard
               </Link>
             </motion.div>
           )}
@@ -224,6 +220,6 @@ causalist pair ${code}`}
           )}
         </AnimatePresence>
       </div>
-    </main>
+    </PageShell>
   );
 }

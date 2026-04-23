@@ -1,12 +1,11 @@
 import Link from "next/link";
 import {
-  ArrowLeft,
   BookOpen,
   Code,
   Lightning,
   Terminal,
 } from "@phosphor-icons/react/dist/ssr";
-import { Logo } from "@/components/brand/logo";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { TOOL_SCHEMAS } from "@/lib/analyze/tools";
 
 export const metadata = {
@@ -89,55 +88,26 @@ const HTTP_ENDPOINTS = [
 
 export default function AgentsPage() {
   return (
-    <main className="min-h-screen bg-white text-neutral-900">
-      <nav className="flex items-center justify-between border-b border-neutral-100 px-8 py-4">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-neutral-900"
-        >
-          <ArrowLeft size={16} />
-          <span>back</span>
-        </Link>
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-neutral-900 transition-opacity hover:opacity-80"
-        >
-          <Logo size={18} />
-          <span className="font-display text-sm font-medium tracking-tight">
-            agents
-          </span>
-        </Link>
-        <a
-          href="https://github.com/daxaur/causalist"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-neutral-500 transition-colors hover:text-neutral-900"
-        >
-          Source
-        </a>
-      </nav>
-
-      <div className="mx-auto max-w-4xl px-8 pt-12 pb-24">
-        <header className="mb-10">
-          <p className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-wider text-neutral-400">
+    <PageShell width="prose">
+      <PageHeader
+        eyebrow={
+          <span className="inline-flex items-center gap-2">
             <Terminal size={11} weight="duotone" />
             Agent API
-          </p>
-          <h1 className="mt-2 font-display text-4xl font-medium tracking-[-0.02em]">
+          </span>
+        }
+        title={
+          <>
             For agents that want to read code{" "}
             <em className="font-normal text-neutral-500">before</em> touching it
-          </h1>
-          <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-neutral-500">
-            Causalist is a causal graph of your codebase that any agent —
-            Claude Code, Cursor, Hermes, anything with shell access — can
-            query. Every tool below is pure (no side effects). Every HTTP
-            endpoint is a Server-Sent Event stream or a JSON fetch.
-          </p>
-        </header>
+          </>
+        }
+        description="Causalist is a causal graph of your codebase that any agent — Claude Code, Cursor, Hermes, anything with shell access — can query. Every tool below is pure (no side effects). Every HTTP endpoint is a Server-Sent Event stream or a JSON fetch."
+      />
 
         {/* Killer demo */}
-        <section className="mb-14 rounded-2xl border border-[#E838A4]/25 bg-[#fbe8f4]/40 p-6">
-          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-[#C92E8E]">
+        <section className="mb-14 rounded-2xl border border-accent-magenta/25 bg-accent-magenta/5 p-6">
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-accent-magenta">
             <Lightning size={11} weight="fill" /> The loop that matters
           </div>
           <h2 className="mt-2 font-display text-2xl font-medium tracking-tight">
@@ -193,7 +163,7 @@ export default function AgentsPage() {
         {/* Session pairing */}
         <section className="mb-14">
           <h2 className="mb-3 flex items-center gap-2 font-display text-2xl font-medium tracking-tight">
-            <Terminal size={18} weight="duotone" className="text-[#E838A4]" />
+            <Terminal size={18} weight="duotone" className="text-accent-magenta" />
             Pair the browser and the terminal
           </h2>
           <ol className="space-y-2 text-sm leading-relaxed text-neutral-600">
@@ -202,7 +172,7 @@ export default function AgentsPage() {
               Visit{" "}
               <Link
                 href="/pair"
-                className="font-mono text-neutral-900 underline decoration-neutral-300 underline-offset-2 hover:decoration-[#E838A4]"
+                className="font-mono text-neutral-900 underline decoration-neutral-300 underline-offset-2 hover:decoration-accent-magenta"
               >
                 causalist.xyz/pair
               </Link>{" "}
@@ -242,7 +212,7 @@ export default function AgentsPage() {
         {/* MCP tools */}
         <section className="mb-14">
           <h2 className="mb-3 flex items-center gap-2 font-display text-2xl font-medium tracking-tight">
-            <BookOpen size={18} weight="duotone" className="text-[#E838A4]" />
+            <BookOpen size={18} weight="duotone" className="text-accent-magenta" />
             Tools the Oracle (and MCP server) expose
           </h2>
           <p className="mb-6 max-w-2xl text-sm text-neutral-500">
@@ -268,7 +238,7 @@ export default function AgentsPage() {
         {/* HTTP endpoints */}
         <section>
           <h2 className="mb-3 flex items-center gap-2 font-display text-2xl font-medium tracking-tight">
-            <Code size={18} weight="duotone" className="text-[#E838A4]" />
+            <Code size={18} weight="duotone" className="text-accent-magenta" />
             HTTP endpoints
           </h2>
           <div className="space-y-3">
@@ -277,8 +247,7 @@ export default function AgentsPage() {
             ))}
           </div>
         </section>
-      </div>
-    </main>
+    </PageShell>
   );
 }
 

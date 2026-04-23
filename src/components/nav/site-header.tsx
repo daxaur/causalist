@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -14,6 +16,35 @@ import { useSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 
 /**
+ * Page-specific actions injected into the shared header's right slot.
+ * A page calls `useHeaderActions(<node>)` to push actions; the SiteHeader
+ * renders whatever is current. Falls back to the default Connect/Settings
+ * row when no page contributes actions.
+ */
+const HeaderActionsContext = createContext<{
+  actions: ReactNode | null;
+  setActions: (node: ReactNode | null) => void;
+}>({ actions: null, setActions: () => {} });
+
+export function HeaderActionsProvider({ children }: { children: ReactNode }) {
+  const [actions, setActions] = useState<ReactNode | null>(null);
+  const value = useMemo(() => ({ actions, setActions }), [actions]);
+  return (
+    <HeaderActionsContext.Provider value={value}>
+      {children}
+    </HeaderActionsContext.Provider>
+  );
+}
+
+/**
+ * Client pages can push a node into the right slot of the shared header.
+ * Wrap in useEffect inside the page to mount/unmount cleanly.
+ */
+export function useHeaderActionsSetter() {
+  return useContext(HeaderActionsContext).setActions;
+}
+
+/**
  * Shared site header. Centered nav with consistent links so every
  * route in the app reads as one product. Hides itself on `/` where
  * the landing page draws its own richer header.
@@ -26,6 +57,7 @@ export function SiteHeader() {
 }
 
 function SiteHeaderVisible({ pathname }: { pathname: string }) {
+  const { actions } = useContext(HeaderActionsContext);
   const settings = useSettings();
   const auth = useGithubAuth();
   const isConnected = auth.authenticated || Boolean(settings.githubToken);
@@ -57,6 +89,11 @@ function SiteHeaderVisible({ pathname }: { pathname: string }) {
       </nav>
 
       <div className="flex items-center gap-2 justify-self-end">
+        {actions && (
+          <div className="mr-1 flex items-center gap-2 border-r border-neutral-100 pr-3">
+            {actions}
+          </div>
+        )}
         <div className="hidden sm:block">
           <GitHubStarButton />
         </div>

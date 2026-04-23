@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
-  ArrowLeft,
   CheckCircle,
   Eye,
   EyeSlash,
@@ -12,9 +10,10 @@ import {
   Shield,
   Trash,
 } from "@phosphor-icons/react";
+import { Logo } from "@/components/brand/logo";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Logo } from "@/components/brand/logo";
 import {
   clearSettings,
   saveSettings,
@@ -52,40 +51,19 @@ export default function SettingsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-white text-neutral-900">
-      <nav className="flex items-center justify-between border-b border-neutral-100 px-8 py-4">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-neutral-900"
-        >
-          <ArrowLeft size={16} />
-          <span>back</span>
-        </Link>
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-neutral-900 transition-opacity hover:opacity-80"
-        >
-          <Logo size={18} />
-          <span className="font-display text-sm font-medium tracking-tight">
-            settings
-          </span>
-        </Link>
-        <div className="w-16" />
-      </nav>
-
-      <div className="mx-auto max-w-2xl px-8 pt-12 pb-24">
-        <div className="mb-10">
-          <h1 className="font-display text-4xl font-medium tracking-[-0.02em]">
-            Keys
-          </h1>
-          <p className="mt-3 text-sm leading-relaxed text-neutral-500">
+    <PageShell width="form">
+      <PageHeader
+        eyebrow="Settings"
+        title="Keys"
+        description={
+          <>
             Causalist runs in your browser. Your API keys are stored only in
-            this device&rsquo;s <code className="font-mono text-[12px]">localStorage</code>
-            , sent directly to Anthropic and GitHub, and never touch our
-            servers.
-          </p>
-        </div>
-
+            this device&rsquo;s <code className="font-mono text-[12px]">localStorage</code>,
+            sent directly to Anthropic and GitHub, and never touch our servers.
+          </>
+        }
+      />
+      <div>
         {/* Anthropic */}
         <section className="mb-10 rounded-2xl border border-neutral-200 p-6">
           <div className="mb-4 flex items-start justify-between gap-4">
@@ -243,6 +221,6 @@ export default function SettingsPage() {
           </p>
         </div>
       </div>
-    </main>
+    </PageShell>
   );
 }

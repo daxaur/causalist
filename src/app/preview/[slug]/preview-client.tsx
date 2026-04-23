@@ -1,16 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import {
-  ArrowLeft,
   GitBranch,
   GithubLogo,
   Sparkle,
 } from "@phosphor-icons/react";
-import { Logo } from "@/components/brand/logo";
 import { AskView } from "@/components/graph/ask-view";
+import { useHeaderActionsSetter } from "@/components/nav/site-header";
 import { CausalGraphViewer } from "@/components/graph/causal-graph-viewer";
 import { ChangesView } from "@/components/graph/changes-view";
 import { ErrorsView } from "@/components/graph/errors-view";
@@ -26,46 +25,32 @@ export function PreviewClient({ preview }: { preview: PreviewMeta }) {
   const [mode, setMode] = useState<PreviewMode>("graph");
   const [highlighted, setHighlighted] = useState<string[]>([]);
   const commits = commitsFor(preview.slug);
+  const setHeaderActions = useHeaderActionsSetter();
+
+  useEffect(() => {
+    setHeaderActions(
+      <a
+        href={`https://github.com/${preview.graph.repo}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 text-[11px] text-neutral-600 transition-colors hover:border-neutral-300 hover:text-neutral-900"
+      >
+        <GithubLogo size={12} weight="fill" />
+        source
+      </a>,
+    );
+    return () => setHeaderActions(null);
+  }, [preview.graph.repo, setHeaderActions]);
 
   return (
-    <main className="relative flex min-h-screen flex-col bg-[#ffffff]">
-      {/* Soft cream-to-white gradient backdrop — unifies the whole page */}
+    <main className="relative flex min-h-[calc(100vh-57px)] flex-col bg-white">
       <div
         aria-hidden
-        className="pointer-events-none fixed inset-0 -z-0 bg-gradient-to-b from-white via-[#ffffff] to-[#f5f5f5]"
+        className="pointer-events-none fixed inset-0 -z-0 bg-gradient-to-b from-white via-white to-neutral-50"
       />
 
-      <nav className="relative z-10 flex items-center justify-between px-6 py-4">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-neutral-900"
-        >
-          <ArrowLeft size={16} />
-          <span>back</span>
-        </Link>
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-neutral-900 transition-opacity hover:opacity-80"
-        >
-          <Logo size={16} />
-          <span className="font-mono text-[11px] text-neutral-500">
-            <span className="text-neutral-400">preview · </span>
-            {preview.subtitle}
-          </span>
-        </Link>
-        <a
-          href={`https://github.com/${preview.graph.repo}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white/80 px-2.5 py-1.5 text-[11px] text-neutral-600 backdrop-blur-sm transition-colors hover:border-neutral-300 hover:text-neutral-900"
-        >
-          <GithubLogo size={12} weight="fill" />
-          source
-        </a>
-      </nav>
-
       <motion.header
-        className="relative z-10 px-6 pt-6 pb-4"
+        className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-8 pb-4 sm:px-6 lg:px-8"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
@@ -79,7 +64,7 @@ export function PreviewClient({ preview }: { preview: PreviewMeta }) {
               <Sparkle
                 size={11}
                 weight="duotone"
-                className="text-[#E838A4]"
+                className="text-accent-magenta"
               />
               {preview.tagline}
             </p>
@@ -96,8 +81,8 @@ export function PreviewClient({ preview }: { preview: PreviewMeta }) {
       </motion.header>
 
       {/* Other-preview pills */}
-      <div className="relative z-10 px-6 pb-2">
-        <div className="flex items-center gap-1.5">
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-2 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
           {PREVIEWS.map((p) => (
             <Link
               key={p.slug}
@@ -121,10 +106,10 @@ export function PreviewClient({ preview }: { preview: PreviewMeta }) {
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 flex-1 px-6 pb-28"
+        className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 pb-28 sm:px-6 lg:px-8"
       >
         {mode === "graph" && (
-          <div className="h-[calc(100vh-260px)] min-h-[560px] w-full">
+          <div className="h-[calc(100vh-320px)] min-h-[560px] w-full">
             <CausalGraphViewer
               graph={preview.graph}
               highlightedIds={highlighted}

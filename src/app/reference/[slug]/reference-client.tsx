@@ -4,12 +4,10 @@ import Link from "next/link";
 import { useState } from "react";
 import { motion } from "motion/react";
 import {
-  ArrowLeft,
   BookOpen,
   Lightning,
   Sparkle,
 } from "@phosphor-icons/react";
-import { Logo } from "@/components/brand/logo";
 import { AskView } from "@/components/graph/ask-view";
 import { CausalGraphViewer } from "@/components/graph/causal-graph-viewer";
 import {
@@ -23,30 +21,9 @@ export function ReferenceClient({ reference }: { reference: ReferenceMeta }) {
   const [highlighted, setHighlighted] = useState<string[]>([]);
 
   return (
-    <main className="relative flex min-h-screen flex-col bg-white">
-      <nav className="relative z-10 flex items-center justify-between px-6 py-4">
-        <Link
-          href="/reference"
-          className="flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-neutral-900"
-        >
-          <ArrowLeft size={16} />
-          <span>all references</span>
-        </Link>
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-neutral-900 transition-opacity hover:opacity-80"
-        >
-          <Logo size={16} />
-          <span className="font-mono text-[11px] text-neutral-500">
-            <span className="text-neutral-400">reference · </span>
-            {reference.slug}
-          </span>
-        </Link>
-        <div className="w-20" />
-      </nav>
-
+    <main className="relative flex min-h-[calc(100vh-57px)] flex-col bg-white">
       <motion.header
-        className="relative z-10 px-6 pt-6 pb-4"
+        className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-8 pb-4 sm:px-6 lg:px-8"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
@@ -60,7 +37,7 @@ export function ReferenceClient({ reference }: { reference: ReferenceMeta }) {
               {reference.title}
             </h1>
             <p className="mt-1.5 flex items-center gap-2 text-sm text-neutral-500">
-              <Sparkle size={11} weight="duotone" className="text-[#E838A4]" />
+              <Sparkle size={11} weight="duotone" className="text-accent-magenta" />
               {reference.subtitle}
             </p>
           </div>
@@ -70,8 +47,8 @@ export function ReferenceClient({ reference }: { reference: ReferenceMeta }) {
           </div>
         </div>
 
-        <div className="mt-4 rounded-lg border border-[#E838A4]/20 bg-[#E838A4]/5 px-4 py-3 text-[13px] text-neutral-700">
-          <div className="mb-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-[#C92E8E]">
+        <div className="mt-4 rounded-lg border border-accent-magenta/20 bg-accent-magenta/5 px-4 py-3 text-[13px] text-neutral-700">
+          <div className="mb-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-accent-magenta">
             <Lightning size={10} weight="fill" />
             Why this graph exists
           </div>
@@ -80,7 +57,7 @@ export function ReferenceClient({ reference }: { reference: ReferenceMeta }) {
       </motion.header>
 
       {/* Other references */}
-      <div className="relative z-10 px-6 pb-2">
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pb-2 sm:px-6 lg:px-8">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
           {REFERENCES.map((r) => (
             <Link
@@ -104,10 +81,10 @@ export function ReferenceClient({ reference }: { reference: ReferenceMeta }) {
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 flex-1 px-6 pb-28"
+        className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 pb-28 sm:px-6 lg:px-8"
       >
         {mode === "graph" && (
-          <div className="h-[calc(100vh-320px)] min-h-[520px] w-full">
+          <div className="h-[calc(100vh-360px)] min-h-[520px] w-full">
             <CausalGraphViewer
               graph={reference.graph}
               highlightedIds={highlighted}
@@ -141,7 +118,7 @@ export function ReferenceClient({ reference }: { reference: ReferenceMeta }) {
             <Sparkle
               size={18}
               weight="duotone"
-              className="mb-3 text-[#E838A4]"
+              className="mb-3 text-accent-magenta"
             />
             This mode is disabled on reference graphs — they&rsquo;re teaching
             material, not a live repository.

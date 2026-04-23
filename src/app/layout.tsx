@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { SiteHeader } from "@/components/nav/site-header";
+import { HeaderActionsProvider, SiteHeader } from "@/components/nav/site-header";
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
@@ -39,8 +39,10 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-white text-neutral-900 antialiased font-sans">
-        <SiteHeader />
-        {children}
+        <HeaderActionsProvider>
+          <SiteHeader />
+          {children}
+        </HeaderActionsProvider>
       </body>
     </html>
   );

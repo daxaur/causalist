@@ -191,21 +191,31 @@ export function useGraphFilters(): {
   return { filters, setFilters, patch, toggleSetValue, clear };
 }
 
-/** Keyboard-level alias for `f` to toggle a drawer, `/` to focus
- * search, `c` to clear, `?` to open help. Provided as a hook so host
- * components can wire their own drawer state. */
+/** Keyboard handler for the graph viewer. All handlers optional. */
 export function useGraphKeyboard({
   onToggleFilters,
   onFocusSearch,
   onOpenPalette,
   onHelp,
   onClear,
+  onWalkNext,
+  onWalkPrev,
+  onFocusToggle,
+  onHistoryBack,
+  onHistoryForward,
+  onEscape,
 }: {
   onToggleFilters?: () => void;
   onFocusSearch?: () => void;
   onOpenPalette?: () => void;
   onHelp?: () => void;
   onClear?: () => void;
+  onWalkNext?: () => void;
+  onWalkPrev?: () => void;
+  onFocusToggle?: () => void;
+  onHistoryBack?: () => void;
+  onHistoryForward?: () => void;
+  onEscape?: () => void;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -216,6 +226,8 @@ export function useGraphKeyboard({
       if (e.key === "/" && onFocusSearch) {
         e.preventDefault();
         onFocusSearch();
+      } else if (e.key === "Escape" && onEscape) {
+        onEscape();
       } else if (e.key.toLowerCase() === "f" && onToggleFilters && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         onToggleFilters();
@@ -225,6 +237,21 @@ export function useGraphKeyboard({
       } else if (e.key.toLowerCase() === "c" && onClear && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         onClear();
+      } else if (e.key === "." && onFocusToggle && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        onFocusToggle();
+      } else if ((e.key === "j" || e.key === "ArrowDown" || e.key === "ArrowRight") && onWalkNext && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        onWalkNext();
+      } else if ((e.key === "k" || e.key === "ArrowUp" || e.key === "ArrowLeft") && onWalkPrev && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        onWalkPrev();
+      } else if (e.key === "[" && onHistoryBack && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        onHistoryBack();
+      } else if (e.key === "]" && onHistoryForward && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        onHistoryForward();
       } else if (
         (e.metaKey || e.ctrlKey) &&
         e.key.toLowerCase() === "k" &&
@@ -236,7 +263,19 @@ export function useGraphKeyboard({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onToggleFilters, onFocusSearch, onOpenPalette, onHelp, onClear]);
+  }, [
+    onToggleFilters,
+    onFocusSearch,
+    onOpenPalette,
+    onHelp,
+    onClear,
+    onWalkNext,
+    onWalkPrev,
+    onFocusToggle,
+    onHistoryBack,
+    onHistoryForward,
+    onEscape,
+  ]);
 }
 
 export function useVisibleIds(

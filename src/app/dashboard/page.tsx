@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft,
   ArrowRight,
   CircleNotch,
   GithubLogo,
@@ -12,7 +11,7 @@ import {
   Star,
   Warning,
 } from "@phosphor-icons/react";
-import { Logo } from "@/components/brand/logo";
+import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { Input } from "@/components/ui/input";
 import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useSettings } from "@/lib/settings";
@@ -90,78 +89,50 @@ export default function DashboardPage() {
   }, [repos, query]);
 
   return (
-    <main className="min-h-screen bg-white text-neutral-900">
-      <nav className="flex items-center justify-between border-b border-neutral-100 px-8 py-4">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-neutral-900"
-        >
-          <ArrowLeft size={16} />
-          <span>back</span>
-        </Link>
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-neutral-900 transition-opacity hover:opacity-80"
-        >
-          <Logo size={18} />
-          <span className="font-display text-sm font-medium tracking-tight">
-            dashboard
-          </span>
-        </Link>
-        <Link
-          href="/settings"
-          className="text-xs text-neutral-500 transition-colors hover:text-neutral-900"
-        >
-          Settings
-        </Link>
-      </nav>
+    <PageShell width="prose">
+      <PageHeader
+        eyebrow="Repositories"
+        title="Your repositories"
+        description={
+          isConnected
+            ? `Pick any repo to map it into a 3D causal graph${auth.login ? ` — signed in as ${auth.login}` : ""}.`
+            : "Connect GitHub to see the repos you can map."
+        }
+      />
 
-      <div className="mx-auto max-w-4xl px-8 pt-12 pb-24">
-        <div className="mb-10">
-          <h1 className="font-display text-4xl font-medium tracking-[-0.02em]">
-            Your repositories
-          </h1>
-          <p className="mt-3 text-sm text-neutral-500">
-            {isConnected
-              ? `Pick any repo to map it into a 3D causal graph${auth.login ? ` — signed in as ${auth.login}` : ""}.`
-              : "Connect GitHub to see the repos you can map."}
-          </p>
-        </div>
+      {!isConnected ? (
+        <MissingTokenCard />
+      ) : (
+        <>
+          <div className="relative mb-6">
+            <MagnifyingGlass
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
+            />
+            <Input
+              placeholder="Search your repos"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="h-11 pl-9"
+            />
+          </div>
 
-        {!isConnected ? (
-          <MissingTokenCard />
-        ) : (
-          <>
-            <div className="relative mb-6">
-              <MagnifyingGlass
-                size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
-              />
-              <Input
-                placeholder="Search your repos"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="h-11 pl-9"
-              />
+          {loading && <LoadingList />}
+          {error && <ErrorCard message={error} />}
+          {!loading && !error && filtered.length === 0 && (
+            <div className="rounded-xl border border-dashed border-neutral-200 p-8 text-center text-sm text-neutral-500">
+              No repositories match {query ? `"${query}"` : "this view"}.
             </div>
+          )}
 
-            {loading && <LoadingList />}
-            {error && <ErrorCard message={error} />}
-            {!loading && !error && filtered.length === 0 && (
-              <div className="rounded-xl border border-dashed border-neutral-200 p-8 text-center text-sm text-neutral-500">
-                No repositories match {query ? `"${query}"` : "this view"}.
-              </div>
-            )}
-
-            <ul className="space-y-2">
-              {filtered.map((r) => (
-                <RepoRow key={r.id} repo={r} />
-              ))}
-            </ul>
-          </>
-        )}
-      </div>
-    </main>
+          <ul className="space-y-2">
+            {filtered.map((r) => (
+              <RepoRow key={r.id} repo={r} />
+            ))}
+          </ul>
+        </>
+      )}
+    </PageShell>
   );
 }
 

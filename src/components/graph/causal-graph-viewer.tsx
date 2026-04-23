@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   Cube,
+  Keyboard,
   List,
   SidebarSimple,
   SquaresFour,
@@ -24,12 +25,16 @@ import {
   type NodeDiffState,
 } from "@/lib/graph/diff";
 import { cn } from "@/lib/utils";
+import { useGraphKeyboard } from "@/lib/graph/filters";
+import { buildFixPrompt } from "@/lib/graph/prompt";
 import { NodePanel } from "./node-panel";
 import { LayerLegend } from "./layer-legend";
 import { FileTree } from "./file-tree";
 import { SelectionToolbar } from "./selection-toolbar";
 import { ImportanceStats } from "./importance-stats";
 import { FirstHotTooltip } from "./first-hot-tooltip";
+import { HelpOverlay } from "./help-overlay";
+import { CommandPalette, type PaletteAction } from "./command-palette";
 
 const ForceGraph3D = dynamic(
   () => import("react-force-graph-3d").then((m) => m.default),
@@ -94,6 +99,13 @@ export function CausalGraphViewer({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const historyRef = useRef<{ stack: string[]; index: number }>({
+    stack: [],
+    index: -1,
+  });
   const externalHighlight = useMemo(
     () => new Set(highlightedIds ?? []),
     [highlightedIds],
@@ -117,6 +129,8 @@ export function CausalGraphViewer({
     return m;
   }, [graph]);
   const hoverChain = hover ? neighbors.get(hover) ?? null : null;
+  const focusChain =
+    focusMode && focusedId ? neighbors.get(focusedId) ?? null : null;
 
   const data = useMemo(() => {
     const nodes: VisNode[] = graph.nodes.map((n) => ({
@@ -209,27 +223,116 @@ export function CausalGraphViewer({
     );
   }, [focusedId, mode, data.nodes]);
 
-  // Keyboard shortcuts
+  // Importance-ordered walk list: hot first, then core, then the rest.
+  const walkOrder = useMemo(() => {
+    const rank = (id: string) => {
+      const t = importance.byId.get(id)?.tier;
+      return t === "hot" ? 0 : t === "core" ? 1 : 2;
+    };
+    return [...graph.nodes].sort((a, b) => rank(a.id) - rank(b.id)).map((n) => n.id);
+  }, [graph.nodes, importance]);
+
+  const selectSingle = (id: string, pushHistory = true) => {
+    setSelectedIds(new Set([id]));
+    setFocusedId(id);
+    if (pushHistory) {
+      const h = historyRef.current;
+      // Truncate forward history when branching
+      h.stack = h.stack.slice(0, h.index + 1);
+      if (h.stack[h.stack.length - 1] !== id) {
+        h.stack.push(id);
+        h.index = h.stack.length - 1;
+      }
+    }
+  };
+
+  const walk = (dir: 1 | -1) => {
+    if (walkOrder.length === 0) return;
+    const currentIdx = focusedId ? walkOrder.indexOf(focusedId) : -1;
+    let nextIdx = currentIdx + dir;
+    if (nextIdx < 0) nextIdx = walkOrder.length - 1;
+    if (nextIdx >= walkOrder.length) nextIdx = 0;
+    selectSingle(walkOrder[nextIdx]);
+  };
+
+  useGraphKeyboard({
+    onOpenPalette: () => setPaletteOpen(true),
+    onHelp: () => setHelpOpen((v) => !v),
+    onEscape: () => {
+      if (helpOpen) setHelpOpen(false);
+      else if (focusMode) setFocusMode(false);
+      else if (selectedIds.size > 0 || focusedId) {
+        setSelectedIds(new Set());
+        setFocusedId(null);
+      }
+    },
+    onFocusToggle: () => {
+      if (!focusedId) return;
+      setFocusMode((v) => !v);
+    },
+    onWalkNext: () => walk(1),
+    onWalkPrev: () => walk(-1),
+    onHistoryBack: () => {
+      const h = historyRef.current;
+      if (h.index > 0) {
+        h.index -= 1;
+        const id = h.stack[h.index];
+        if (id) selectSingle(id, false);
+      }
+    },
+    onHistoryForward: () => {
+      const h = historyRef.current;
+      if (h.index < h.stack.length - 1) {
+        h.index += 1;
+        const id = h.stack[h.index];
+        if (id) selectSingle(id, false);
+      }
+    },
+  });
+
+  // ⌘A select all — kept separate from the walk/filter shortcuts.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       if (target && /^(INPUT|TEXTAREA)$/.test(target.tagName)) return;
       if (target?.isContentEditable) return;
-
-      if (e.key === "Escape") {
-        if (selectedIds.size > 0 || focusedId) {
-          setSelectedIds(new Set());
-          setFocusedId(null);
-          e.preventDefault();
-        }
-      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
         setSelectedIds(new Set(graph.nodes.map((n) => n.id)));
         e.preventDefault();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedIds, focusedId, graph.nodes]);
+  }, [graph.nodes]);
+
+  // Read focus/selection from the URL once on mount; write back on change.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const focusParam = sp.get("focus");
+    const selParam = sp.get("sel");
+    if (focusParam && graph.nodes.some((n) => n.id === focusParam)) {
+      const sel = selParam
+        ? new Set(selParam.split(",").filter(Boolean))
+        : new Set([focusParam]);
+      setSelectedIds(sel);
+      setFocusedId(focusParam);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    if (focusedId) sp.set("focus", focusedId);
+    else sp.delete("focus");
+    if (selectedIds.size > 0) sp.set("sel", Array.from(selectedIds).join(","));
+    else sp.delete("sel");
+    const qs = sp.toString();
+    const target =
+      window.location.pathname + (qs ? `?${qs}` : "") + window.location.hash;
+    window.history.replaceState(null, "", target);
+  }, [focusedId, selectedIds]);
 
   const layers = Array.from(new Set(graph.nodes.map((n) => n.layer))) as SemanticLayer[];
 
@@ -299,17 +402,30 @@ export function CausalGraphViewer({
       const radius =
         (n.size ?? 4) + (n.kind === "external" ? 1.5 : 0) + tierBoost;
 
-      // Dim non-neighbors when hovering so the causal chain pops.
-      const inChain = hoverChain ? hoverChain.has(n.id) : true;
+      // Hover never dims. Only explicit focus-mode (. key) dims
+      // non-neighbors so the user sees an intentional filter, not
+      // mysterious greying on every mouse move. Hovered neighbors get
+      // a small emissive bump below instead — brighten, don't dim.
+      const inFocusChain = focusChain ? focusChain.has(n.id) : true;
+      const inHoverChain = hoverChain ? hoverChain.has(n.id) : false;
+      const emissiveBump = focusedNow
+        ? 0.4
+        : selectedNow
+          ? 0.3
+          : highlightedNow
+            ? 0.25
+            : inHoverChain
+              ? 0.18
+              : 0;
 
       // Core sphere — flat Lambert material, no bloom needed.
       const geom = new THREE.SphereGeometry(radius, 18, 18);
       const mat = new THREE.MeshLambertMaterial({
         color: baseHex,
         emissive: baseHex,
-        emissiveIntensity: focusedNow ? 0.4 : selectedNow ? 0.3 : highlightedNow ? 0.25 : 0,
+        emissiveIntensity: emissiveBump,
         transparent: true,
-        opacity: inChain ? 1 : 0.25,
+        opacity: inFocusChain ? 1 : 0.25,
       });
       const mesh = new THREE.Mesh(geom, mat);
       group.add(mesh);
@@ -409,6 +525,95 @@ export function CausalGraphViewer({
     backgroundColor: CANVAS_BG,
     cooldownTicks: 150,
   };
+
+  const paletteActions: PaletteAction[] = useMemo(() => {
+    const slug = graph.repo?.replace(/[^a-z0-9-]/gi, "-").toLowerCase() || "graph";
+    const download = (filename: string, mime: string, content: string) => {
+      const blob = new Blob([content], { type: mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+    return [
+      {
+        id: "export-json",
+        label: "Export graph as JSON",
+        hint: ".json",
+        run: () =>
+          download(
+            `${slug}.json`,
+            "application/json",
+            JSON.stringify(graph, null, 2),
+          ),
+      },
+      {
+        id: "export-png",
+        label: "Export canvas as PNG",
+        hint: ".png",
+        run: () => {
+          const canvas = document.querySelector(
+            ".scene-container canvas, canvas",
+          ) as HTMLCanvasElement | null;
+          if (!canvas) {
+            alert("Canvas not ready yet — zoom in/out once, then try again.");
+            return;
+          }
+          canvas.toBlob((blob) => {
+            if (!blob) return;
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${slug}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+          }, "image/png");
+        },
+      },
+      {
+        id: "copy-prompt",
+        label:
+          selectedIds.size > 0
+            ? `Copy prompt for ${selectedIds.size} selected node${selectedIds.size === 1 ? "" : "s"}`
+            : "Copy prompt (select nodes first)",
+        hint: "→ Claude Code",
+        run: async () => {
+          if (selectedIds.size === 0) {
+            alert("Select one or more nodes first (click; shift-click to add).");
+            return;
+          }
+          const prompt = buildFixPrompt(graph, selectedIds);
+          await navigator.clipboard.writeText(prompt);
+        },
+      },
+      {
+        id: "copy-url",
+        label: "Copy shareable URL",
+        hint: "?focus=…",
+        run: async () => {
+          await navigator.clipboard.writeText(window.location.href);
+        },
+      },
+      {
+        id: "toggle-focus",
+        label: focusMode ? "Exit focus mode" : "Enter focus mode (selection only)",
+        hint: ".",
+        run: () => {
+          if (!focusedId) {
+            alert("Focus a node first (click it).");
+            return;
+          }
+          setFocusMode((v) => !v);
+        },
+      },
+    ];
+  }, [graph, selectedIds, focusMode, focusedId]);
 
   return (
     <div className="relative flex h-full w-full overflow-hidden rounded-3xl border border-neutral-200/70 bg-[#14091A] text-white shadow-[0_4px_40px_-12px_rgba(20,9,26,0.35)] ring-1 ring-black/5">
@@ -625,6 +830,17 @@ export function CausalGraphViewer({
               <List size={11} />
               {graph.nodes.length} · {graph.edges.length}
             </div>
+            <div className="mx-1 h-4 w-px bg-white/10" />
+            <button
+              onClick={() => setHelpOpen(true)}
+              aria-label="Keyboard shortcuts"
+              className="flex items-center gap-1 rounded px-2 py-1 font-mono text-[10px] text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <Keyboard size={11} />
+              <kbd className="rounded border border-white/20 px-1 text-[9px]">
+                ?
+              </kbd>
+            </button>
           </div>
 
           <div className="pointer-events-auto absolute right-4 top-14">
@@ -683,6 +899,25 @@ export function CausalGraphViewer({
             />
           </div>
         )}
+
+        {/* Focus mode label */}
+        {focusMode && focusedId && (
+          <div className="pointer-events-none absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full border border-accent-magenta/40 bg-black/50 px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-accent-magenta backdrop-blur">
+            Focus mode · press . to exit
+          </div>
+        )}
+
+        {/* Help overlay (?) */}
+        <HelpOverlay open={helpOpen} onClose={() => setHelpOpen(false)} />
+
+        {/* Command palette (⌘K) */}
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          graph={graph}
+          onSelectNode={(n) => selectSingle(n.id)}
+          actions={paletteActions}
+        />
       </div>
     </div>
   );

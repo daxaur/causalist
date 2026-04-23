@@ -6,7 +6,6 @@ import {
   BookOpen,
   Lightning,
 } from "@phosphor-icons/react/dist/ssr";
-import { Logo } from "@/components/brand/logo";
 import { DocsMarkdown } from "@/components/docs/markdown";
 import { CITATIONS, SECTIONS, sectionBySlug } from "@/lib/docs/content";
 
@@ -42,35 +41,8 @@ export default async function DocsSectionPage({
   const next = index < SECTIONS.length - 1 ? SECTIONS[index + 1] : null;
 
   return (
-    <main className="min-h-screen bg-white text-neutral-900">
-      <nav className="sticky top-0 z-20 flex items-center justify-between border-b border-neutral-100 bg-white/90 px-8 py-4 backdrop-blur">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-neutral-900"
-        >
-          <ArrowLeft size={16} />
-          <span>back</span>
-        </Link>
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-neutral-900 transition-opacity hover:opacity-80"
-        >
-          <Logo size={18} />
-          <span className="font-display text-sm font-medium tracking-tight">
-            docs
-          </span>
-        </Link>
-        <a
-          href="https://github.com/daxaur/causalist"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-neutral-500 transition-colors hover:text-neutral-900"
-        >
-          Source
-        </a>
-      </nav>
-
-      <div className="mx-auto flex max-w-6xl gap-10 px-6 pt-10 pb-24">
+    <main className="min-h-[calc(100vh-57px)] bg-white text-neutral-900">
+      <div className="mx-auto flex max-w-6xl gap-10 px-4 pt-10 pb-24 sm:px-6 lg:px-8">
         {/* Sidebar */}
         <aside className="hidden w-56 shrink-0 lg:block">
           <div className="sticky top-24">
@@ -114,7 +86,7 @@ export default async function DocsSectionPage({
                       href={c.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block transition-colors hover:text-[#E838A4]"
+                      className="block transition-colors hover:text-accent-magenta"
                     >
                       <span className="text-neutral-700">{c.authors}</span>{" "}
                       <span className="text-neutral-400">· {c.year}</span>
