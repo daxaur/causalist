@@ -219,7 +219,6 @@ export function CausalGraphViewer({
         (n.size ?? 4) + (n.kind === "external" ? 1.5 : 0) + tierBoost;
 
       // Core sphere — flat Lambert material, no bloom needed.
-      // Selected/highlight states signal via color + halo, not glow.
       const geom = new THREE.SphereGeometry(radius, 18, 18);
       const mat = new THREE.MeshLambertMaterial({
         color: baseHex,
@@ -229,13 +228,18 @@ export function CausalGraphViewer({
       const mesh = new THREE.Mesh(geom, mat);
       group.add(mesh);
 
-      // Outer soft halo only for the focused node — everything else stays clean
-      if (focusedNow) {
-        const haloGeom = new THREE.SphereGeometry(radius * 1.6, 20, 20);
+      // Soft halo for any active state — full sphere, not an arc —
+      // so the node always reads as a closed ring at hover.
+      if (focusedNow || selectedNow || highlightedNow) {
+        const haloGeom = new THREE.SphereGeometry(radius * 1.55, 22, 22);
         const haloMat = new THREE.MeshBasicMaterial({
           color: ACCENT_HEX,
           transparent: true,
-          opacity: 0.18,
+          opacity: focusedNow
+            ? 0.22
+            : selectedNow
+              ? 0.16
+              : 0.1,
         });
         group.add(new THREE.Mesh(haloGeom, haloMat));
       }
@@ -356,6 +360,7 @@ export function CausalGraphViewer({
               /* Replace the default circle with our own pill node so
                  labels stop stacking on top of each other, and hit
                  area expands beyond the visible dot. */
+              nodeRelSize={6}
               nodeCanvasObjectMode={() => "replace"}
               nodeCanvasObject={(
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -376,57 +381,71 @@ export function CausalGraphViewer({
                     ? ACCENT
                     : `#${layerHex.toString(16).padStart(6, "0")}`;
                 const r =
-                  (node.size ?? 4) +
+                  (node.size ?? 5) +
                   (imp?.tier === "hot" ? 3 : imp?.tier === "core" ? 1.5 : 0) +
-                  (foc ? 1.5 : 0);
-                // Shadow ring (selected / focused)
-                if (foc || sel) {
+                  (foc ? 2 : 0);
+
+                // Outer hover halo — always a full ring so it reads
+                // as a single closed circle on hover/selected/focused.
+                if (hov || foc || sel || ext) {
                   ctx.beginPath();
-                  ctx.arc(node.x, node.y, r + 3, 0, Math.PI * 2);
-                  ctx.fillStyle = "rgba(232,56,164,0.18)";
+                  ctx.arc(node.x, node.y, r + 4, 0, Math.PI * 2);
+                  ctx.fillStyle = foc
+                    ? "rgba(232,56,164,0.22)"
+                    : sel || ext
+                      ? "rgba(232,56,164,0.16)"
+                      : "rgba(232,56,164,0.10)";
                   ctx.fill();
                 }
+
                 // Dot
                 ctx.beginPath();
                 ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
                 ctx.fillStyle = baseColor;
                 ctx.fill();
                 // Thin outline for legibility on white
-                ctx.lineWidth = 0.8 / scale;
-                ctx.strokeStyle = "rgba(10,10,15,0.55)";
+                ctx.lineWidth = 0.9 / scale;
+                ctx.strokeStyle = foc
+                  ? "rgba(232,56,164,1)"
+                  : "rgba(10,10,15,0.45)";
                 ctx.stroke();
 
-                // Labels only when useful:
-                // - hovered or focused (any zoom)
-                // - hot/core at scale > 1.3
-                // - anything at scale > 2.8 (user zoomed in deliberately)
+                // Label logic — tight rules so zooming in doesn't
+                // explode into text soup, and hovering always wins:
+                // - always for hovered + focused
+                // - selected always
+                // - hot at scale >= 0.9, core at >= 1.4
+                // - anything else only at scale >= 2.2
                 const showLabel =
                   hov ||
                   foc ||
                   sel ||
-                  (scale > 1.3 &&
-                    (imp?.tier === "hot" || imp?.tier === "core")) ||
-                  scale > 2.8;
+                  (imp?.tier === "hot" && scale >= 0.9) ||
+                  (imp?.tier === "core" && scale >= 1.4) ||
+                  scale >= 2.2;
                 if (!showLabel) return;
-                const fontSize = Math.max(10, 11 / Math.max(1, scale));
+                // Font size inverts with zoom so labels stay
+                // visually small even when zoomed in — kills the
+                // text-soup-at-close-range bug.
+                const fontSize = Math.max(9, Math.min(13, 13 / Math.max(1, scale)));
                 ctx.font = `500 ${fontSize}px ui-sans-serif, system-ui`;
                 ctx.textAlign = "center";
                 ctx.textBaseline = "top";
                 const label = node.label as string;
-                const padX = 6;
-                const padY = 3;
+                const padX = 5;
+                const padY = 2.5;
                 const w = ctx.measureText(label).width + padX * 2;
                 const h = fontSize + padY * 2;
-                const ly = node.y + r + 4;
+                const ly = node.y + r + 5;
                 // Rounded label background
                 ctx.fillStyle = foc
-                  ? "rgba(232,56,164,0.92)"
+                  ? "rgba(232,56,164,0.95)"
                   : hov
                     ? "rgba(20,9,26,0.92)"
-                    : "rgba(255,255,255,0.92)";
+                    : "rgba(255,255,255,0.95)";
                 ctx.strokeStyle = foc
                   ? "rgba(232,56,164,1)"
-                  : "rgba(10,10,15,0.15)";
+                  : "rgba(10,10,15,0.18)";
                 ctx.lineWidth = 0.8 / scale;
                 const lx = node.x - w / 2;
                 const radius = h / 2;
@@ -459,9 +478,9 @@ export function CausalGraphViewer({
                 ctx.fillStyle = color;
                 const imp = importance.byId.get(node.id);
                 const r =
-                  (node.size ?? 4) +
+                  (node.size ?? 5) +
                   (imp?.tier === "hot" ? 3 : imp?.tier === "core" ? 1.5 : 0) +
-                  6;
+                  8;
                 ctx.beginPath();
                 ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
                 ctx.fill();
@@ -526,8 +545,9 @@ export function CausalGraphViewer({
           </div>
         </div>
 
-        {/* Selection toolbar — floating, above the node panel */}
-        <div className="pointer-events-none absolute bottom-4 left-1/2 z-30 -translate-x-1/2">
+        {/* Selection toolbar — sits well above the mode switcher (which
+            lives at fixed bottom-6) and above the node panel footer. */}
+        <div className="pointer-events-none absolute bottom-20 left-1/2 z-30 -translate-x-1/2">
           <SelectionToolbar
             graph={graph}
             selectedIds={selectedIds}

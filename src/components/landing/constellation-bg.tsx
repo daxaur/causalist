@@ -181,10 +181,21 @@ export function ConstellationBackground() {
   }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="fixed inset-0 z-0 pointer-events-none"
-      style={{ opacity: 1 }}
-    />
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-x-0 top-0 z-0"
+      style={{ height: "100vh" }}
+    >
+      <canvas ref={canvasRef} className="absolute inset-0" />
+      {/* Fade the constellation out below the hero so the features
+          section reads as its own, quiet thing. */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-48"
+        style={{
+          background:
+            "linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,1))",
+        }}
+      />
+    </div>
   );
 }

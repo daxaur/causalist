@@ -233,24 +233,40 @@ export function NodePanel({
 }
 
 function ImportanceBadge({ importance }: { importance: Importance }) {
-  if (importance.tier === "hot") {
+  const { fanIn, fanOut, tier } = importance;
+  const tip =
+    tier === "hot"
+      ? `Hot — top 10% most load-bearing. ${fanIn} files depend on this.`
+      : tier === "core"
+        ? `Core — top 25%. ${fanIn} dependents, ${fanOut} deps.`
+        : `Leaf — nothing depends on this (safe to refactor).`;
+  if (tier === "hot") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-[#E838A4]/40 bg-[#E838A4]/15 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-[#FF9CD9]">
+      <span
+        title={tip}
+        className="inline-flex items-center gap-1 rounded-full border border-[#E838A4]/40 bg-[#E838A4]/15 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-[#FF9CD9]"
+      >
         <Fire size={9} weight="fill" />
         hot
       </span>
     );
   }
-  if (importance.tier === "core") {
+  if (tier === "core") {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-amber-300">
+      <span
+        title={tip}
+        className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-amber-300"
+      >
         <Sparkle size={9} weight="fill" />
         core
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-white/50">
+    <span
+      title={tip}
+      className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-white/50"
+    >
       <Leaf size={9} weight="regular" />
       leaf
     </span>
