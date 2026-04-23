@@ -29,6 +29,7 @@ import { LayerLegend } from "./layer-legend";
 import { FileTree } from "./file-tree";
 import { SelectionToolbar } from "./selection-toolbar";
 import { ImportanceStats } from "./importance-stats";
+import { FirstHotTooltip } from "./first-hot-tooltip";
 
 const ForceGraph3D = dynamic(
   () => import("react-force-graph-3d").then((m) => m.default),
@@ -101,6 +102,18 @@ export function CausalGraphViewer({
   const graphRef = useRef<any>(null);
 
   const importance = useMemo(() => rankImportance(graph), [graph]);
+
+  // Precompute neighbor sets for hover-chain dim.
+  const neighbors = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const n of graph.nodes) m.set(n.id, new Set([n.id]));
+    for (const e of graph.edges) {
+      m.get(e.source)?.add(e.target);
+      m.get(e.target)?.add(e.source);
+    }
+    return m;
+  }, [graph]);
+  const hoverChain = hover ? neighbors.get(hover) ?? null : null;
 
   const data = useMemo(() => {
     const nodes: VisNode[] = graph.nodes.map((n) => ({
@@ -239,12 +252,17 @@ export function CausalGraphViewer({
       const radius =
         (n.size ?? 4) + (n.kind === "external" ? 1.5 : 0) + tierBoost;
 
+      // Dim non-neighbors when hovering so the causal chain pops.
+      const inChain = hoverChain ? hoverChain.has(n.id) : true;
+
       // Core sphere — flat Lambert material, no bloom needed.
       const geom = new THREE.SphereGeometry(radius, 18, 18);
       const mat = new THREE.MeshLambertMaterial({
         color: baseHex,
         emissive: baseHex,
         emissiveIntensity: focusedNow ? 0.4 : selectedNow ? 0.3 : highlightedNow ? 0.25 : 0,
+        transparent: true,
+        opacity: inChain ? 1 : 0.25,
       });
       const mesh = new THREE.Mesh(geom, mat);
       group.add(mesh);
@@ -564,6 +582,11 @@ export function CausalGraphViewer({
               totalNodes={graph.nodes.length}
             />
           </div>
+
+          <FirstHotTooltip
+            enabled={importance.hotIds.size > 0}
+            hotCount={importance.hotIds.size}
+          />
         </div>
 
         {/* Legend */}

@@ -50,6 +50,12 @@
   --animate-marquee: marquee var(--duration) infinite linear;
   --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
   --animate-shiny-text: shiny-text 8s infinite;
+  --animate-shimmer: shimmer 1.6s infinite;
+  @keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+    }
+  }
   @keyframes marquee {
   from {
     transform: translateX(0);
