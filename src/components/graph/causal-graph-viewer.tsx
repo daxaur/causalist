@@ -77,11 +77,14 @@ export function CausalGraphViewer({
   graph,
   highlightedIds,
   diff,
+  visibleIds,
   onAskAboutSelection,
 }: {
   graph: CausalGraph;
   highlightedIds?: string[];
   diff?: DiffOverlay;
+  /** If set, nodes NOT in the set are dimmed (not hidden). From filter panel. */
+  visibleIds?: Set<string>;
   onAskAboutSelection?: (ids: string[]) => void;
 }) {
   const [mode, setMode] = useState<"3d" | "2d">("3d");
@@ -322,6 +325,10 @@ export function CausalGraphViewer({
     linkColor: (l: GraphLink) => {
       const s = typeof l.source === "string" ? l.source : (l.source as VisNode).id;
       const t = typeof l.target === "string" ? l.target : (l.target as VisNode).id;
+      // Filter: if either endpoint is filtered out, dim the edge too.
+      if (visibleIds && (!visibleIds.has(s) || !visibleIds.has(t))) {
+        return "rgba(200,200,210,0.05)";
+      }
       if (diff) {
         const state = diff.edges.get(edgeKey(s, t, l.kind));
         if (state === "added") return DIFF_HEX.added;
