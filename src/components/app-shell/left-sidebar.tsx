@@ -11,10 +11,8 @@ import {
   Folders,
   GearSix,
   GithubLogo,
-  Graph,
   HouseSimple,
-  Terminal,
-  User,
+  Plugs,
 } from "@phosphor-icons/react";
 import {
   Sidebar,
@@ -34,41 +32,37 @@ type Item = {
 
 const WORKSPACE: Item[] = [
   {
-    label: "Browse",
+    label: "Home",
     href: "/app",
     icon: <HouseSimple className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
     match: (p) => p === "/app",
   },
   {
-    label: "Live demos",
+    label: "Demo graphs",
     href: "/app?tab=previews",
     icon: <Cube className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
     match: (p) => p.startsWith("/app/preview"),
   },
   {
-    label: "Reference",
+    label: "How things work",
     href: "/app?tab=reference",
     icon: <BookOpen className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
     match: (p) => p.startsWith("/app/reference"),
   },
   {
-    label: "Library",
+    label: "Saved graphs",
     href: "/app?tab=library",
     icon: <Folders className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
-    match: (p) => p === "/app" && p.includes("library"),
+    match: () => false,
   },
 ];
 
 const ACCOUNT: Item[] = [
   {
-    label: "Profile",
-    href: "/app/profile",
-    icon: <User className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
-  },
-  {
-    label: "Pair terminal",
-    href: "/pair",
-    icon: <Terminal className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
+    label: "Connect Claude Code",
+    href: "/app?tab=claude-code",
+    icon: <Plugs className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
+    match: () => false,
   },
   {
     label: "Settings",
@@ -246,7 +240,3 @@ function Footer({ open }: { open: boolean }) {
   );
 }
 
-// Re-export so the rest of the app can show a layer/tier summary
-// chip in the top-left of the viewer without fishing the icon out
-// here.
-export { Graph as GraphIcon };

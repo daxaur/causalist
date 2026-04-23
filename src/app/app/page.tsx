@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   BookOpen,
+  CheckCircle,
   CircleNotch,
   Cube,
   Folders,
@@ -12,7 +13,9 @@ import {
   Graph,
   Key,
   MagnifyingGlass,
+  Plugs,
   Star,
+  Terminal,
   Warning,
 } from "@phosphor-icons/react";
 import { PageHeader, PageShell } from "@/components/layout/page-shell";
@@ -25,7 +28,7 @@ import { REFERENCES } from "@/lib/graph/references";
 import { useLibrary } from "@/lib/library/store";
 import { cn } from "@/lib/utils";
 
-type Tab = "repos" | "previews" | "reference" | "library";
+type Tab = "repos" | "previews" | "reference" | "library" | "claude-code";
 
 interface Repo {
   id: number;
@@ -54,7 +57,10 @@ export default function DashboardPage() {
     if (typeof window === "undefined") return;
     const sp = new URLSearchParams(window.location.search);
     const t = sp.get("tab") as Tab | null;
-    if (t && ["repos", "previews", "reference", "library"].includes(t)) {
+    if (
+      t &&
+      ["repos", "previews", "reference", "library", "claude-code"].includes(t)
+    ) {
       setTab(t);
     }
   }, []);
@@ -151,33 +157,43 @@ export default function DashboardPage() {
     );
   }, [libraryEntries, query]);
 
-  const TABS: { key: Tab; label: string; count: number; icon: React.ReactNode }[] =
-    [
-      {
-        key: "previews",
-        label: "Live demos",
-        count: PREVIEWS.length,
-        icon: <Cube size={12} weight="duotone" />,
-      },
-      {
-        key: "reference",
-        label: "Reference",
-        count: REFERENCES.length,
-        icon: <BookOpen size={12} weight="duotone" />,
-      },
-      {
-        key: "repos",
-        label: "Your repos",
-        count: repos.length || (isConnected ? 0 : 0),
-        icon: <GithubLogo size={12} weight="fill" />,
-      },
-      {
-        key: "library",
-        label: "Saved",
-        count: libraryEntries.length,
-        icon: <Folders size={12} weight="duotone" />,
-      },
-    ];
+  const TABS: {
+    key: Tab;
+    label: string;
+    count: number | null;
+    icon: React.ReactNode;
+  }[] = [
+    {
+      key: "previews",
+      label: "Demo graphs",
+      count: PREVIEWS.length,
+      icon: <Cube size={12} weight="duotone" />,
+    },
+    {
+      key: "reference",
+      label: "How things work",
+      count: REFERENCES.length,
+      icon: <BookOpen size={12} weight="duotone" />,
+    },
+    {
+      key: "repos",
+      label: "Your repos",
+      count: repos.length || (isConnected ? 0 : 0),
+      icon: <GithubLogo size={12} weight="fill" />,
+    },
+    {
+      key: "library",
+      label: "Saved",
+      count: libraryEntries.length,
+      icon: <Folders size={12} weight="duotone" />,
+    },
+    {
+      key: "claude-code",
+      label: "Use with Claude Code",
+      count: null,
+      icon: <Plugs size={12} weight="duotone" />,
+    },
+  ];
 
   return (
     <PageShell width="docs">
@@ -208,9 +224,11 @@ export default function DashboardPage() {
               {t.icon}
             </span>
             {t.label}
-            <span className="font-mono text-[10px] text-neutral-400">
-              {t.count}
-            </span>
+            {t.count !== null && (
+              <span className="font-mono text-[10px] text-neutral-400">
+                {t.count}
+              </span>
+            )}
             {tab === t.key && (
               <span className="absolute inset-x-0 -bottom-px h-0.5 bg-accent-magenta" />
             )}
@@ -219,23 +237,23 @@ export default function DashboardPage() {
       </div>
 
       {/* Search */}
-      <div className="relative mb-5">
-        <MagnifyingGlass
-          size={15}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
-        />
-        <Input
-          placeholder={`Search ${TABS.find((t) => t.key === tab)?.label.toLowerCase() ?? tab}`}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="h-10 pl-9"
-        />
-      </div>
+      {tab !== "claude-code" && (
+        <div className="relative mb-5">
+          <MagnifyingGlass
+            size={15}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
+          />
+          <Input
+            placeholder={`Search ${TABS.find((t) => t.key === tab)?.label.toLowerCase() ?? tab}`}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="h-10 pl-9"
+          />
+        </div>
+      )}
 
       {/* Content */}
-      {tab === "previews" && (
-        <PreviewsGrid items={filteredPreviews} />
-      )}
+      {tab === "previews" && <PreviewsGrid items={filteredPreviews} />}
 
       {tab === "reference" && <ReferenceGrid items={filteredReferences} />}
 
@@ -288,9 +306,257 @@ export default function DashboardPage() {
           )}
         </>
       )}
+
+      {tab === "claude-code" && <ClaudeCodeTab />}
     </PageShell>
   );
 }
+
+function ClaudeCodeTab() {
+  return (
+    <div className="space-y-8">
+      {/* Pitch */}
+      <div className="relative overflow-hidden rounded-2xl border border-accent-magenta/20 bg-accent-magenta/5 p-6">
+        <div className="relative flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-md border border-accent-magenta/30 bg-white">
+              <Plugs size={18} weight="duotone" className="text-accent-magenta" />
+            </div>
+            <div>
+              <h2 className="font-display text-lg font-medium tracking-tight text-neutral-900">
+                Use Causalist inside Claude Code
+              </h2>
+              <p className="mt-0.5 text-[13px] text-neutral-600">
+                Give your coding agent a map of the repo it&rsquo;s working in.
+                It picks better files to touch and catches what breaks before
+                it ships.
+              </p>
+            </div>
+          </div>
+          <a
+            href="https://docs.claude.com/en/docs/claude-code/overview"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-neutral-900/10 bg-white px-3 text-[11px] text-neutral-700 transition-colors hover:border-neutral-300 hover:text-neutral-900"
+          >
+            What is Claude Code?
+            <ArrowRight size={11} />
+          </a>
+        </div>
+      </div>
+
+      {/* 3-step setup */}
+      <section>
+        <h3 className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
+          Setup · 3 steps
+        </h3>
+        <ol className="space-y-3">
+          <SetupStep
+            n={1}
+            title="Install Claude Code"
+            body={
+              <>
+                Grab the CLI from{" "}
+                <a
+                  href="https://docs.claude.com/en/docs/claude-code/overview"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-neutral-900 underline decoration-neutral-300 underline-offset-2 hover:decoration-accent-magenta"
+                >
+                  docs.claude.com/claude-code
+                </a>
+                . Run <code className="font-mono text-[12px]">claude</code>{" "}
+                in your repo — it&rsquo;s an agent that reads, writes, and
+                runs shells.
+              </>
+            }
+          />
+          <SetupStep
+            n={2}
+            title="Add the Causalist MCP server"
+            body={
+              <>
+                One line in your Claude Code MCP config (
+                <code className="font-mono text-[12px]">~/.claude/mcp.json</code>
+                ):
+                <pre className="mt-2 overflow-x-auto rounded-md border border-neutral-200 bg-neutral-50 p-3 font-mono text-[11.5px] text-neutral-800">
+{`{
+  "mcpServers": {
+    "causalist": {
+      "command": "npx",
+      "args": ["-y", "causalist-mcp@latest"]
+    }
+  }
+}`}
+                </pre>
+                Claude Code now has 10 graph-reading tools:{" "}
+                <code className="font-mono text-[12px]">query_node</code>,{" "}
+                <code className="font-mono text-[12px]">get_neighbors</code>,{" "}
+                <code className="font-mono text-[12px]">find_path</code>,{" "}
+                <code className="font-mono text-[12px]">blast_radius</code>,
+                and more.
+              </>
+            }
+          />
+          <SetupStep
+            n={3}
+            title="Pair your browser"
+            body={
+              <>
+                So the tool-use events you see in the terminal stream into
+                this tab in real time. Run:
+                <pre className="mt-2 overflow-x-auto rounded-md border border-neutral-200 bg-neutral-50 p-3 font-mono text-[11.5px] text-neutral-800">
+                  curl -sSL https://causalist.xyz/api/pair/setup?code=XXXXXX |
+                  sh
+                </pre>
+                <Link
+                  href="/pair"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-neutral-900 px-3 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-neutral-800"
+                >
+                  <Terminal size={11} />
+                  Get a pair code
+                  <ArrowRight size={10} />
+                </Link>
+              </>
+            }
+          />
+        </ol>
+      </section>
+
+      {/* The loop that matters */}
+      <section className="rounded-xl border border-neutral-200 bg-white p-6">
+        <h3 className="mb-1 font-display text-[15px] font-medium tracking-tight text-neutral-900">
+          The loop that matters
+        </h3>
+        <p className="mb-4 text-[13px] text-neutral-500">
+          Concretely, here&rsquo;s how Claude Code uses the graph when you
+          give it a task.
+        </p>
+        <ul className="space-y-2.5 text-[13px] leading-relaxed text-neutral-700">
+          <LoopStep n={1}>
+            <em>You:</em> &ldquo;Add rate limiting to every authenticated API
+            route.&rdquo;
+          </LoopStep>
+          <LoopStep n={2}>
+            Claude calls{" "}
+            <code className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[12px]">
+              find_nodes_by_layer(&quot;api&quot;)
+            </code>{" "}
+            → finds 15 routes.
+          </LoopStep>
+          <LoopStep n={3}>
+            Filters by{" "}
+            <code className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[12px]">
+              get_neighbors(auth-middleware, &quot;in&quot;)
+            </code>{" "}
+            → 11 depend on auth.
+          </LoopStep>
+          <LoopStep n={4}>Prints a plan. You approve.</LoopStep>
+          <LoopStep n={5}>
+            Edits files. Each Edit fires a{" "}
+            <code className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[12px]">
+              PostToolUse
+            </code>{" "}
+            hook → browser tab highlights the node.
+          </LoopStep>
+          <LoopStep n={6}>
+            Calls{" "}
+            <code className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[12px]">
+              affected_tests(edited_ids)
+            </code>{" "}
+            → 12 of 340 tests touched. Runs those only.
+          </LoopStep>
+        </ul>
+        <p className="mt-5 font-display text-[14px] italic text-neutral-600">
+          Claude Code already knows what it changed. Causalist knows what
+          that change <em>means</em>.
+        </p>
+      </section>
+
+      {/* Tools exposed */}
+      <section className="rounded-xl border border-neutral-200 bg-white p-6">
+        <h3 className="mb-3 font-display text-[15px] font-medium tracking-tight text-neutral-900">
+          Tools exposed to your agent
+        </h3>
+        <div className="grid grid-cols-1 gap-2 text-[13px] sm:grid-cols-2">
+          {TOOL_SUMMARIES.map((t) => (
+            <div
+              key={t.name}
+              className="rounded-lg border border-neutral-100 bg-neutral-50/60 px-3 py-2"
+            >
+              <code className="font-mono text-[12px] font-medium text-neutral-900">
+                {t.name}
+              </code>
+              <p className="mt-0.5 text-[12px] text-neutral-500">{t.what}</p>
+            </div>
+          ))}
+        </div>
+        <Link
+          href="/agents"
+          className="mt-4 inline-flex items-center gap-1.5 text-[12px] text-accent-magenta hover:underline underline-offset-2"
+        >
+          Full tool docs
+          <ArrowRight size={11} />
+        </Link>
+      </section>
+    </div>
+  );
+}
+
+function SetupStep({
+  n,
+  title,
+  body,
+}: {
+  n: number;
+  title: string;
+  body: React.ReactNode;
+}) {
+  return (
+    <li className="flex gap-4 rounded-xl border border-neutral-200 bg-white p-5">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-900 font-mono text-[11px] font-medium text-white">
+        {n}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 font-display text-[14px] font-medium text-neutral-900">
+          {title}
+          <CheckCircle
+            size={12}
+            weight="fill"
+            className="text-emerald-400 opacity-0"
+          />
+        </div>
+        <div className="mt-1 text-[13px] leading-relaxed text-neutral-600">
+          {body}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function LoopStep({ n, children }: { n: number; children: React.ReactNode }) {
+  return (
+    <li className="flex gap-3">
+      <span className="mt-0.5 font-mono text-[11px] text-neutral-400">
+        {n}.
+      </span>
+      <span className="flex-1">{children}</span>
+    </li>
+  );
+}
+
+const TOOL_SUMMARIES = [
+  { name: "query_node", what: "Full metadata on any node by id or path." },
+  { name: "get_neighbors", what: "All imports / callers — one hop, any direction." },
+  { name: "find_path", what: "Shortest causal chain between two nodes." },
+  { name: "find_nodes_by_layer", what: "Every API route, every UI component, etc." },
+  { name: "blast_radius", what: "What breaks if this node changes." },
+  { name: "affected_tests", what: "Which tests transitively touch these edits." },
+  { name: "find_writers", what: "Who mutates this piece of state?" },
+  { name: "similar_nodes", what: "Siblings by structure and semantics." },
+  { name: "topo_order", what: "Dependency order for a subgraph." },
+  { name: "co_change", what: "Nodes that tend to change together in commits." },
+];
 
 function PreviewsGrid({ items }: { items: PreviewMeta[] }) {
   if (items.length === 0)
