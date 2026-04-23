@@ -90,7 +90,6 @@ export function CausalGraphViewer({
     : null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<any>(null);
-  const bloomSetupRef = useRef(false);
 
   const importance = useMemo(() => rankImportance(graph), [graph]);
 
@@ -107,44 +106,9 @@ export function CausalGraphViewer({
     return { nodes, links };
   }, [graph]);
 
-  // Install a UnrealBloomPass on first mount in 3D mode — this is the
-  // single biggest visual upgrade. Nodes stop looking like generic
-  // three.js spheres and start looking like embers.
-  useEffect(() => {
-    if (mode !== "3d") return;
-    if (bloomSetupRef.current) return;
-    let cancelled = false;
-    (async () => {
-      // small delay so the force-graph has instantiated its composer
-      await new Promise((r) => setTimeout(r, 150));
-      if (cancelled) return;
-      const g = graphRef.current;
-      if (!g || typeof g.postProcessingComposer !== "function") return;
-      try {
-        const THREE = await import("three");
-        const { UnrealBloomPass } = await import(
-          "three/addons/postprocessing/UnrealBloomPass.js"
-        );
-        const w = window.innerWidth;
-        const h = window.innerHeight;
-        const bloom = new UnrealBloomPass(
-          new THREE.Vector2(w, h),
-          0.55, // strength — kept subtle so the graph stays readable
-          0.65, // radius
-          0.24, // threshold — higher so only bright parts bloom
-        );
-        g.postProcessingComposer().addPass(bloom);
-        bloomSetupRef.current = true;
-      } catch (err) {
-        // addons path might resolve differently in some environments;
-        // the viewer still works without bloom.
-        console.warn("Bloom pass skipped:", err);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [mode]);
+  // Bloom was too loud even at low strength — user feedback. The graph
+  // reads as a clean dashboard without it. Selected-node color, size
+  // tier, and the 270° arc halo carry the visual weight.
 
   useEffect(() => {
     const g = graphRef.current;
@@ -254,20 +218,13 @@ export function CausalGraphViewer({
       const radius =
         (n.size ?? 4) + (n.kind === "external" ? 1.5 : 0) + tierBoost;
 
-      // Core sphere — quieter emissive, more "material" less "neon"
-      const geom = new THREE.SphereGeometry(radius, 20, 20);
-      const mat = new THREE.MeshStandardMaterial({
+      // Core sphere — flat Lambert material, no bloom needed.
+      // Selected/highlight states signal via color + halo, not glow.
+      const geom = new THREE.SphereGeometry(radius, 18, 18);
+      const mat = new THREE.MeshLambertMaterial({
         color: baseHex,
         emissive: baseHex,
-        emissiveIntensity: focusedNow
-          ? 0.95
-          : selectedNow
-            ? 0.65
-            : highlightedNow
-              ? 0.55
-              : 0.22,
-        roughness: 0.5,
-        metalness: 0.12,
+        emissiveIntensity: focusedNow ? 0.4 : selectedNow ? 0.3 : highlightedNow ? 0.25 : 0,
       });
       const mesh = new THREE.Mesh(geom, mat);
       group.add(mesh);
@@ -396,7 +353,10 @@ export function CausalGraphViewer({
             <ForceGraph2D
               ref={graphRef}
               {...sharedProps}
-              nodeCanvasObjectMode={() => "after"}
+              /* Replace the default circle with our own pill node so
+                 labels stop stacking on top of each other, and hit
+                 area expands beyond the visible dot. */
+              nodeCanvasObjectMode={() => "replace"}
               nodeCanvasObject={(
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 node: any,
@@ -404,18 +364,107 @@ export function CausalGraphViewer({
                 scale: number,
               ) => {
                 if (node.x == null || node.y == null) return;
-                const size = Math.max(10, 11 / scale);
-                ctx.font = `500 ${size}px ui-sans-serif, system-ui`;
+                const id = node.id as string;
+                const sel = selectedIds.has(id);
+                const foc = focusedId === id;
+                const hov = hover === id;
+                const ext = externalHighlight.has(id);
+                const imp = importance.byId.get(id);
+                const layerHex = LAYER_HEX[node.layer as SemanticLayer] ?? 0xcccccc;
+                const baseColor =
+                  sel || foc || hov || ext
+                    ? ACCENT
+                    : `#${layerHex.toString(16).padStart(6, "0")}`;
+                const r =
+                  (node.size ?? 4) +
+                  (imp?.tier === "hot" ? 3 : imp?.tier === "core" ? 1.5 : 0) +
+                  (foc ? 1.5 : 0);
+                // Shadow ring (selected / focused)
+                if (foc || sel) {
+                  ctx.beginPath();
+                  ctx.arc(node.x, node.y, r + 3, 0, Math.PI * 2);
+                  ctx.fillStyle = "rgba(232,56,164,0.18)";
+                  ctx.fill();
+                }
+                // Dot
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+                ctx.fillStyle = baseColor;
+                ctx.fill();
+                // Thin outline for legibility on white
+                ctx.lineWidth = 0.8 / scale;
+                ctx.strokeStyle = "rgba(10,10,15,0.55)";
+                ctx.stroke();
+
+                // Labels only when useful:
+                // - hovered or focused (any zoom)
+                // - hot/core at scale > 1.3
+                // - anything at scale > 2.8 (user zoomed in deliberately)
+                const showLabel =
+                  hov ||
+                  foc ||
+                  sel ||
+                  (scale > 1.3 &&
+                    (imp?.tier === "hot" || imp?.tier === "core")) ||
+                  scale > 2.8;
+                if (!showLabel) return;
+                const fontSize = Math.max(10, 11 / Math.max(1, scale));
+                ctx.font = `500 ${fontSize}px ui-sans-serif, system-ui`;
                 ctx.textAlign = "center";
                 ctx.textBaseline = "top";
-                const sel = selectedIds.has(node.id);
-                const hov = hover === node.id;
-                ctx.fillStyle = sel
-                  ? ACCENT
+                const label = node.label as string;
+                const padX = 6;
+                const padY = 3;
+                const w = ctx.measureText(label).width + padX * 2;
+                const h = fontSize + padY * 2;
+                const ly = node.y + r + 4;
+                // Rounded label background
+                ctx.fillStyle = foc
+                  ? "rgba(232,56,164,0.92)"
                   : hov
-                    ? "#ffffff"
-                    : "rgba(229,231,235,0.55)";
-                ctx.fillText(node.label, node.x, node.y + 6);
+                    ? "rgba(20,9,26,0.92)"
+                    : "rgba(255,255,255,0.92)";
+                ctx.strokeStyle = foc
+                  ? "rgba(232,56,164,1)"
+                  : "rgba(10,10,15,0.15)";
+                ctx.lineWidth = 0.8 / scale;
+                const lx = node.x - w / 2;
+                const radius = h / 2;
+                ctx.beginPath();
+                ctx.moveTo(lx + radius, ly);
+                ctx.arcTo(lx + w, ly, lx + w, ly + h, radius);
+                ctx.arcTo(lx + w, ly + h, lx, ly + h, radius);
+                ctx.arcTo(lx, ly + h, lx, ly, radius);
+                ctx.arcTo(lx, ly, lx + w, ly, radius);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                // Label text
+                ctx.fillStyle = foc
+                  ? "#ffffff"
+                  : hov
+                    ? "#f5f5f5"
+                    : "#14091A";
+                ctx.fillText(label, node.x, ly + padY);
+              }}
+              /* Expand click hit area beyond the tiny dot so 2D is
+                 actually clickable. */
+              nodePointerAreaPaint={(
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                node: any,
+                color: string,
+                ctx: CanvasRenderingContext2D,
+              ) => {
+                if (node.x == null || node.y == null) return;
+                ctx.fillStyle = color;
+                const imp = importance.byId.get(node.id);
+                const r =
+                  (node.size ?? 4) +
+                  (imp?.tier === "hot" ? 3 : imp?.tier === "core" ? 1.5 : 0) +
+                  6;
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+                ctx.fill();
               }}
             />
           )}
