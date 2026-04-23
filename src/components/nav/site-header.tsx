@@ -112,7 +112,7 @@ function SiteHeaderVisible({ pathname }: { pathname: string }) {
           <GitHubStarButton />
         </div>
         <Link
-          href="/settings"
+          href="/app/settings"
           aria-label="Settings"
           className="relative flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-500 transition-colors hover:border-neutral-300 hover:text-neutral-900"
         >

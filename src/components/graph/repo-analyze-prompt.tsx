@@ -374,7 +374,7 @@ function MissingKeyCard() {
         We never store it.
       </p>
       <Link
-        href="/settings"
+        href="/app/settings"
         className="inline-flex h-9 items-center gap-1.5 rounded-md bg-neutral-900 px-4 text-xs text-white transition-colors hover:bg-neutral-800"
       >
         Open settings

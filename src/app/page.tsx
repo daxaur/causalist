@@ -61,7 +61,7 @@ export default function Home() {
             />
           </Link>
           <Link
-            href="/settings"
+            href="/app/settings"
             aria-label="Keys and settings"
             className="relative flex h-9 w-9 items-center justify-center rounded-md border border-neutral-200 bg-white/80 text-neutral-500 backdrop-blur-sm transition-colors hover:border-neutral-300 hover:text-neutral-900"
           >
@@ -188,7 +188,7 @@ function Footer() {
               { label: "Foundations", href: "/docs/foundations" },
               { label: "Graph schema", href: "/docs/graph-schema" },
               { label: "Retrieval model", href: "/docs/retrieval" },
-              { label: "Settings", href: "/settings" },
+              { label: "Settings", href: "/app/settings" },
             ]}
           />
         </div>

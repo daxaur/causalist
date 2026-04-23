@@ -102,7 +102,7 @@ export function NodeDeepDive({
   if (!canGenerate) {
     return (
       <Link
-        href="/settings"
+        href="/app/settings"
         className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-left text-[11px] text-white/60 transition-colors hover:border-[#E838A4]/50 hover:text-white"
       >
         <span className="flex items-center gap-1.5">

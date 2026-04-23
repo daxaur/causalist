@@ -610,7 +610,7 @@ function ErrorCard({ message }: { message: string }) {
         <p className="text-sm text-red-700">Couldn&rsquo;t load repositories</p>
         <p className="mt-1 font-mono text-xs text-red-500">{message}</p>
         <Link
-          href="/settings"
+          href="/app/settings"
           className="mt-2 inline-flex items-center gap-1 text-xs text-red-700 underline underline-offset-2 hover:text-red-900"
         >
           Check your GitHub token
@@ -634,7 +634,7 @@ function MissingTokenCard() {
         access token. The token stays in your browser — we never see it.
       </p>
       <Link
-        href="/settings"
+        href="/app/settings"
         className="mt-6 inline-flex h-10 items-center gap-1.5 rounded-md bg-neutral-900 px-4 text-sm text-white transition-colors hover:bg-neutral-800"
       >
         <Key size={14} />

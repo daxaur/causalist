@@ -163,7 +163,7 @@ export function Hero({
           <p className="px-1 text-xs text-neutral-400">
             Add your Anthropic API key in{" "}
             <Link
-              href="/settings"
+              href="/app/settings"
               className="underline underline-offset-2 hover:text-neutral-700"
             >
               settings

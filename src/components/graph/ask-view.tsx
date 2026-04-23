@@ -307,7 +307,7 @@ export function AskView({
           Keys stay in your browser.
         </p>
         <Link
-          href="/settings"
+          href="/app/settings"
           className="inline-flex h-10 items-center gap-1.5 rounded-md bg-neutral-900 px-4 text-sm text-white transition-colors hover:bg-neutral-800"
         >
           Add your key

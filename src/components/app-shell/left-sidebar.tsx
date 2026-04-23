@@ -45,14 +45,17 @@ const WORKSPACE: Item[] = [
     label: "Connect Claude Code",
     href: "/app?tab=claude-code",
     icon: (
-      /* eslint-disable-next-line @next/next/no-img-element */
-      <img
-        src="/claude-code.png"
-        alt=""
-        width={18}
-        height={18}
-        className="h-[18px] w-[18px] shrink-0"
-      />
+      <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/claude-code.png"
+          alt=""
+          width={18}
+          height={18}
+          className="h-[18px] w-[18px] object-contain"
+          style={{ maxHeight: "18px", maxWidth: "18px" }}
+        />
+      </span>
     ),
     match: () => false,
   },
@@ -61,7 +64,7 @@ const WORKSPACE: Item[] = [
 const ACCOUNT: Item[] = [
   {
     label: "Settings",
-    href: "/settings",
+    href: "/app/settings",
     icon: <GearSix className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
   },
 ];
@@ -189,19 +192,20 @@ function Footer({ open }: { open: boolean }) {
   if (connected && auth.avatar_url) {
     return (
       <Link
-        href="/settings"
+        href="/app/settings"
         className="flex items-center gap-3 overflow-hidden rounded-md px-2 py-2 transition-colors hover:bg-neutral-100"
       >
-        <div className="flex h-[22px] w-[22px] shrink-0 items-center justify-center">
+        <span
+          className="relative block h-[22px] w-[22px] shrink-0 overflow-hidden rounded-full bg-neutral-100 ring-1 ring-neutral-200"
+          aria-hidden
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={auth.avatar_url}
             alt=""
-            width={22}
-            height={22}
-            className="h-[22px] w-[22px] rounded-full object-cover ring-1 ring-neutral-200"
+            className="absolute inset-0 h-full w-full object-cover"
           />
-        </div>
+        </span>
         <motion.div
           animate={{
             opacity: open ? 1 : 0,
