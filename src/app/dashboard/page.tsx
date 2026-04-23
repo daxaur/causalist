@@ -19,7 +19,8 @@ import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { Input } from "@/components/ui/input";
 import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useSettings } from "@/lib/settings";
-import { PREVIEWS } from "@/lib/graph/previews";
+import { PreviewDialog } from "@/components/landing/preview-dialog";
+import { PREVIEWS, type PreviewMeta } from "@/lib/graph/previews";
 import { REFERENCES } from "@/lib/graph/references";
 import { useLibrary } from "@/lib/library/store";
 import { cn } from "@/lib/utils";
@@ -291,53 +292,50 @@ export default function DashboardPage() {
   );
 }
 
-function PreviewsGrid({
-  items,
-}: {
-  items: { slug: string; title: string; subtitle: string; tagline: string; graph: { nodes: unknown[]; edges: unknown[] } }[];
-}) {
+function PreviewsGrid({ items }: { items: PreviewMeta[] }) {
   if (items.length === 0)
     return <EmptyHint message="No demos match that search." />;
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
       {items.map((p) => (
-        <Link
-          key={p.slug}
-          href={`/preview/${p.slug}`}
-          className="group relative flex flex-col gap-4 overflow-hidden rounded-xl border border-neutral-200 bg-white p-5 transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-[0_2px_14px_rgba(0,0,0,0.05)]"
-        >
-          <div
-            className="absolute inset-x-0 top-0 h-[2px] origin-left scale-x-0 bg-accent-magenta transition-transform group-hover:scale-x-100"
-            aria-hidden
-          />
-          <div className="flex items-center justify-between">
-            <span className="rounded-full border border-accent-magenta/30 bg-accent-magenta/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-accent-magenta">
-              live demo
-            </span>
-            <span className="flex items-center gap-1 font-mono text-[10px] text-neutral-400">
-              <Graph size={10} weight="duotone" />
-              {p.graph.nodes.length}n · {p.graph.edges.length}e
-            </span>
-          </div>
-          <div>
-            <h3 className="font-display text-lg font-medium tracking-tight text-neutral-900">
-              {p.title}
-            </h3>
-            <p className="mt-1 font-mono text-[11px] text-neutral-400">
-              {p.subtitle}
-            </p>
-            <p className="mt-3 text-[13px] leading-relaxed text-neutral-500">
-              {p.tagline}
-            </p>
-          </div>
-          <div className="flex items-center justify-between pt-1 text-[11px] text-neutral-400">
-            <span className="font-mono">{p.slug}</span>
-            <ArrowRight
-              size={13}
-              className="text-neutral-300 transition-transform group-hover:translate-x-0.5 group-hover:text-accent-magenta"
+        <PreviewDialog key={p.slug} preview={p}>
+          <button
+            type="button"
+            className="group relative flex w-full flex-col gap-4 overflow-hidden rounded-xl border border-neutral-200 bg-white p-5 text-left transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-[0_2px_14px_rgba(0,0,0,0.05)]"
+          >
+            <div
+              className="absolute inset-x-0 top-0 h-[2px] origin-left scale-x-0 bg-accent-magenta transition-transform group-hover:scale-x-100"
+              aria-hidden
             />
-          </div>
-        </Link>
+            <div className="flex items-center justify-between">
+              <span className="rounded-full border border-accent-magenta/30 bg-accent-magenta/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-accent-magenta">
+                live demo
+              </span>
+              <span className="flex items-center gap-1 font-mono text-[10px] text-neutral-400">
+                <Graph size={10} weight="duotone" />
+                {p.graph.nodes.length}n · {p.graph.edges.length}e
+              </span>
+            </div>
+            <div>
+              <h3 className="font-display text-lg font-medium tracking-tight text-neutral-900">
+                {p.title}
+              </h3>
+              <p className="mt-1 font-mono text-[11px] text-neutral-400">
+                {p.subtitle}
+              </p>
+              <p className="mt-3 text-[13px] leading-relaxed text-neutral-500">
+                {p.tagline}
+              </p>
+            </div>
+            <div className="flex items-center justify-between pt-1 text-[11px] text-neutral-400">
+              <span className="font-mono">click to open</span>
+              <ArrowRight
+                size={13}
+                className="text-neutral-300 transition-transform group-hover:translate-x-0.5 group-hover:text-accent-magenta"
+              />
+            </div>
+          </button>
+        </PreviewDialog>
       ))}
     </div>
   );

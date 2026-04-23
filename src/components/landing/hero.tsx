@@ -4,18 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { motion } from "motion/react";
-import { ArrowRight, Sparkle } from "@phosphor-icons/react";
+import { ArrowRight, Sparkle, Cube } from "@phosphor-icons/react";
 import { AnimatedShinyText } from "@/components/ui/animated-shiny-text";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PREVIEWS } from "@/lib/graph/previews";
+import { PreviewDialog } from "./preview-dialog";
 
 const GITHUB_URL = /github\.com\/([^/\s]+)\/([^/\s?#]+)/;
-
-const PREVIEW_LINKS = [
-  { slug: "causalist", label: "causalist" },
-  { slug: "next-js", label: "next.js" },
-  { slug: "flask", label: "flask" },
-];
 
 const container = {
   hidden: {},
@@ -179,13 +175,27 @@ export function Hero({
 
       <motion.div
         variants={item}
-        className="mt-8 flex flex-wrap items-center justify-center gap-2 text-sm"
+        className="mt-8 flex items-center justify-center gap-3"
+      >
+        <Link
+          href="/dashboard"
+          className="inline-flex h-10 items-center gap-2 rounded-md border border-neutral-200 bg-white px-4 text-sm text-neutral-700 transition-all hover:border-neutral-400 hover:shadow-sm"
+        >
+          <Cube size={14} weight="duotone" className="text-accent-magenta" />
+          Open the application
+          <ArrowRight size={13} className="text-neutral-400" />
+        </Link>
+      </motion.div>
+
+      <motion.div
+        variants={item}
+        className="mt-10 flex flex-wrap items-center justify-center gap-2 text-sm"
       >
         <span className="mr-1 flex items-center gap-1.5 text-neutral-400">
           <Sparkle size={13} weight="duotone" />
-          Instant preview
+          Or try a live demo
         </span>
-        {PREVIEW_LINKS.map((p, i) => (
+        {PREVIEWS.map((p, i) => (
           <motion.span
             key={p.slug}
             initial={{ opacity: 0, y: 6 }}
@@ -196,12 +206,14 @@ export function Hero({
               ease: [0.16, 1, 0.3, 1],
             }}
           >
-            <Link
-              href={`/preview/${p.slug}`}
-              className="rounded-full border border-neutral-200 bg-white/80 px-3 py-1 font-mono text-xs text-neutral-700 backdrop-blur-sm transition-all hover:border-neutral-400 hover:shadow-sm"
-            >
-              {p.label}
-            </Link>
+            <PreviewDialog preview={p}>
+              <button
+                type="button"
+                className="rounded-full border border-neutral-200 bg-white/80 px-3 py-1 font-mono text-xs text-neutral-700 backdrop-blur-sm transition-all hover:border-accent-magenta hover:text-neutral-900 hover:shadow-sm"
+              >
+                {p.title}
+              </button>
+            </PreviewDialog>
           </motion.span>
         ))}
       </motion.div>

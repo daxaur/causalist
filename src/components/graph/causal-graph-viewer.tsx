@@ -48,34 +48,47 @@ const ForceGraph2D = dynamic(
 type GraphLink = { source: string; target: string; kind: string };
 type VisNode = CausalNode & { iconUrl: string | null };
 
+// Palette derived from the "editorial light" research: warm off-white
+// canvas + cream default nodes + magenta only as an accent + warm-grey
+// edges. No more neon-on-black. Matches the rest of the product.
 const ACCENT = "#E838A4";
 const ACCENT_HEX = 0xe838a4;
-const CANVAS_BG = "#14091A";
+const CANVAS_BG = "#FAFAF8";
+
+const INK = "#2A2420"; // primary ink
+const NODE_DEFAULT_FILL = 0xede9e3; // warm cream
+const NODE_DEFAULT_STROKE = 0x2a2420; // ink hairline
+const NODE_LEAF_FILL = 0xffffff;
+const NODE_LEAF_STROKE = 0xbdb6ac;
+const EDGE_DEFAULT = "rgba(180,170,158,0.60)"; // #D4D0C8 @ 0.6
 
 const KIND_EDGE_COLOR: Record<string, string> = {
-  imports: "rgba(255,255,255,0.45)",
-  calls: "rgba(232,56,164,0.85)",
-  reads: "rgba(125,211,252,0.75)",
-  writes: "rgba(248,113,113,0.75)",
-  extends: "rgba(192,132,252,0.75)",
+  imports: EDGE_DEFAULT,
+  calls: "rgba(232,56,164,0.70)",
+  reads: "rgba(120,113,108,0.60)",
+  writes: "rgba(120,113,108,0.60)",
+  extends: "rgba(120,113,108,0.60)",
 };
 
 const KIND_EDGE_HEX: Record<string, number> = {
-  imports: 0xbababa,
+  imports: 0xd4d0c8,
   calls: 0xe838a4,
-  reads: 0x7dd3fc,
-  writes: 0xf87171,
-  extends: 0xc084fc,
+  reads: 0xb8b1a7,
+  writes: 0xb8b1a7,
+  extends: 0xb8b1a7,
 };
 
+// Soft, desaturated hues — all pass against the #FAFAF8 canvas
+// without vibrating, and every one reads as a sibling in the same
+// palette family.
 const LAYER_HEX: Record<SemanticLayer, number> = {
-  infra: 0x60a5fa,
-  data: 0x34d399,
-  logic: 0xfbbf24,
-  api: 0xf87171,
-  ui: 0xc084fc,
-  test: 0xe5e7eb,
-  config: 0x94a3b8,
+  infra: 0x8eabc8, // dusty blue
+  data: 0x86b6a1, // sage
+  logic: 0xcdb586, // wheat
+  api: 0xd08a8a, // terracotta
+  ui: 0xb199c8, // muted lilac
+  test: 0xcccccc, // greige
+  config: 0x99928a, // warm taupe
 };
 
 export function CausalGraphViewer({
@@ -389,61 +402,76 @@ export function CausalGraphViewer({
             : diffState === "modified"
               ? 0xd29922
               : null;
-      const baseHex =
-        diffHex !== null
-          ? diffHex
-          : selectedNow || highlightedNow
-            ? ACCENT_HEX
-            : (LAYER_HEX[n.layer as SemanticLayer] ?? 0xcccccc);
 
       const imp = importance.byId.get(n.id);
-      const tierBoost =
-        imp?.tier === "hot" ? 2.6 : imp?.tier === "core" ? 1.2 : 0;
-      const radius =
-        (n.size ?? 4) + (n.kind === "external" ? 1.5 : 0) + tierBoost;
+      const tier = imp?.tier ?? "leaf";
+      // Light-mode rendering rules (from research):
+      //  - hot/core nodes: solid magenta, no stroke
+      //  - default: cream fill + ink hairline
+      //  - leaf (external or low-importance): white fill + grey hairline
+      //  - selected: fill stays, stroke becomes magenta 1.5px
+      //  - hover: stroke thickens; NEVER dims non-neighbors
+      let fillHex: number;
+      let strokeHex: number | null;
+      if (diffHex !== null) {
+        fillHex = diffHex;
+        strokeHex = null;
+      } else if (selectedNow) {
+        fillHex = tier === "hot" ? ACCENT_HEX : (LAYER_HEX[n.layer as SemanticLayer] ?? NODE_DEFAULT_FILL);
+        strokeHex = ACCENT_HEX;
+      } else if (tier === "hot" || tier === "core") {
+        fillHex = ACCENT_HEX;
+        strokeHex = null;
+      } else if (n.kind === "external") {
+        fillHex = NODE_LEAF_FILL;
+        strokeHex = NODE_LEAF_STROKE;
+      } else {
+        // Use layer tint at low saturation as the fill; ink hairline
+        fillHex = LAYER_HEX[n.layer as SemanticLayer] ?? NODE_DEFAULT_FILL;
+        strokeHex = NODE_DEFAULT_STROKE;
+      }
 
-      // Hover never dims. Only explicit focus-mode (. key) dims
-      // non-neighbors so the user sees an intentional filter, not
-      // mysterious greying on every mouse move. Hovered neighbors get
-      // a small emissive bump below instead — brighten, don't dim.
+      const tierBoost = tier === "hot" ? 3 : tier === "core" ? 1.5 : 0;
+      const radius =
+        (n.size ?? 4) + (n.kind === "external" ? 1 : 0) + tierBoost;
+
+      // Focus-mode dimming only; hover leaves alpha alone.
       const inFocusChain = focusChain ? focusChain.has(n.id) : true;
       const inHoverChain = hoverChain ? hoverChain.has(n.id) : false;
-      const emissiveBump = focusedNow
-        ? 0.4
-        : selectedNow
-          ? 0.3
-          : highlightedNow
-            ? 0.25
-            : inHoverChain
-              ? 0.18
-              : 0;
 
-      // Core sphere — flat Lambert material, no bloom needed.
-      const geom = new THREE.SphereGeometry(radius, 18, 18);
+      // Core sphere — flat fill, no emissive (no bloom, no glow). On a
+      // light canvas the fill alone is enough.
+      const geom = new THREE.SphereGeometry(radius, 20, 20);
       const mat = new THREE.MeshLambertMaterial({
-        color: baseHex,
-        emissive: baseHex,
-        emissiveIntensity: emissiveBump,
+        color: fillHex,
         transparent: true,
-        opacity: inFocusChain ? 1 : 0.25,
+        opacity: inFocusChain ? 1 : 0.2,
       });
-      const mesh = new THREE.Mesh(geom, mat);
-      group.add(mesh);
+      group.add(new THREE.Mesh(geom, mat));
 
-      // Soft halo for any active state — full sphere, not an arc —
-      // so the node always reads as a closed ring at hover.
-      if (focusedNow || selectedNow || highlightedNow) {
-        const haloGeom = new THREE.SphereGeometry(radius * 1.55, 22, 22);
-        const haloMat = new THREE.MeshBasicMaterial({
+      // Hairline stroke: render a slightly larger back-face sphere so
+      // the edge shows as a dark rim. Thin, architectural.
+      if (strokeHex !== null) {
+        const strokeGeom = new THREE.SphereGeometry(radius + 0.25, 20, 20);
+        const strokeMat = new THREE.MeshBasicMaterial({
+          color: strokeHex,
+          transparent: true,
+          opacity: 0.85,
+          side: THREE.BackSide,
+        });
+        group.add(new THREE.Mesh(strokeGeom, strokeMat));
+      }
+
+      // Hover ring — thickened accent stroke, no fill fade.
+      if (inHoverChain || highlightedNow) {
+        const ringGeom = new THREE.SphereGeometry(radius + 0.6, 22, 22);
+        const ringMat = new THREE.MeshBasicMaterial({
           color: ACCENT_HEX,
           transparent: true,
-          opacity: focusedNow
-            ? 0.22
-            : selectedNow
-              ? 0.16
-              : 0.1,
+          opacity: 0.35,
+          side: THREE.BackSide,
         });
-        group.add(new THREE.Mesh(haloGeom, haloMat));
+        group.add(new THREE.Mesh(ringGeom, ringMat));
       }
 
       // Focused: 270° torus arc — Arc+Terminus logo motif
@@ -616,21 +644,26 @@ export function CausalGraphViewer({
   }, [graph, selectedIds, focusMode, focusedId]);
 
   return (
-    <div className="relative flex h-full w-full overflow-hidden rounded-3xl border border-neutral-200/70 bg-[#14091A] text-white shadow-[0_4px_40px_-12px_rgba(20,9,26,0.35)] ring-1 ring-black/5">
-      {/* Radial fade so the edges of the canvas don't feel hard */}
+    <div
+      className="relative flex h-full w-full overflow-hidden border border-neutral-200/70 text-[color:var(--ink,#2A2420)]"
+      style={{ backgroundColor: CANVAS_BG }}
+    >
+      {/* Subtle architectural grid — 48px lines at 3% opacity. Gives
+          the canvas structure without reading as a graph-paper demo. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 z-[1] rounded-3xl"
+        className="pointer-events-none absolute inset-0 z-[1]"
         style={{
-          background:
-            "radial-gradient(120% 80% at 50% 50%, transparent 60%, rgba(255,92,192,0.04) 100%)",
+          backgroundImage:
+            "linear-gradient(to right, rgba(0,0,0,0.035) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.035) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
         }}
       />
 
       {/* File-tree sidebar */}
       <aside
         className={cn(
-          "flex shrink-0 flex-col border-r border-white/5 bg-[#0C0611] transition-all duration-300",
+          "flex shrink-0 flex-col border-r border-neutral-200 bg-white/70 backdrop-blur transition-all duration-300",
           sidebarOpen ? "w-64" : "w-0",
         )}
       >
@@ -676,39 +709,34 @@ export function CausalGraphViewer({
                 const hov = hover === id;
                 const ext = externalHighlight.has(id);
                 const imp = importance.byId.get(id);
-                const layerHex = LAYER_HEX[node.layer as SemanticLayer] ?? 0xcccccc;
-                const baseColor =
-                  sel || foc || hov || ext
-                    ? ACCENT
-                    : `#${layerHex.toString(16).padStart(6, "0")}`;
+                const tier = imp?.tier ?? "leaf";
+                // Light-mode node rules — match the 3D path.
+                let fillColor: string;
+                let strokeColor: string;
+                if (tier === "hot" || tier === "core") {
+                  fillColor = ACCENT;
+                  strokeColor = ACCENT;
+                } else if (node.kind === "external") {
+                  fillColor = "#FFFFFF";
+                  strokeColor = "#BDB6AC";
+                } else {
+                  const layerHex = LAYER_HEX[node.layer as SemanticLayer] ?? 0xede9e3;
+                  fillColor = `#${layerHex.toString(16).padStart(6, "0")}`;
+                  strokeColor = INK;
+                }
                 const r =
                   (node.size ?? 5) +
-                  (imp?.tier === "hot" ? 3 : imp?.tier === "core" ? 1.5 : 0) +
+                  (tier === "hot" ? 3 : tier === "core" ? 1.5 : 0) +
                   (foc ? 2 : 0);
-
-                // Outer hover halo — always a full ring so it reads
-                // as a single closed circle on hover/selected/focused.
-                if (hov || foc || sel || ext) {
-                  ctx.beginPath();
-                  ctx.arc(node.x, node.y, r + 4, 0, Math.PI * 2);
-                  ctx.fillStyle = foc
-                    ? "rgba(232,56,164,0.22)"
-                    : sel || ext
-                      ? "rgba(232,56,164,0.16)"
-                      : "rgba(232,56,164,0.10)";
-                  ctx.fill();
-                }
 
                 // Dot
                 ctx.beginPath();
                 ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
-                ctx.fillStyle = baseColor;
+                ctx.fillStyle = fillColor;
                 ctx.fill();
-                // Thin outline for legibility on white
-                ctx.lineWidth = 0.9 / scale;
-                ctx.strokeStyle = foc
-                  ? "rgba(232,56,164,1)"
-                  : "rgba(10,10,15,0.45)";
+                // Hairline stroke — thickens on hover / becomes magenta when selected.
+                ctx.lineWidth = (sel || foc ? 1.8 : hov || ext ? 1.4 : 1.0) / scale;
+                ctx.strokeStyle = sel || foc ? ACCENT : strokeColor;
                 ctx.stroke();
 
                 // Label logic — tight rules so zooming in doesn't
@@ -741,12 +769,12 @@ export function CausalGraphViewer({
                 // Rounded label background
                 ctx.fillStyle = foc
                   ? "rgba(232,56,164,0.95)"
-                  : hov
-                    ? "rgba(20,9,26,0.92)"
-                    : "rgba(255,255,255,0.95)";
+                  : "rgba(255,255,255,0.96)";
                 ctx.strokeStyle = foc
                   ? "rgba(232,56,164,1)"
-                  : "rgba(10,10,15,0.18)";
+                  : hov || sel
+                    ? "rgba(42,36,32,0.35)"
+                    : "rgba(42,36,32,0.15)";
                 ctx.lineWidth = 0.8 / scale;
                 const lx = node.x - w / 2;
                 const radius = h / 2;
@@ -760,11 +788,7 @@ export function CausalGraphViewer({
                 ctx.fill();
                 ctx.stroke();
                 // Label text
-                ctx.fillStyle = foc
-                  ? "#ffffff"
-                  : hov
-                    ? "#f5f5f5"
-                    : "#14091A";
+                ctx.fillStyle = foc ? "#ffffff" : INK;
                 ctx.fillText(label, node.x, ly + padY);
               }}
               /* Expand click hit area beyond the tiny dot so 2D is
@@ -798,21 +822,21 @@ export function CausalGraphViewer({
               aria-label="Toggle file tree"
               aria-pressed={sidebarOpen}
               className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-black/40 backdrop-blur transition-colors",
-                sidebarOpen ? "text-white" : "text-white/50 hover:text-white",
+                "flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 bg-white/80 backdrop-blur transition-colors",
+                sidebarOpen ? "text-neutral-900" : "text-neutral-500 hover:text-neutral-900",
               )}
             >
               <SidebarSimple size={14} />
             </button>
-            <div className="rounded-md border border-white/10 bg-black/40 px-3 py-1.5 font-mono text-xs text-white/80 backdrop-blur">
+            <div className="rounded-md border border-neutral-200 bg-white/80 px-3 py-1.5 font-mono text-xs text-neutral-700 backdrop-blur">
               {graph.repo}
               {graph.commit ? (
-                <span className="text-white/40">@{graph.commit.slice(0, 7)}</span>
+                <span className="text-neutral-400">@{graph.commit.slice(0, 7)}</span>
               ) : null}
             </div>
           </div>
 
-          <div className="pointer-events-auto flex items-center gap-1 rounded-md border border-white/10 bg-black/40 p-1 backdrop-blur">
+          <div className="pointer-events-auto flex items-center gap-1 rounded-md border border-neutral-200 bg-white/80 p-1 backdrop-blur">
             <ModeButton
               active={mode === "3d"}
               onClick={() => setMode("3d")}
@@ -825,19 +849,19 @@ export function CausalGraphViewer({
               label="2D"
               icon={<SquaresFour size={13} weight={mode === "2d" ? "fill" : "regular"} />}
             />
-            <div className="mx-1 h-4 w-px bg-white/10" />
-            <div className="flex items-center gap-1.5 px-2 font-mono text-[10px] text-white/50">
+            <div className="mx-1 h-4 w-px bg-neutral-200" />
+            <div className="flex items-center gap-1.5 px-2 font-mono text-[10px] text-neutral-500">
               <List size={11} />
               {graph.nodes.length} · {graph.edges.length}
             </div>
-            <div className="mx-1 h-4 w-px bg-white/10" />
+            <div className="mx-1 h-4 w-px bg-neutral-200" />
             <button
               onClick={() => setHelpOpen(true)}
               aria-label="Keyboard shortcuts"
-              className="flex items-center gap-1 rounded px-2 py-1 font-mono text-[10px] text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+              className="flex items-center gap-1 rounded px-2 py-1 font-mono text-[10px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
             >
               <Keyboard size={11} />
-              <kbd className="rounded border border-white/20 px-1 text-[9px]">
+              <kbd className="rounded border border-neutral-300 px-1 text-[9px]">
                 ?
               </kbd>
             </button>
@@ -871,13 +895,13 @@ export function CausalGraphViewer({
 
         {/* Always-visible keyboard hint strip — makes the viewer feel
             controllable at a glance without requiring a modal open. */}
-        <div className="pointer-events-none absolute bottom-4 right-4 z-10 hidden items-center gap-3 rounded-full border border-white/10 bg-black/40 px-3 py-1.5 font-mono text-[10px] text-white/55 backdrop-blur md:flex">
+        <div className="pointer-events-none absolute bottom-4 right-4 z-10 hidden items-center gap-3 rounded-full border border-neutral-200 bg-white/80 px-3 py-1.5 font-mono text-[10px] text-neutral-500 backdrop-blur md:flex">
           <Hint keys={["j", "k"]} label="walk" />
-          <span className="text-white/15">·</span>
+          <span className="text-neutral-300">·</span>
           <Hint keys={["."]} label="focus" />
-          <span className="text-white/15">·</span>
+          <span className="text-neutral-300">·</span>
           <Hint keys={["⌘", "K"]} label="cmd" />
-          <span className="text-white/15">·</span>
+          <span className="text-neutral-300">·</span>
           <Hint keys={["?"]} label="help" />
         </div>
 
@@ -941,12 +965,12 @@ function Hint({ keys, label }: { keys: string[]; label: string }) {
       {keys.map((k) => (
         <kbd
           key={k}
-          className="rounded border border-white/15 bg-white/5 px-1 py-[1px] text-[9px] text-white/75"
+          className="rounded border border-neutral-300 bg-white px-1 py-[1px] text-[9px] text-neutral-700"
         >
           {k}
         </kbd>
       ))}
-      <span className="text-white/50">{label}</span>
+      <span className="text-neutral-500">{label}</span>
     </span>
   );
 }
@@ -968,7 +992,7 @@ function ModeButton({
       aria-pressed={active}
       className={cn(
         "flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors",
-        active ? "bg-white/15 text-white" : "text-white/60 hover:text-white",
+        active ? "bg-neutral-900 text-white" : "text-neutral-500 hover:text-neutral-900",
       )}
     >
       {icon}
