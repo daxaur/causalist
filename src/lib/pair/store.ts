@@ -1,11 +1,7 @@
-// Ephemeral pair-code store. In-memory only — same trade-off as the
-// stream bus: good for local dev + single-instance Vercel. Swap for
-// Upstash Redis when you need multi-instance scaling.
-//
-// Contract:
-// - POST /api/pair                → creates a code, returns { code, sessionId }
-// - GET  /api/pair?code=<code>    → consumes the code, returns { sessionId, token }
-// - Codes are single-use and expire after 10 minutes.
+// Pair-code store with Supabase persistence and in-memory fallback.
+// Codes are 6-char, single-use, and expire after 10 minutes.
+
+import { serverSupabase } from "@/lib/supabase/client";
 
 interface PairEntry {
   sessionId: string;
@@ -15,16 +11,14 @@ interface PairEntry {
   claimedAt?: number;
 }
 
-const codes = new Map<string, PairEntry>();
+const memory = new Map<string, PairEntry>();
 const TTL_MS = 10 * 60 * 1000;
 const CLEANUP_INTERVAL = 60 * 1000;
 
-// Lazy GC — delete expired entries on every read so we don't need a
-// persistent interval timer (Vercel serverless can't keep one alive).
 function gc() {
   const now = Date.now();
-  for (const [code, entry] of codes) {
-    if (now - entry.createdAt > TTL_MS) codes.delete(code);
+  for (const [code, entry] of memory) {
+    if (now - entry.createdAt > TTL_MS) memory.delete(code);
   }
 }
 
@@ -37,24 +31,57 @@ function maybeGc() {
   }
 }
 
-export function mintCode(sessionId: string, token: string): string {
+export async function mintCode(
+  sessionId: string,
+  token: string,
+): Promise<string> {
   maybeGc();
   const code = generate6();
-  codes.set(code, { sessionId, token, createdAt: Date.now() });
+  const sb = serverSupabase();
+  if (sb) {
+    const { error } = await sb.from("causalist_pair_codes").insert({
+      code,
+      session_id: sessionId,
+      token,
+    });
+    if (error) throw new Error(`pair code insert failed: ${error.message}`);
+  } else {
+    memory.set(code, { sessionId, token, createdAt: Date.now() });
+  }
   return code;
 }
 
-export function claimCode(
+export async function claimCode(
   code: string,
-): { sessionId: string; token: string; claimedAt: number } | null {
+): Promise<{ sessionId: string; token: string; claimedAt: number } | null> {
   maybeGc();
-  const entry = codes.get(code);
+  const sb = serverSupabase();
+  if (sb) {
+    // Atomic claim: update row, set claimed_at if not set and not expired.
+    const now = new Date();
+    const expiryCutoff = new Date(Date.now() - TTL_MS).toISOString();
+    const { data, error } = await sb
+      .from("causalist_pair_codes")
+      .update({ claimed_at: now.toISOString() })
+      .eq("code", code)
+      .is("claimed_at", null)
+      .gt("created_at", expiryCutoff)
+      .select("session_id, token")
+      .maybeSingle();
+    if (error || !data) return null;
+    return {
+      sessionId: data.session_id as string,
+      token: data.token as string,
+      claimedAt: now.getTime(),
+    };
+  }
+  const entry = memory.get(code);
   if (!entry) return null;
   if (Date.now() - entry.createdAt > TTL_MS) {
-    codes.delete(code);
+    memory.delete(code);
     return null;
   }
-  if (entry.claimedAt) return null; // single-use
+  if (entry.claimedAt) return null;
   entry.claimedAt = Date.now();
   return {
     sessionId: entry.sessionId,
@@ -63,8 +90,17 @@ export function claimCode(
   };
 }
 
-export function isClaimed(code: string): boolean {
-  const entry = codes.get(code);
+export async function isClaimed(code: string): Promise<boolean> {
+  const sb = serverSupabase();
+  if (sb) {
+    const { data } = await sb
+      .from("causalist_pair_codes")
+      .select("claimed_at")
+      .eq("code", code)
+      .maybeSingle();
+    return Boolean(data?.claimed_at);
+  }
+  const entry = memory.get(code);
   return Boolean(entry?.claimedAt);
 }
 

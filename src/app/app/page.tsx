@@ -47,7 +47,7 @@ export default function DashboardPage() {
   const [loadingRepos, setLoadingRepos] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<Tab>("previews");
+  const [tab, setTab] = useState<Tab>("repos");
   const { entries: libraryEntries, loading: loadingLib } = useLibrary();
 
   const githubToken = auth.token ?? settings.githubToken;
@@ -157,24 +157,16 @@ export default function DashboardPage() {
     );
   }, [libraryEntries, query]);
 
+  // Demo graphs intentionally omitted — they live on the landing page
+  // (hero pills + PreviewDialog). The app shell is for the user's
+  // own work: their repos, their saved graphs, references, plus the
+  // Claude Code integration pitch.
   const TABS: {
     key: Tab;
     label: string;
     count: number | null;
     icon: React.ReactNode;
   }[] = [
-    {
-      key: "previews",
-      label: "Demo graphs",
-      count: PREVIEWS.length,
-      icon: <Cube size={12} weight="duotone" />,
-    },
-    {
-      key: "reference",
-      label: "How things work",
-      count: REFERENCES.length,
-      icon: <BookOpen size={12} weight="duotone" />,
-    },
     {
       key: "repos",
       label: "Your repos",
@@ -183,9 +175,15 @@ export default function DashboardPage() {
     },
     {
       key: "library",
-      label: "Saved",
+      label: "Saved graphs",
       count: libraryEntries.length,
       icon: <Folders size={12} weight="duotone" />,
+    },
+    {
+      key: "reference",
+      label: "How things work",
+      count: REFERENCES.length,
+      icon: <BookOpen size={12} weight="duotone" />,
     },
     {
       key: "claude-code",
@@ -316,19 +314,33 @@ function ClaudeCodeTab() {
   return (
     <div className="space-y-8">
       {/* Pitch */}
-      <div className="relative overflow-hidden rounded-2xl border border-accent-magenta/20 bg-accent-magenta/5 p-6">
-        <div className="relative flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md border border-accent-magenta/30 bg-white">
-              <Plugs size={18} weight="duotone" className="text-accent-magenta" />
+      <div className="relative overflow-hidden rounded-2xl border border-neutral-200 bg-white p-6">
+        <div
+          aria-hidden
+          className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-gradient-to-br from-accent-magenta/10 to-transparent blur-3xl"
+        />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/claude-mark.svg"
+                alt="Claude"
+                width={28}
+                height={28}
+                className="h-7 w-7"
+              />
             </div>
             <div>
-              <h2 className="font-display text-lg font-medium tracking-tight text-neutral-900">
-                Use Causalist inside Claude Code
+              <div className="mb-0.5 font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
+                For Claude Code
+              </div>
+              <h2 className="font-display text-xl font-medium tracking-tight text-neutral-900">
+                Give your agent a map of the repo
               </h2>
-              <p className="mt-0.5 text-[13px] text-neutral-600">
-                Give your coding agent a map of the repo it&rsquo;s working in.
-                It picks better files to touch and catches what breaks before
+              <p className="mt-1 max-w-xl text-[13px] leading-relaxed text-neutral-500">
+                Causalist exposes a typed causal graph over MCP. Claude Code
+                reads it, plans better edits, and knows what breaks before
                 it ships.
               </p>
             </div>
@@ -337,7 +349,7 @@ function ClaudeCodeTab() {
             href="https://docs.claude.com/en/docs/claude-code/overview"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-neutral-900/10 bg-white px-3 text-[11px] text-neutral-700 transition-colors hover:border-neutral-300 hover:text-neutral-900"
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 text-[12px] text-neutral-700 transition-colors hover:border-neutral-300 hover:text-neutral-900"
           >
             What is Claude Code?
             <ArrowRight size={11} />

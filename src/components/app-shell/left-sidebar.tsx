@@ -7,7 +7,6 @@ import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import {
   BookOpen,
-  Cube,
   Folders,
   GearSix,
   GithubLogo,
@@ -38,22 +37,22 @@ const WORKSPACE: Item[] = [
     match: (p) => p === "/app",
   },
   {
-    label: "Demo graphs",
-    href: "/app?tab=previews",
-    icon: <Cube className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
-    match: (p) => p.startsWith("/app/preview"),
-  },
-  {
-    label: "How things work",
-    href: "/app?tab=reference",
-    icon: <BookOpen className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
-    match: (p) => p.startsWith("/app/reference"),
+    label: "Your repos",
+    href: "/app?tab=repos",
+    icon: <GithubLogo className="h-[18px] w-[18px] shrink-0" weight="fill" />,
+    match: (p) => /^\/app\/[^/]+\/[^/]+/.test(p),
   },
   {
     label: "Saved graphs",
     href: "/app?tab=library",
     icon: <Folders className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
     match: () => false,
+  },
+  {
+    label: "How things work",
+    href: "/app?tab=reference",
+    icon: <BookOpen className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
+    match: (p) => p.startsWith("/app/reference"),
   },
 ];
 
@@ -188,24 +187,31 @@ function Footer({ open }: { open: boolean }) {
   const auth = useGithubAuth();
   const connected = auth.authenticated;
 
+  // Wrapping the avatar in a fixed-size shrink-0 box prevents flex
+  // math from warping it into a rectangle when the sidebar width
+  // animates down to 60px.
   if (connected && auth.avatar_url) {
     return (
       <Link
-        href="/app/profile"
-        className="flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-neutral-100"
+        href="/settings"
+        className="flex items-center gap-3 overflow-hidden rounded-md px-2 py-2 transition-colors hover:bg-neutral-100"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={auth.avatar_url}
-          alt=""
-          className="h-[22px] w-[22px] shrink-0 rounded-full ring-1 ring-neutral-200"
-        />
+        <div className="flex h-[22px] w-[22px] shrink-0 items-center justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={auth.avatar_url}
+            alt=""
+            width={22}
+            height={22}
+            className="h-[22px] w-[22px] rounded-full object-cover ring-1 ring-neutral-200"
+          />
+        </div>
         <motion.div
           animate={{
             opacity: open ? 1 : 0,
-            display: open ? "block" : "none",
+            width: open ? "auto" : 0,
           }}
-          className="min-w-0 flex-1"
+          className="min-w-0 flex-1 overflow-hidden whitespace-nowrap"
         >
           <div className="truncate text-[13px] font-medium text-neutral-900">
             {auth.login}
@@ -221,18 +227,17 @@ function Footer({ open }: { open: boolean }) {
   return (
     <Link
       href="/api/auth/github/login"
-      className="flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-neutral-100"
+      className="flex items-center gap-3 overflow-hidden rounded-md px-2 py-2 transition-colors hover:bg-neutral-100"
     >
-      <GithubLogo
-        className="h-[18px] w-[18px] shrink-0 text-neutral-700"
-        weight="fill"
-      />
+      <div className="flex h-[22px] w-[22px] shrink-0 items-center justify-center">
+        <GithubLogo className="h-[18px] w-[18px] text-neutral-700" weight="fill" />
+      </div>
       <motion.span
         animate={{
           opacity: open ? 1 : 0,
-          display: open ? "inline-block" : "none",
+          width: open ? "auto" : 0,
         }}
-        className="text-[13px] font-medium text-neutral-700"
+        className="overflow-hidden whitespace-nowrap text-[13px] font-medium text-neutral-700"
       >
         Connect GitHub
       </motion.span>

@@ -26,7 +26,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       headers: { "Content-Type": "text/plain" },
     });
   }
-  const claim = claimCode(code.toUpperCase());
+  const claim = await claimCode(code.toUpperCase());
   if (!claim) {
     return new Response(
       `# causalist: code ${code.toUpperCase()} is invalid or already used.\n# Generate a new one at https://causalist.xyz/pair\n`,

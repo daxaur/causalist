@@ -21,7 +21,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<Response> {
   const { id } = await params;
-  const graph = getSessionGraph(id);
+  const graph = await getSessionGraph(id);
   if (!graph) {
     return Response.json(
       { error: "No graph stored for this session" },
@@ -48,6 +48,6 @@ export async function PUT(
       { status: 400 },
     );
   }
-  putSessionGraph(id, body.graph);
+  await putSessionGraph(id, body.graph);
   return Response.json({ ok: true, nodes: body.graph.nodes.length });
 }

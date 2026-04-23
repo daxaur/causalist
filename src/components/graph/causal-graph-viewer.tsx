@@ -635,11 +635,49 @@ export function CausalGraphViewer({
       },
       {
         id: "copy-url",
-        label: "Copy shareable URL",
+        label: "Copy this URL",
         hint: "?focus=…",
         run: async () => {
           await navigator.clipboard.writeText(window.location.href);
           toast.success("Link copied");
+        },
+      },
+      {
+        id: "create-share",
+        label: "Share graph (public link)",
+        hint: "/s/…",
+        run: async () => {
+          const t = toast.loading("Creating share link…");
+          try {
+            const res = await fetch("/api/share", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                graph,
+                repo: graph.repo,
+                owner: graph.repo.split("/")[0],
+                title: graph.repo,
+              }),
+            });
+            const data = (await res.json()) as { id?: string; url?: string; error?: string };
+            if (!res.ok || !data.url) {
+              toast.error("Share failed", {
+                id: t,
+                description: data.error ?? "Try again in a moment",
+              });
+              return;
+            }
+            await navigator.clipboard.writeText(data.url);
+            toast.success("Share link copied", {
+              id: t,
+              description: data.url,
+            });
+          } catch (e) {
+            toast.error("Share failed", {
+              id: t,
+              description: e instanceof Error ? e.message : "unknown",
+            });
+          }
         },
       },
       {
@@ -664,22 +702,29 @@ export function CausalGraphViewer({
       className="relative flex h-full w-full overflow-hidden border border-neutral-200/70 text-[color:var(--ink,#2A2420)]"
       style={{ backgroundColor: CANVAS_BG }}
     >
-      {/* Subtle architectural grid — 48px lines at 3% opacity. Gives
-          the canvas structure without reading as a graph-paper demo. */}
+      {/* Subtle architectural grid — 64px dot matrix at very low
+          contrast. Used to feel like "data-viz canvas" not "graph
+          paper." Radial mask keeps it dense-center, sparse-edges. */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 z-[1]"
         style={{
           backgroundImage:
-            "linear-gradient(to right, rgba(0,0,0,0.035) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.035) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
+            "radial-gradient(circle, rgba(42,36,32,0.12) 1px, transparent 1px)",
+          backgroundSize: "32px 32px",
+          maskImage:
+            "radial-gradient(circle at 50% 50%, black 0%, transparent 70%)",
+          WebkitMaskImage:
+            "radial-gradient(circle at 50% 50%, black 0%, transparent 70%)",
+          opacity: 0.55,
         }}
       />
 
-      {/* File-tree sidebar */}
+      {/* File-tree sidebar — slightly warmer than the canvas so the
+          tree reads as a separate surface, not a ghost overlay. */}
       <aside
         className={cn(
-          "flex shrink-0 flex-col border-r border-neutral-200 bg-white/70 backdrop-blur transition-all duration-300",
+          "relative z-[2] flex shrink-0 flex-col border-r border-neutral-200 bg-white transition-all duration-300",
           sidebarOpen ? "w-64" : "w-0",
         )}
       >

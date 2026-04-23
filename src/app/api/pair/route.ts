@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export async function POST(): Promise<Response> {
   const sessionId = crypto.randomUUID();
   const token = randomBytes(24).toString("base64url");
-  const code = mintCode(sessionId, token);
+  const code = await mintCode(sessionId, token);
   return NextResponse.json({ code, sessionId });
 }
 
@@ -26,7 +26,7 @@ export async function POST(): Promise<Response> {
 export async function GET(req: NextRequest): Promise<Response> {
   const code = req.nextUrl.searchParams.get("code");
   if (!code) return NextResponse.json({ error: "missing code" }, { status: 400 });
-  const claim = claimCode(code.toUpperCase());
+  const claim = await claimCode(code.toUpperCase());
   if (!claim) {
     return NextResponse.json(
       { error: "invalid or already-used code" },

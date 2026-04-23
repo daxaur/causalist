@@ -69,11 +69,11 @@ export function FileTree({
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b border-white/10 px-4 py-3">
-        <div className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+      <div className="border-b border-neutral-200 px-4 py-3">
+        <div className="font-mono text-[10px] uppercase tracking-wider text-neutral-400">
           files
         </div>
-        <div className="mt-0.5 text-xs text-white/70">
+        <div className="mt-0.5 text-xs text-neutral-700">
           {nodes.length} nodes · {unmappedCount} external
         </div>
       </div>
@@ -88,8 +88,8 @@ export function FileTree({
           />
         ))}
         {externals.length > 0 && (
-          <div className="mt-3 border-t border-white/5 pt-3">
-            <div className="mb-1 px-2 font-mono text-[10px] uppercase tracking-wider text-white/30">
+          <div className="mt-3 border-t border-neutral-100 pt-3">
+            <div className="mb-1 px-2 font-mono text-[10px] uppercase tracking-wider text-neutral-400">
               externals
             </div>
             {externals.map((n) => (
@@ -99,8 +99,8 @@ export function FileTree({
                 className={cn(
                   "group flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors",
                   selectedId === n.id
-                    ? "bg-[#e838a4]/15 text-white"
-                    : "text-white/60 hover:bg-white/5 hover:text-white",
+                    ? "bg-accent-magenta/10 text-accent-magenta"
+                    : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900",
                 )}
               >
                 <span
@@ -141,11 +141,11 @@ function TreeRow({
         className={cn(
           "flex w-full items-center gap-2 rounded-md py-1 pr-2 text-left transition-colors",
           isSelected
-            ? "bg-[#e838a4]/15 text-white"
-            : "text-white/60 hover:bg-white/5 hover:text-white",
+            ? "bg-accent-magenta/10 text-accent-magenta"
+            : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900",
         )}
       >
-        <FileCode size={11} className="shrink-0 text-white/30" />
+        <FileCode size={11} className="shrink-0 text-neutral-400" />
         <span className="truncate">{node.name}</span>
         <span
           className="ml-auto h-1 w-1 shrink-0 rounded-full"
@@ -161,17 +161,17 @@ function TreeRow({
       <button
         onClick={() => setOpen((v) => !v)}
         style={{ paddingLeft: `${depth * 10 + 4}px` }}
-        className="flex w-full items-center gap-1 rounded-md py-1 pr-2 text-left text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+        className="flex w-full items-center gap-1 rounded-md py-1 pr-2 text-left text-neutral-700 transition-colors hover:bg-neutral-50 hover:text-neutral-900"
       >
         {open ? (
-          <CaretDown size={10} className="shrink-0 text-white/40" />
+          <CaretDown size={10} className="shrink-0 text-neutral-400" />
         ) : (
-          <CaretRight size={10} className="shrink-0 text-white/40" />
+          <CaretRight size={10} className="shrink-0 text-neutral-400" />
         )}
         {open ? (
-          <FolderOpen size={11} className="shrink-0 text-white/50" />
+          <FolderOpen size={11} className="shrink-0 text-neutral-500" />
         ) : (
-          <Folder size={11} className="shrink-0 text-white/50" />
+          <Folder size={11} className="shrink-0 text-neutral-500" />
         )}
         <span className="truncate">{node.name}</span>
       </button>
