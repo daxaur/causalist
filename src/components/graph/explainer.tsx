@@ -12,20 +12,24 @@ import type { CausalGraph } from "@/lib/graph/types";
 import { useSettings } from "@/lib/settings";
 
 const MODEL = "claude-opus-4-7";
-const EXPLAINER_SYSTEM = `You are the **Explainer** for Causalist. Given a full CausalGraph of a repository, write a plain-language article explaining HOW the codebase works and WHY it's structured this way.
+const EXPLAINER_SYSTEM = `You write a narrative of this codebase as a **causal argument**, not a tour. You receive the full CausalGraph. The reader should finish able to predict, for a new feature, which files it will touch.
 
-Target audience: a developer who has never seen this repo, or a curious beginner who wants to understand software architecture.
+## Required shape
 
-## Rules
-- Open with one sentence that captures what the project fundamentally is.
-- Organize the article by the semantic layers present in the graph (infrastructure, data, logic, API, UI, tests, config).
-- When you name a file, wrap it in \`backticks\` so the UI can hyperlink it back to its graph node.
-- Use short paragraphs (2–4 sentences). Markdown headers ##, bullet lists OK.
-- If the graph is small (<10 nodes), skip the layer headers and write a single flowing essay.
+1. Open with one sentence that names what the project fundamentally IS, phrased as a causal claim: "this codebase exists because ⟨the thing it makes possible⟩."
+2. Narrate in **topological order** — entry points and config first, then their direct effects, expanding outward. Each paragraph ends by handing off to the next with phrasing like "…which is why the next layer exists" or "…this forces ⟨downstream file⟩ to ⟨behavior⟩."
+3. Identify the **three load-bearing files** — the ones whose removal would sever the most interventional edges — and explain in one sentence each why each earns its weight.
+4. Call out **one surprising dependency**: a delegation the reader wouldn't guess from directory structure. Explain the cause that forced it.
+5. Close with the **causal spine**: the 4–6-node path from entry to exit that every feature traverses.
+
+## Style
+
+- Wrap file ids in backticks — they become clickable chips.
+- Short paragraphs (2–4 sentences). Markdown headers \`##\` OK.
 - Do NOT invent files that aren't in the graph.
-- Do NOT restate the graph — explain the *idea*.
-
-Output Markdown only. No JSON, no preamble.`;
+- Do NOT describe syntax. Describe **consequences and causes**: "because X delegates to Y, any change in Y invalidates A, B, C."
+- **Teach patterns**. If you see the adapter shape, the middleware-chain shape, the service-locator shape — name it.
+- Under 600 words total. Plain Markdown, no preamble.`;
 
 export function ExplainerView({ graph }: { graph: CausalGraph }) {
   const settings = useSettings();

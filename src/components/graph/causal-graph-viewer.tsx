@@ -17,11 +17,18 @@ import {
 } from "@/lib/graph/types";
 import { iconUrlForLanguage, iconUrlForPath } from "@/lib/graph/devicon";
 import { rankImportance } from "@/lib/graph/importance";
+import {
+  DIFF_HEX,
+  edgeKey,
+  type DiffOverlay,
+  type NodeDiffState,
+} from "@/lib/graph/diff";
 import { cn } from "@/lib/utils";
 import { NodePanel } from "./node-panel";
 import { LayerLegend } from "./layer-legend";
 import { FileTree } from "./file-tree";
 import { SelectionToolbar } from "./selection-toolbar";
+import { ImportanceStats } from "./importance-stats";
 
 const ForceGraph3D = dynamic(
   () => import("react-force-graph-3d").then((m) => m.default),
@@ -68,10 +75,12 @@ const LAYER_HEX: Record<SemanticLayer, number> = {
 export function CausalGraphViewer({
   graph,
   highlightedIds,
+  diff,
   onAskAboutSelection,
 }: {
   graph: CausalGraph;
   highlightedIds?: string[];
+  diff?: DiffOverlay;
   onAskAboutSelection?: (ids: string[]) => void;
 }) {
   const [mode, setMode] = useState<"3d" | "2d">("3d");
@@ -208,9 +217,21 @@ export function CausalGraphViewer({
       const selectedNow = isSelected(n.id);
       const focusedNow = isFocused(n.id);
       const highlightedNow = isHighlighted(n.id);
-      const baseHex = selectedNow || highlightedNow
-        ? ACCENT_HEX
-        : LAYER_HEX[n.layer as SemanticLayer] ?? 0xcccccc;
+      const diffState: NodeDiffState | undefined = diff?.nodes.get(n.id);
+      const diffHex =
+        diffState === "added"
+          ? 0x3fb950
+          : diffState === "removed"
+            ? 0xf85149
+            : diffState === "modified"
+              ? 0xd29922
+              : null;
+      const baseHex =
+        diffHex !== null
+          ? diffHex
+          : selectedNow || highlightedNow
+            ? ACCENT_HEX
+            : (LAYER_HEX[n.layer as SemanticLayer] ?? 0xcccccc);
 
       const imp = importance.byId.get(n.id);
       const tierBoost =
@@ -283,10 +304,16 @@ export function CausalGraphViewer({
     linkColor: (l: GraphLink) => {
       const s = typeof l.source === "string" ? l.source : (l.source as VisNode).id;
       const t = typeof l.target === "string" ? l.target : (l.target as VisNode).id;
-      if (selectedIds.has(s) || selectedIds.has(t)) return ACCENT;
-      if (hover && (hover === s || hover === t)) {
-        return "rgba(232,56,164,0.55)";
+      if (diff) {
+        const state = diff.edges.get(edgeKey(s, t, l.kind));
+        if (state === "added") return DIFF_HEX.added;
+        if (state === "removed") return DIFF_HEX.removed;
+        if (diff.focusMode && state === "unchanged")
+          return "rgba(200,200,210,0.08)";
       }
+      if (selectedIds.has(s) || selectedIds.has(t)) return ACCENT;
+      if (hover && (hover === s || hover === t))
+        return "rgba(232,56,164,0.55)";
       return KIND_EDGE_COLOR[l.kind] ?? "rgba(200,200,210,0.12)";
     },
     linkWidth: (l: GraphLink) => {
@@ -529,6 +556,13 @@ export function CausalGraphViewer({
               <List size={11} />
               {graph.nodes.length} · {graph.edges.length}
             </div>
+          </div>
+
+          <div className="pointer-events-auto absolute right-4 top-14">
+            <ImportanceStats
+              summary={importance}
+              totalNodes={graph.nodes.length}
+            />
           </div>
         </div>
 
