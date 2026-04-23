@@ -16,6 +16,7 @@ import {
   type SemanticLayer,
 } from "@/lib/graph/types";
 import { iconUrlForLanguage, iconUrlForPath } from "@/lib/graph/devicon";
+import { rankImportance } from "@/lib/graph/importance";
 import { cn } from "@/lib/utils";
 import { NodePanel } from "./node-panel";
 import { LayerLegend } from "./layer-legend";
@@ -90,6 +91,8 @@ export function CausalGraphViewer({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<any>(null);
   const bloomSetupRef = useRef(false);
+
+  const importance = useMemo(() => rankImportance(graph), [graph]);
 
   const data = useMemo(() => {
     const nodes: VisNode[] = graph.nodes.map((n) => ({
@@ -245,7 +248,11 @@ export function CausalGraphViewer({
         ? ACCENT_HEX
         : LAYER_HEX[n.layer as SemanticLayer] ?? 0xcccccc;
 
-      const radius = (n.size ?? 4) + (n.kind === "external" ? 1.5 : 0);
+      const imp = importance.byId.get(n.id);
+      const tierBoost =
+        imp?.tier === "hot" ? 3.5 : imp?.tier === "core" ? 1.8 : 0;
+      const radius =
+        (n.size ?? 4) + (n.kind === "external" ? 1.5 : 0) + tierBoost;
 
       // Core sphere
       const geom = new THREE.SphereGeometry(radius, 20, 20);
@@ -295,10 +302,28 @@ export function CausalGraphViewer({
         group.add(arc);
       }
 
+      // Hot nodes (top 10%) get a thin outer ring even when not selected
+      // — signal their importance at a glance.
+      if (imp?.tier === "hot" && !focusedNow) {
+        const ringGeom = new THREE.TorusGeometry(
+          radius * 1.85,
+          0.09,
+          6,
+          40,
+        );
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: ACCENT_HEX,
+          transparent: true,
+          opacity: 0.55,
+        });
+        const ring = new THREE.Mesh(ringGeom, ringMat);
+        group.add(ring);
+      }
+
       return group;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIds, focusedId, hover, externalHighlight]);
+  }, [selectedIds, focusedId, hover, externalHighlight, importance]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sharedProps: any = {
@@ -486,6 +511,8 @@ export function CausalGraphViewer({
               node={focused}
               allNodes={graph.nodes}
               allEdges={graph.edges}
+              importance={importance.byId.get(focused.id)}
+              graph={graph}
               onSelect={(n) => handleNodeClick(n)}
               onClose={() => {
                 setFocusedId(null);

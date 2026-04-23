@@ -1,16 +1,28 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowRight, Check, Copy, X } from "@phosphor-icons/react";
+import {
+  ArrowRight,
+  Check,
+  Copy,
+  Fire,
+  Leaf,
+  Sparkle,
+  X,
+} from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { iconUrlForLanguage, iconUrlForPath } from "@/lib/graph/devicon";
+import { buildFixPrompt } from "@/lib/graph/prompt";
+import type { CausalGraph } from "@/lib/graph/types";
 import {
   LAYER_COLORS,
   LAYER_LABELS,
   type CausalEdge,
   type CausalNode,
 } from "@/lib/graph/types";
+import type { Importance } from "@/lib/graph/importance";
 import { NodeNeighborhood } from "./node-neighborhood";
+import { NodeDeepDive } from "./node-deep-dive";
 
 const EDGE_KIND_LABELS: Record<string, string> = {
   imports: "imports",
@@ -24,6 +36,8 @@ interface NodePanelProps {
   node: CausalNode;
   allNodes: CausalNode[];
   allEdges: CausalEdge[];
+  importance?: Importance;
+  graph: CausalGraph;
   onSelect: (n: CausalNode) => void;
   onClose: () => void;
 }
@@ -32,10 +46,13 @@ export function NodePanel({
   node,
   allNodes,
   allEdges,
+  importance,
+  graph,
   onSelect,
   onClose,
 }: NodePanelProps) {
   const [copied, setCopied] = useState(false);
+  const [promptCopied, setPromptCopied] = useState(false);
 
   const { incoming, outgoing } = useMemo(() => {
     const incoming: { node: CausalNode; kind: string }[] = [];
@@ -63,23 +80,31 @@ export function NodePanel({
     setTimeout(() => setCopied(false), 1500);
   };
 
+  const onCopyPrompt = () => {
+    const prompt = buildFixPrompt(graph, [node.id]);
+    navigator.clipboard.writeText(prompt);
+    setPromptCopied(true);
+    setTimeout(() => setPromptCopied(false), 1800);
+  };
+
   return (
     <aside className="flex h-full flex-col border-l border-white/10 bg-[#0a0d0f]/95 backdrop-blur-xl">
       {/* Header */}
       <div className="flex items-start justify-between gap-4 border-b border-white/5 p-5">
         <div className="flex min-w-0 flex-col gap-2.5">
-          <div
-            className="inline-flex w-fit items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider"
-            style={{ color: LAYER_COLORS[node.layer] }}
-          >
-            <span
-              className="h-1.5 w-1.5 rounded-full"
-              style={{ backgroundColor: LAYER_COLORS[node.layer] }}
-            />
-            {LAYER_LABELS[node.layer]}
-            {node.kind && (
-              <span className="text-white/30">· {node.kind}</span>
-            )}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div
+              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider"
+              style={{ color: LAYER_COLORS[node.layer] }}
+            >
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: LAYER_COLORS[node.layer] }}
+              />
+              {LAYER_LABELS[node.layer]}
+              {node.kind && <span className="text-white/30">· {node.kind}</span>}
+            </div>
+            {importance && <ImportanceBadge importance={importance} />}
           </div>
           <div className="flex items-start gap-3">
             {iconUrl && (
@@ -130,6 +155,36 @@ export function NodePanel({
           </p>
         )}
 
+        {/* Deep-dive — Claude explains this file in depth */}
+        <div className="mt-4">
+          <NodeDeepDive
+            graph={graph}
+            node={node}
+            onCitationClick={(id) => {
+              const n = allNodes.find((x) => x.id === id);
+              if (n) onSelect(n);
+            }}
+          />
+        </div>
+
+        {/* Copy fix prompt for this file */}
+        <button
+          onClick={onCopyPrompt}
+          className="mt-3 flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-left text-[11px] text-white/70 transition-colors hover:border-white/20 hover:text-white"
+        >
+          <span className="flex items-center gap-1.5">
+            {promptCopied ? (
+              <Check size={11} className="text-emerald-400" />
+            ) : (
+              <Copy size={11} />
+            )}
+            {promptCopied ? "Prompt copied" : "Copy prompt for this file"}
+          </span>
+          <span className="font-mono text-[9px] text-white/30">
+            paste into Claude Code
+          </span>
+        </button>
+
         {/* Visual neighborhood — a mini graph of just this node + neighbors */}
         {(incoming.length > 0 || outgoing.length > 0) && (
           <div className="mt-5">
@@ -166,23 +221,41 @@ export function NodePanel({
         )}
       </div>
 
-      {/* Footer actions */}
-      <div className="border-t border-white/5 p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 text-[10px] text-white/40">
-            <span>{outgoing.length + incoming.length} connections</span>
-          </div>
-          <button
-            disabled
-            title="Oracle coming in Phase 3"
-            className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/60 disabled:cursor-not-allowed"
-          >
-            Ask Oracle
-            <ArrowRight size={10} />
-          </button>
-        </div>
+      {/* Footer */}
+      <div className="flex items-center justify-between gap-3 border-t border-white/5 p-4 text-[10px] text-white/40">
+        <span>{outgoing.length + incoming.length} connections</span>
+        {importance && (
+          <span className="font-mono">
+            fan-in {importance.fanIn} · fan-out {importance.fanOut}
+          </span>
+        )}
       </div>
     </aside>
+  );
+}
+
+function ImportanceBadge({ importance }: { importance: Importance }) {
+  if (importance.tier === "hot") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-[#E838A4]/40 bg-[#E838A4]/15 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-[#FF9CD9]">
+        <Fire size={9} weight="fill" />
+        hot
+      </span>
+    );
+  }
+  if (importance.tier === "core") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-amber-300">
+        <Sparkle size={9} weight="fill" />
+        core
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-white/50">
+      <Leaf size={9} weight="regular" />
+      leaf
+    </span>
   );
 }
 
