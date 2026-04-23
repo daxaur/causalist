@@ -6,12 +6,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import {
-  BookOpen,
-  Folders,
   GearSix,
   GithubLogo,
   HouseSimple,
-  Plugs,
 } from "@phosphor-icons/react";
 import {
   Sidebar,
@@ -29,6 +26,8 @@ type Item = {
   match?: (pathname: string) => boolean;
 };
 
+// Intentionally short — 4 items total. Saved graphs and reference
+// are reachable as tabs on Home, not as their own sidebar links.
 const WORKSPACE: Item[] = [
   {
     label: "Home",
@@ -43,26 +42,23 @@ const WORKSPACE: Item[] = [
     match: (p) => /^\/app\/[^/]+\/[^/]+/.test(p),
   },
   {
-    label: "Saved graphs",
-    href: "/app?tab=library",
-    icon: <Folders className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
+    label: "Connect Claude Code",
+    href: "/app?tab=claude-code",
+    icon: (
+      /* eslint-disable-next-line @next/next/no-img-element */
+      <img
+        src="/claude-code.png"
+        alt=""
+        width={18}
+        height={18}
+        className="h-[18px] w-[18px] shrink-0"
+      />
+    ),
     match: () => false,
-  },
-  {
-    label: "How things work",
-    href: "/app?tab=reference",
-    icon: <BookOpen className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
-    match: (p) => p.startsWith("/app/reference"),
   },
 ];
 
 const ACCOUNT: Item[] = [
-  {
-    label: "Connect Claude Code",
-    href: "/app?tab=claude-code",
-    icon: <Plugs className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
-    match: () => false,
-  },
   {
     label: "Settings",
     href: "/settings",

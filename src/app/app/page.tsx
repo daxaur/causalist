@@ -4,16 +4,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
-  BookOpen,
   CheckCircle,
   CircleNotch,
-  Cube,
   Folders,
   GithubLogo,
-  Graph,
   Key,
   MagnifyingGlass,
-  Plugs,
   Star,
   Terminal,
   Warning,
@@ -22,13 +18,10 @@ import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { Input } from "@/components/ui/input";
 import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useSettings } from "@/lib/settings";
-import { PreviewDialog } from "@/components/landing/preview-dialog";
-import { PREVIEWS, type PreviewMeta } from "@/lib/graph/previews";
-import { REFERENCES } from "@/lib/graph/references";
 import { useLibrary } from "@/lib/library/store";
 import { cn } from "@/lib/utils";
 
-type Tab = "repos" | "previews" | "reference" | "library" | "claude-code";
+type Tab = "repos" | "library" | "claude-code";
 
 interface Repo {
   id: number;
@@ -57,10 +50,7 @@ export default function DashboardPage() {
     if (typeof window === "undefined") return;
     const sp = new URLSearchParams(window.location.search);
     const t = sp.get("tab") as Tab | null;
-    if (
-      t &&
-      ["repos", "previews", "reference", "library", "claude-code"].includes(t)
-    ) {
+    if (t && ["repos", "library", "claude-code"].includes(t)) {
       setTab(t);
     }
   }, []);
@@ -125,28 +115,6 @@ export default function DashboardPage() {
     );
   }, [repos, query]);
 
-  const filteredPreviews = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return PREVIEWS;
-    return PREVIEWS.filter(
-      (p) =>
-        p.title.toLowerCase().includes(q) ||
-        p.subtitle.toLowerCase().includes(q) ||
-        p.tagline.toLowerCase().includes(q),
-    );
-  }, [query]);
-
-  const filteredReferences = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return REFERENCES;
-    return REFERENCES.filter(
-      (r) =>
-        r.title.toLowerCase().includes(q) ||
-        r.subtitle.toLowerCase().includes(q) ||
-        r.slug.toLowerCase().includes(q),
-    );
-  }, [query]);
-
   const filteredLibrary = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return libraryEntries;
@@ -161,6 +129,8 @@ export default function DashboardPage() {
   // (hero pills + PreviewDialog). The app shell is for the user's
   // own work: their repos, their saved graphs, references, plus the
   // Claude Code integration pitch.
+  // 3 tabs — kept intentionally short. Demo graphs live on landing;
+  // references are linked from the landing footer.
   const TABS: {
     key: Tab;
     label: string;
@@ -175,21 +145,24 @@ export default function DashboardPage() {
     },
     {
       key: "library",
-      label: "Saved graphs",
+      label: "Saved",
       count: libraryEntries.length,
       icon: <Folders size={12} weight="duotone" />,
-    },
-    {
-      key: "reference",
-      label: "How things work",
-      count: REFERENCES.length,
-      icon: <BookOpen size={12} weight="duotone" />,
     },
     {
       key: "claude-code",
       label: "Use with Claude Code",
       count: null,
-      icon: <Plugs size={12} weight="duotone" />,
+      icon: (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src="/claude-code.png"
+          alt=""
+          width={12}
+          height={12}
+          className="h-3 w-3"
+        />
+      ),
     },
   ];
 
@@ -251,10 +224,6 @@ export default function DashboardPage() {
       )}
 
       {/* Content */}
-      {tab === "previews" && <PreviewsGrid items={filteredPreviews} />}
-
-      {tab === "reference" && <ReferenceGrid items={filteredReferences} />}
-
       {tab === "repos" && (
         <>
           {!isConnected ? (
@@ -321,14 +290,14 @@ function ClaudeCodeTab() {
         />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-neutral-50">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-white">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src="/claude-mark.svg"
-                alt="Claude"
-                width={28}
-                height={28}
-                className="h-7 w-7"
+                src="/claude-code.png"
+                alt="Claude Code"
+                width={48}
+                height={48}
+                className="h-10 w-auto"
               />
             </div>
             <div>
@@ -569,104 +538,6 @@ const TOOL_SUMMARIES = [
   { name: "topo_order", what: "Dependency order for a subgraph." },
   { name: "co_change", what: "Nodes that tend to change together in commits." },
 ];
-
-function PreviewsGrid({ items }: { items: PreviewMeta[] }) {
-  if (items.length === 0)
-    return <EmptyHint message="No demos match that search." />;
-  return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {items.map((p) => (
-        <PreviewDialog key={p.slug} preview={p}>
-          <button
-            type="button"
-            className="group relative flex w-full flex-col gap-4 overflow-hidden rounded-xl border border-neutral-200 bg-white p-5 text-left transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-[0_2px_14px_rgba(0,0,0,0.05)]"
-          >
-            <div
-              className="absolute inset-x-0 top-0 h-[2px] origin-left scale-x-0 bg-accent-magenta transition-transform group-hover:scale-x-100"
-              aria-hidden
-            />
-            <div className="flex items-center justify-between">
-              <span className="rounded-full border border-accent-magenta/30 bg-accent-magenta/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-accent-magenta">
-                live demo
-              </span>
-              <span className="flex items-center gap-1 font-mono text-[10px] text-neutral-400">
-                <Graph size={10} weight="duotone" />
-                {p.graph.nodes.length}n · {p.graph.edges.length}e
-              </span>
-            </div>
-            <div>
-              <h3 className="font-display text-lg font-medium tracking-tight text-neutral-900">
-                {p.title}
-              </h3>
-              <p className="mt-1 font-mono text-[11px] text-neutral-400">
-                {p.subtitle}
-              </p>
-              <p className="mt-3 text-[13px] leading-relaxed text-neutral-500">
-                {p.tagline}
-              </p>
-            </div>
-            <div className="flex items-center justify-between pt-1 text-[11px] text-neutral-400">
-              <span className="font-mono">click to open</span>
-              <ArrowRight
-                size={13}
-                className="text-neutral-300 transition-transform group-hover:translate-x-0.5 group-hover:text-accent-magenta"
-              />
-            </div>
-          </button>
-        </PreviewDialog>
-      ))}
-    </div>
-  );
-}
-
-function ReferenceGrid({
-  items,
-}: {
-  items: { slug: string; title: string; subtitle: string; graph: { nodes: unknown[]; edges: unknown[] } }[];
-}) {
-  if (items.length === 0)
-    return <EmptyHint message="No references match." />;
-  return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {items.map((r) => (
-        <Link
-          key={r.slug}
-          href={`/reference/${r.slug}`}
-          className="group relative flex flex-col gap-4 overflow-hidden rounded-xl border border-neutral-200 bg-white p-5 transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-[0_2px_14px_rgba(0,0,0,0.05)]"
-        >
-          <div
-            className="absolute inset-x-0 top-0 h-[2px] origin-left scale-x-0 bg-accent-magenta transition-transform group-hover:scale-x-100"
-            aria-hidden
-          />
-          <div className="flex items-center justify-between">
-            <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-neutral-500">
-              reference
-            </span>
-            <span className="flex items-center gap-1 font-mono text-[10px] text-neutral-400">
-              <Graph size={10} weight="duotone" />
-              {r.graph.nodes.length}n · {r.graph.edges.length}e
-            </span>
-          </div>
-          <div>
-            <h3 className="font-display text-lg font-medium leading-snug tracking-tight text-neutral-900">
-              {r.title}
-            </h3>
-            <p className="mt-1.5 text-[13px] leading-relaxed text-neutral-500">
-              {r.subtitle}
-            </p>
-          </div>
-          <div className="flex items-center justify-between pt-1 text-[11px] text-neutral-400">
-            <span className="font-mono">{r.slug}</span>
-            <ArrowRight
-              size={13}
-              className="text-neutral-300 transition-transform group-hover:translate-x-0.5 group-hover:text-accent-magenta"
-            />
-          </div>
-        </Link>
-      ))}
-    </div>
-  );
-}
 
 function RepoRow({ repo }: { repo: Repo }) {
   return (
