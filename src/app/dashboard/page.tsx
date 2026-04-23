@@ -14,6 +14,7 @@ import {
 } from "@phosphor-icons/react";
 import { Logo } from "@/components/brand/logo";
 import { Input } from "@/components/ui/input";
+import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useSettings } from "@/lib/settings";
 
 interface Repo {
@@ -28,23 +29,30 @@ interface Repo {
 
 export default function DashboardPage() {
   const settings = useSettings();
+  const auth = useGithubAuth();
   const [repos, setRepos] = useState<Repo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
+  // Prefer the OAuth token from the signed-in session; fall back to a
+  // personal access token saved in /settings.
+  const githubToken = auth.token ?? settings.githubToken;
+  const isConnected = auth.authenticated || Boolean(settings.githubToken);
+
   useEffect(() => {
-    if (!settings.githubToken) return;
+    if (!githubToken) return;
     let cancelled = false;
     const load = async () => {
       setLoading(true);
       setError(null);
       try {
         const { Octokit } = await import("@octokit/rest");
-        const octokit = new Octokit({ auth: settings.githubToken });
+        const octokit = new Octokit({ auth: githubToken });
         const { data } = await octokit.repos.listForAuthenticatedUser({
           per_page: 100,
           sort: "updated",
+          affiliation: "owner,collaborator,organization_member",
         });
         if (cancelled) return;
         setRepos(
@@ -69,7 +77,7 @@ export default function DashboardPage() {
     return () => {
       cancelled = true;
     };
-  }, [settings.githubToken]);
+  }, [githubToken]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -114,13 +122,13 @@ export default function DashboardPage() {
             Your repositories
           </h1>
           <p className="mt-3 text-sm text-neutral-500">
-            {settings.githubToken
-              ? "Pick any repo to map it into a 3D causal graph."
+            {isConnected
+              ? `Pick any repo to map it into a 3D causal graph${auth.login ? ` — signed in as ${auth.login}` : ""}.`
               : "Connect GitHub to see the repos you can map."}
           </p>
         </div>
 
-        {!settings.githubToken ? (
+        {!isConnected ? (
           <MissingTokenCard />
         ) : (
           <>
