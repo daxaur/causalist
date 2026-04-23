@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { NodePanel } from "./node-panel";
 import { LayerLegend } from "./layer-legend";
 import { FileTree } from "./file-tree";
+import { SelectionToolbar } from "./selection-toolbar";
 
 const ForceGraph3D = dynamic(
   () => import("react-force-graph-3d").then((m) => m.default),
@@ -66,18 +67,26 @@ const LAYER_HEX: Record<SemanticLayer, number> = {
 export function CausalGraphViewer({
   graph,
   highlightedIds,
+  onAskAboutSelection,
 }: {
   graph: CausalGraph;
   highlightedIds?: string[];
+  onAskAboutSelection?: (ids: string[]) => void;
 }) {
   const [mode, setMode] = useState<"3d" | "2d">("3d");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [selected, setSelected] = useState<CausalNode | null>(null);
+  // Multi-select: Set of selected node ids.
+  // The "focused" node (for the detail panel) is the most recently clicked.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [focusedId, setFocusedId] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const externalHighlight = useMemo(
     () => new Set(highlightedIds ?? []),
     [highlightedIds],
   );
+  const focused = focusedId
+    ? graph.nodes.find((n) => n.id === focusedId) ?? null
+    : null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<any>(null);
   const bloomSetupRef = useRef(false);
@@ -141,12 +150,12 @@ export function CausalGraphViewer({
     return () => clearTimeout(t);
   }, [mode, graph]);
 
-  // Cinematic fly-to on selection (3D)
+  // Cinematic fly-to on focus change (3D)
   useEffect(() => {
-    if (!selected || mode !== "3d") return;
+    if (!focusedId || mode !== "3d") return;
     const g = graphRef.current;
     if (!g || typeof g.cameraPosition !== "function") return;
-    const vn = data.nodes.find((n) => n.id === selected.id) as
+    const vn = data.nodes.find((n) => n.id === focusedId) as
       | { x?: number; y?: number; z?: number }
       | undefined;
     if (!vn?.x) return;
@@ -162,13 +171,60 @@ export function CausalGraphViewer({
       vn,
       1000,
     );
-  }, [selected, mode, data.nodes]);
+  }, [focusedId, mode, data.nodes]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA)$/.test(target.tagName)) return;
+      if (target?.isContentEditable) return;
+
+      if (e.key === "Escape") {
+        if (selectedIds.size > 0 || focusedId) {
+          setSelectedIds(new Set());
+          setFocusedId(null);
+          e.preventDefault();
+        }
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
+        setSelectedIds(new Set(graph.nodes.map((n) => n.id)));
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedIds, focusedId, graph.nodes]);
 
   const layers = Array.from(new Set(graph.nodes.map((n) => n.layer))) as SemanticLayer[];
 
-  const isSelected = (id: string) => selected?.id === id;
+  const isSelected = (id: string) => selectedIds.has(id);
+  const isFocused = (id: string) => focusedId === id;
   const isHighlighted = (id: string) =>
     hover === id || externalHighlight.has(id);
+
+  const handleNodeClick = (
+    n: { id: string },
+    event?: { shiftKey?: boolean; metaKey?: boolean; ctrlKey?: boolean },
+  ) => {
+    const additive = event?.shiftKey || event?.metaKey || event?.ctrlKey;
+    if (additive) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(n.id)) next.delete(n.id);
+        else next.add(n.id);
+        return next;
+      });
+      setFocusedId(n.id);
+    } else {
+      setSelectedIds(new Set([n.id]));
+      setFocusedId(n.id);
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setFocusedId(null);
+  };
 
   // ── Custom Three.js node rendering ──────────────────────────────
   // Returns a mesh with emissive material per layer. Selected nodes
@@ -183,6 +239,7 @@ export function CausalGraphViewer({
       const group = new THREE.Group();
 
       const selectedNow = isSelected(n.id);
+      const focusedNow = isFocused(n.id);
       const highlightedNow = isHighlighted(n.id);
       const baseHex = selectedNow || highlightedNow
         ? ACCENT_HEX
@@ -195,32 +252,38 @@ export function CausalGraphViewer({
       const mat = new THREE.MeshStandardMaterial({
         color: baseHex,
         emissive: baseHex,
-        emissiveIntensity: selectedNow ? 1.6 : highlightedNow ? 1.1 : 0.55,
+        emissiveIntensity: focusedNow
+          ? 1.7
+          : selectedNow
+            ? 1.3
+            : highlightedNow
+              ? 1.1
+              : 0.55,
         roughness: 0.35,
         metalness: 0.15,
       });
       const mesh = new THREE.Mesh(geom, mat);
       group.add(mesh);
 
-      // Outer soft halo for hover/selected
+      // Outer soft halo for any selected / hover
       if (selectedNow || highlightedNow) {
         const haloGeom = new THREE.SphereGeometry(radius * 1.7, 20, 20);
         const haloMat = new THREE.MeshBasicMaterial({
           color: ACCENT_HEX,
           transparent: true,
-          opacity: selectedNow ? 0.28 : 0.16,
+          opacity: focusedNow ? 0.3 : selectedNow ? 0.22 : 0.16,
         });
         group.add(new THREE.Mesh(haloGeom, haloMat));
       }
 
-      // Selected: 270° torus arc — the Causalist logo motif as halo
-      if (selectedNow) {
+      // Focused: 270° torus arc — Arc+Terminus logo motif
+      if (focusedNow) {
         const arcGeom = new THREE.TorusGeometry(
           radius * 2.3,
           0.25,
           8,
           48,
-          Math.PI * 1.5, // 270°
+          Math.PI * 1.5,
         );
         const arcMat = new THREE.MeshBasicMaterial({
           color: ACCENT_HEX,
@@ -235,7 +298,7 @@ export function CausalGraphViewer({
       return group;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, hover, externalHighlight]);
+  }, [selectedIds, focusedId, hover, externalHighlight]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sharedProps: any = {
@@ -249,9 +312,7 @@ export function CausalGraphViewer({
     linkColor: (l: GraphLink) => {
       const s = typeof l.source === "string" ? l.source : (l.source as VisNode).id;
       const t = typeof l.target === "string" ? l.target : (l.target as VisNode).id;
-      if (selected && (selected.id === s || selected.id === t)) {
-        return ACCENT;
-      }
+      if (selectedIds.has(s) || selectedIds.has(t)) return ACCENT;
       if (hover && (hover === s || hover === t)) {
         return "rgba(232,56,164,0.55)";
       }
@@ -260,21 +321,24 @@ export function CausalGraphViewer({
     linkWidth: (l: GraphLink) => {
       const s = typeof l.source === "string" ? l.source : (l.source as VisNode).id;
       const t = typeof l.target === "string" ? l.target : (l.target as VisNode).id;
-      return selected && (selected.id === s || selected.id === t) ? 2.2 : 0.6;
+      return selectedIds.has(s) || selectedIds.has(t) ? 2.2 : 0.6;
     },
     linkOpacity: 0.85,
     linkDirectionalParticles: (l: GraphLink) => {
       const s = typeof l.source === "string" ? l.source : (l.source as VisNode).id;
       const t = typeof l.target === "string" ? l.target : (l.target as VisNode).id;
-      if (!selected) return 0;
-      return selected.id === s || selected.id === t ? 4 : 0;
+      return selectedIds.has(s) || selectedIds.has(t) ? 4 : 0;
     },
     linkDirectionalParticleSpeed: 0.007,
     linkDirectionalParticleWidth: 1.6,
     linkDirectionalParticleColor: () => ACCENT,
-    onNodeClick: (n: VisNode) => setSelected(n),
+    onNodeClick: (
+      n: VisNode,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      event?: any,
+    ) => handleNodeClick(n, event),
     onNodeHover: (n: VisNode | null) => setHover(n?.id ?? null),
-    onBackgroundClick: () => setSelected(null),
+    onBackgroundClick: () => clearSelection(),
     backgroundColor: CANVAS_BG,
     cooldownTicks: 150,
   };
@@ -301,8 +365,8 @@ export function CausalGraphViewer({
         {sidebarOpen && (
           <FileTree
             nodes={graph.nodes}
-            selectedId={selected?.id ?? null}
-            onSelect={(n) => setSelected(n)}
+            selectedId={focusedId}
+            onSelect={(n) => handleNodeClick(n)}
           />
         )}
       </aside>
@@ -334,7 +398,7 @@ export function CausalGraphViewer({
                 ctx.font = `500 ${size}px ui-sans-serif, system-ui`;
                 ctx.textAlign = "center";
                 ctx.textBaseline = "top";
-                const sel = selected?.id === node.id;
+                const sel = selectedIds.has(node.id);
                 const hov = hover === node.id;
                 ctx.fillStyle = sel
                   ? ACCENT
@@ -403,15 +467,30 @@ export function CausalGraphViewer({
           </div>
         </div>
 
+        {/* Selection toolbar — floating, above the node panel */}
+        <div className="pointer-events-none absolute bottom-4 left-1/2 z-30 -translate-x-1/2">
+          <SelectionToolbar
+            graph={graph}
+            selectedIds={selectedIds}
+            onClear={clearSelection}
+            onExplain={() =>
+              onAskAboutSelection?.(Array.from(selectedIds))
+            }
+          />
+        </div>
+
         {/* Side panel */}
-        {selected && (
+        {focused && (
           <div className="absolute right-0 top-0 z-20 h-full w-full max-w-sm">
             <NodePanel
-              node={selected}
+              node={focused}
               allNodes={graph.nodes}
               allEdges={graph.edges}
-              onSelect={(n) => setSelected(n)}
-              onClose={() => setSelected(null)}
+              onSelect={(n) => handleNodeClick(n)}
+              onClose={() => {
+                setFocusedId(null);
+                setSelectedIds(new Set());
+              }}
             />
           </div>
         )}

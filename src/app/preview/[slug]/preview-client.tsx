@@ -128,11 +128,20 @@ export function PreviewClient({ preview }: { preview: PreviewMeta }) {
             <CausalGraphViewer
               graph={preview.graph}
               highlightedIds={highlighted}
+              onAskAboutSelection={(ids) => {
+                setHighlighted(ids);
+                setMode("ask");
+              }}
             />
           </div>
         )}
         {mode === "explainer" && <ExplainerView graph={preview.graph} />}
-        {mode === "errors" && <ErrorsView graph={preview.graph} />}
+        {mode === "errors" && (
+          <ErrorsView
+            graph={preview.graph}
+            onHighlightNodes={setHighlighted}
+          />
+        )}
         {mode === "changes" && (
           <ChangesView
             graph={preview.graph}
