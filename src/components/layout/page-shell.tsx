@@ -21,7 +21,7 @@ export function PageShell({
   children: ReactNode;
 }) {
   return (
-    <main className="min-h-[calc(100vh-57px)] bg-white text-neutral-900">
+    <div className="h-full overflow-y-auto bg-[#FAFAF8] text-neutral-900">
       <div
         className={cn(
           "mx-auto px-4 py-10 sm:px-6 sm:py-12 lg:px-8",
@@ -31,7 +31,7 @@ export function PageShell({
       >
         {children}
       </div>
-    </main>
+    </div>
   );
 }
 

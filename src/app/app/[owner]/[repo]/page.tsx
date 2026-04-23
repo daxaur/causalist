@@ -6,9 +6,14 @@ import { RepoAnalyzePrompt } from "@/components/graph/repo-analyze-prompt";
 // Top-level route segments that must NOT be treated as repo owners.
 const RESERVED_OWNERS = new Set([
   "api",
+  "app",
   "preview",
   "dashboard",
   "settings",
+  "reference",
+  "docs",
+  "agents",
+  "pair",
 ]);
 
 function findCachedPreview(owner: string, repo: string) {
@@ -32,25 +37,25 @@ export default async function RepoGraphPage({
 
   const cachedPreview = findCachedPreview(owner, repo);
 
+  // Fullscreen — the shell parent (<main class="relative flex-1
+  // overflow-hidden"> from app-shell/left-sidebar.tsx) is our
+  // canvas. No max-w-* wrappers, no top-nav math.
   return (
-    <main className="flex min-h-[calc(100vh-57px)] flex-col bg-white">
-      <div className="mx-auto w-full max-w-6xl px-4 pt-4 pb-1 sm:px-6 lg:px-8">
+    <div className="absolute inset-0 flex flex-col bg-[#FAFAF8]">
+      <div className="flex items-center justify-between border-b border-neutral-200/70 px-6 py-3">
         <div className="flex items-center gap-2 font-mono text-[12px] text-neutral-500">
           <span className="text-neutral-900">{owner}</span>
           <span className="text-neutral-300">/</span>
           <span className="text-neutral-900">{repo}</span>
         </div>
       </div>
-
-      <div className="mx-auto w-full max-w-6xl flex-1 px-4 pb-6 sm:px-6 lg:px-8">
+      <div className="flex-1 overflow-hidden">
         {cachedPreview ? (
-          <div className="h-[calc(100vh-140px)] min-h-[560px] w-full">
-            <CausalGraphViewer graph={cachedPreview.graph} />
-          </div>
+          <CausalGraphViewer graph={cachedPreview.graph} />
         ) : (
           <RepoAnalyzePrompt owner={owner} repo={repo} />
         )}
       </div>
-    </main>
+    </div>
   );
 }

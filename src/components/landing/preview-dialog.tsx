@@ -60,7 +60,7 @@ export function PreviewDialog({
                 source
               </a>
               <Link
-                href={`/preview/${preview.slug}`}
+                href={`/app/preview/${preview.slug}`}
                 className="flex h-8 items-center gap-1.5 rounded-md bg-neutral-900 px-3 text-[11px] text-white transition-colors hover:bg-neutral-800"
               >
                 Open full-screen

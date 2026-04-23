@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "motion/react";
+import { toast } from "sonner";
 import {
   Check,
   Copy,
@@ -37,6 +38,10 @@ export function SelectionToolbar({
     if (!text) return;
     await navigator.clipboard.writeText(text);
     setCopied(true);
+    toast.success(
+      `${count} path${count === 1 ? "" : "s"} copied`,
+      { description: "Paste into any agent or terminal." },
+    );
     setTimeout(() => setCopied(false), 1500);
   };
 

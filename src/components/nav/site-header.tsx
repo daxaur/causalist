@@ -51,7 +51,9 @@ export function useHeaderActionsSetter() {
  */
 export function SiteHeader() {
   const pathname = usePathname();
+  // Hide on landing (has its own) and on /app/* (uses sidebar shell).
   if (pathname === "/") return null;
+  if (pathname === "/app" || pathname.startsWith("/app/")) return null;
 
   return <SiteHeaderVisible pathname={pathname} />;
 }

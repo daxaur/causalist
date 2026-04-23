@@ -272,7 +272,7 @@ export default function DashboardPage() {
               {filteredLibrary.map((e) => (
                 <Link
                   key={e.id}
-                  href={`/${e.owner}/${e.repo}`}
+                  href={`/app/${e.owner}/${e.repo}`}
                   className="group rounded-xl border border-neutral-200 bg-white p-4 transition-all hover:-translate-y-px hover:border-neutral-300 hover:shadow-sm"
                 >
                   <div className="font-mono text-[13px] text-neutral-900">
@@ -394,7 +394,7 @@ function RepoRow({ repo }: { repo: Repo }) {
   return (
     <li>
       <Link
-        href={`/${repo.fullName}`}
+        href={`/app/${repo.fullName}`}
         className="group flex items-center justify-between gap-4 rounded-xl border border-neutral-200 bg-white px-5 py-4 transition-all hover:border-neutral-300 hover:shadow-sm"
       >
         <div className="min-w-0">

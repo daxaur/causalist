@@ -19,7 +19,7 @@ export function ReferenceClient({ reference }: { reference: ReferenceMeta }) {
   const next = idx < REFERENCES.length - 1 ? REFERENCES[idx + 1] : null;
 
   return (
-    <main className="relative h-[calc(100vh-57px)] w-full overflow-hidden bg-white">
+    <main className="absolute inset-0 overflow-hidden bg-[#FAFAF8]">
       {mode === "graph" && (
         <div className="absolute inset-0">
           <CausalGraphViewer

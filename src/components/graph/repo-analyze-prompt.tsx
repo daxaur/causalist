@@ -319,7 +319,7 @@ export function RepoAnalyzePrompt({
           ) : stage === "done" ? (
             <div className="flex items-center gap-2">
               <Link
-                href={`/${owner}/${repo}`}
+                href={`/app/${owner}/${repo}`}
                 className="inline-flex h-9 items-center gap-1.5 rounded-md bg-neutral-900 px-4 text-xs text-white transition-colors hover:bg-neutral-800"
               >
                 Open full viewer

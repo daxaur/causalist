@@ -24,6 +24,7 @@ import {
   type DiffOverlay,
   type NodeDiffState,
 } from "@/lib/graph/diff";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useGraphKeyboard } from "@/lib/graph/filters";
 import { buildFixPrompt } from "@/lib/graph/prompt";
@@ -572,12 +573,16 @@ export function CausalGraphViewer({
         id: "export-json",
         label: "Export graph as JSON",
         hint: ".json",
-        run: () =>
+        run: () => {
           download(
             `${slug}.json`,
             "application/json",
             JSON.stringify(graph, null, 2),
-          ),
+          );
+          toast.success(`${slug}.json downloaded`, {
+            description: `${graph.nodes.length} nodes · ${graph.edges.length} edges`,
+          });
+        },
       },
       {
         id: "export-png",
@@ -588,7 +593,9 @@ export function CausalGraphViewer({
             ".scene-container canvas, canvas",
           ) as HTMLCanvasElement | null;
           if (!canvas) {
-            alert("Canvas not ready yet — zoom in/out once, then try again.");
+            toast.warning("Canvas not ready", {
+              description: "Zoom in/out once, then try again.",
+            });
             return;
           }
           canvas.toBlob((blob) => {
@@ -601,6 +608,7 @@ export function CausalGraphViewer({
             a.click();
             document.body.removeChild(a);
             setTimeout(() => URL.revokeObjectURL(url), 1000);
+            toast.success(`${slug}.png saved`);
           }, "image/png");
         },
       },
@@ -613,11 +621,16 @@ export function CausalGraphViewer({
         hint: "→ Claude Code",
         run: async () => {
           if (selectedIds.size === 0) {
-            alert("Select one or more nodes first (click; shift-click to add).");
+            toast.info("Select nodes first", {
+              description: "Click a node (shift-click to add more).",
+            });
             return;
           }
           const prompt = buildFixPrompt(graph, selectedIds);
           await navigator.clipboard.writeText(prompt);
+          toast.success("Prompt copied", {
+            description: `${selectedIds.size} node${selectedIds.size === 1 ? "" : "s"} · paste into Claude Code`,
+          });
         },
       },
       {
@@ -626,6 +639,7 @@ export function CausalGraphViewer({
         hint: "?focus=…",
         run: async () => {
           await navigator.clipboard.writeText(window.location.href);
+          toast.success("Link copied");
         },
       },
       {
@@ -634,7 +648,9 @@ export function CausalGraphViewer({
         hint: ".",
         run: () => {
           if (!focusedId) {
-            alert("Focus a node first (click it).");
+            toast.info("Focus a node first", {
+              description: "Click a node to set focus.",
+            });
             return;
           }
           setFocusMode((v) => !v);

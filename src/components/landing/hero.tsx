@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { motion } from "motion/react";
-import { ArrowRight, Sparkle, Cube } from "@phosphor-icons/react";
+import { ArrowRight, Sparkle } from "@phosphor-icons/react";
 import { AnimatedShinyText } from "@/components/ui/animated-shiny-text";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,7 +63,7 @@ export function Hero({
     const [, owner, repo] = match;
     setError(null);
     setIsLoading(true);
-    router.push(`/${owner}/${repo.replace(/\.git$/, "")}`);
+    router.push(`/app/${owner}/${repo.replace(/\.git$/, "")}`);
   };
 
   // Split headline into words for per-word animation
@@ -175,25 +175,11 @@ export function Hero({
 
       <motion.div
         variants={item}
-        className="mt-8 flex items-center justify-center gap-3"
-      >
-        <Link
-          href="/dashboard"
-          className="inline-flex h-10 items-center gap-2 rounded-md border border-neutral-200 bg-white px-4 text-sm text-neutral-700 transition-all hover:border-neutral-400 hover:shadow-sm"
-        >
-          <Cube size={14} weight="duotone" className="text-accent-magenta" />
-          Open the application
-          <ArrowRight size={13} className="text-neutral-400" />
-        </Link>
-      </motion.div>
-
-      <motion.div
-        variants={item}
         className="mt-10 flex flex-wrap items-center justify-center gap-2 text-sm"
       >
         <span className="mr-1 flex items-center gap-1.5 text-neutral-400">
           <Sparkle size={13} weight="duotone" />
-          Or try a live demo
+          Or open a live demo
         </span>
         {PREVIEWS.map((p, i) => (
           <motion.span

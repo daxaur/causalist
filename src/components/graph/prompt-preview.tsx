@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { toast } from "sonner";
 import {
   ArrowRight,
   Check,
@@ -81,6 +82,9 @@ export function PromptPreviewModal({
   const copyToClipboard = async () => {
     await navigator.clipboard.writeText(text);
     setCopied(true);
+    toast.success("Prompt copied", {
+      description: `${text.length.toLocaleString()} chars · paste into Claude Code`,
+    });
     setTimeout(() => setCopied(false), 1800);
   };
 
@@ -121,13 +125,13 @@ export function PromptPreviewModal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.98 }}
             transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-x-4 top-12 bottom-12 z-50 mx-auto flex max-w-3xl flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-2xl sm:inset-y-auto sm:top-[8vh] sm:bottom-auto sm:max-h-[85vh]"
+            className="fixed inset-x-4 top-8 bottom-8 z-50 mx-auto flex w-[min(1100px,calc(100vw-2rem))] max-w-none flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-[0_30px_80px_-20px_rgba(20,9,26,0.35)] sm:inset-y-auto sm:top-[6vh] sm:bottom-auto sm:max-h-[88vh]"
           >
             {/* Header */}
             <header className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[#E838A4]/30 bg-[#E838A4]/10">
-                  <Sparkle size={14} weight="duotone" className="text-[#E838A4]" />
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-accent-magenta/30 bg-accent-magenta/10">
+                  <Sparkle size={14} weight="duotone" className="text-accent-magenta" />
                 </div>
                 <div className="min-w-0">
                   <h2 className="truncate font-display text-base font-medium text-neutral-900">
@@ -182,7 +186,7 @@ export function PromptPreviewModal({
                 value={task}
                 onChange={(e) => setTask(e.target.value)}
                 placeholder='e.g. "refactor the error handling to use Result&lt;T, E&gt; types"'
-                className="h-9 w-full rounded-md border border-neutral-200 bg-white px-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[#E838A4]/50 focus:outline-none focus:ring-2 focus:ring-[#E838A4]/10"
+                className="h-9 w-full rounded-md border border-neutral-200 bg-white px-3 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-accent-magenta/50 focus:outline-none focus:ring-2 focus:ring-accent-magenta/10"
               />
             </div>
 

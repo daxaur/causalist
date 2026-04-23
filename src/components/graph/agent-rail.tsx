@@ -61,23 +61,31 @@ export function AgentRail({
   const totalDone = agents.filter((a) => a.status === "done").length;
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0C0611] font-mono text-sm text-white">
-      <header className="border-b border-white/5 px-4 py-3">
-        <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-white/40">
+    <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white font-mono text-sm text-neutral-900 shadow-[0_1px_0_rgba(0,0,0,0.02),0_20px_40px_-24px_rgba(20,9,26,0.15)]">
+      <header className="border-b border-neutral-100 px-4 py-3">
+        <div className="flex items-center justify-between text-[10px] uppercase tracking-wider text-neutral-400">
           <span className="flex items-center gap-1.5">
-            <Sparkle size={10} weight="duotone" className="text-[#E838A4]" />
+            <Sparkle size={10} weight="duotone" className="text-accent-magenta" />
             Agents
           </span>
           <span>
             {totalDone}/{agents.length}
           </span>
         </div>
-        <div className="mt-1 text-xs text-white/70">
-          {running.length > 0
-            ? `${running.length} working · streaming`
-            : totalDone === agents.length
-              ? "All done"
-              : "Idle"}
+        <div className="mt-1 text-xs text-neutral-600">
+          {running.length > 0 ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inset-0 animate-ping rounded-full bg-accent-magenta opacity-75" />
+                <span className="relative rounded-full bg-accent-magenta h-1.5 w-1.5" />
+              </span>
+              {running.length} working · streaming
+            </span>
+          ) : totalDone === agents.length ? (
+            "All done"
+          ) : (
+            "Idle"
+          )}
         </div>
       </header>
       <ul className="flex-1 overflow-y-auto">
@@ -119,32 +127,44 @@ function AgentRow({
       <button
         onClick={onSelect}
         className={cn(
-          "w-full border-b border-white/5 px-4 py-3 text-left transition-colors",
-          selected ? "bg-[#E838A4]/8" : "hover:bg-white/5",
+          "w-full border-b border-neutral-100 px-4 py-3 text-left transition-colors",
+          selected
+            ? "bg-accent-magenta/5"
+            : "hover:bg-neutral-50",
         )}
       >
         <div className="flex items-center justify-between text-[10px] uppercase tracking-wider">
           <div className="flex items-center gap-1.5">
             <StatusDot status={agent.status} />
-            <span className="text-white/80">{agent.name}</span>
+            <span className="text-neutral-700">{agent.name}</span>
           </div>
-          <span className="tabular-nums text-white/40">{elapsed}</span>
+          <span className="tabular-nums text-neutral-400">{elapsed}</span>
         </div>
 
-        <div className="mt-1.5 h-px w-full bg-white/5">
+        {/* Track + progress bar — a little thicker so it reads as movement */}
+        <div className="relative mt-2 h-[3px] w-full overflow-hidden rounded-full bg-neutral-100">
           <motion.div
             className={cn(
-              "h-px",
+              "absolute inset-y-0 left-0 rounded-full",
               agent.status === "error"
-                ? "bg-red-400"
+                ? "bg-red-500"
                 : agent.status === "done"
-                  ? "bg-emerald-400"
-                  : "bg-[#E838A4]",
+                  ? "bg-emerald-500"
+                  : "bg-accent-magenta",
             )}
             initial={{ width: 0 }}
             animate={{ width: `${pct}%` }}
-            transition={{ duration: 0.35, ease: "easeOut" }}
+            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
           />
+          {/* Shimmer sweep while running */}
+          {agent.status === "running" && (
+            <motion.div
+              aria-hidden
+              className="absolute inset-y-0 w-16 bg-gradient-to-r from-transparent via-white/80 to-transparent"
+              animate={{ x: ["-100%", "400%"] }}
+              transition={{ duration: 1.6, ease: "linear", repeat: Infinity }}
+            />
+          )}
         </div>
 
         <AnimatePresence mode="popLayout">
@@ -154,8 +174,8 @@ function AgentRow({
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="mt-2 truncate text-[12.5px] text-white/90"
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              className="mt-2 truncate text-[12.5px] text-neutral-800"
             >
               {last.text}
             </motion.div>
@@ -163,12 +183,12 @@ function AgentRow({
         </AnimatePresence>
 
         {lastFinding && lastFinding !== last && (
-          <div className="mt-0.5 truncate text-[11px] text-white/40">
+          <div className="mt-0.5 truncate text-[11px] text-neutral-400">
             └─ {lastFinding.text}
           </div>
         )}
 
-        <div className="mt-1 text-[10px] text-white/30">
+        <div className="mt-1 text-[10px] text-neutral-400">
           {agent.description}
         </div>
       </button>
@@ -178,13 +198,13 @@ function AgentRow({
 
 function StatusDot({ status }: { status: AgentStatus }) {
   if (status === "running") {
-    return <CircleNotch size={10} className="animate-spin text-[#E838A4]" />;
+    return <CircleNotch size={10} className="animate-spin text-accent-magenta" />;
   }
   if (status === "done") {
-    return <CheckCircle size={10} weight="fill" className="text-emerald-400" />;
+    return <CheckCircle size={10} weight="fill" className="text-emerald-500" />;
   }
   if (status === "error") {
-    return <WarningCircle size={10} weight="fill" className="text-red-400" />;
+    return <WarningCircle size={10} weight="fill" className="text-red-500" />;
   }
-  return <span className="h-2 w-2 rounded-full border border-white/20" />;
+  return <span className="h-2 w-2 rounded-full border border-neutral-300" />;
 }
