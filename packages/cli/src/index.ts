@@ -4,6 +4,7 @@ import { Command } from "commander";
 import kleur from "kleur";
 import { map } from "./commands/map.js";
 import { install } from "./commands/install.js";
+import { pair } from "./commands/pair.js";
 import { serve } from "./commands/serve.js";
 
 const program = new Command();
@@ -29,6 +30,15 @@ program
   .description("Install Causalist as a Claude Code plugin")
   .option("--dir <path>", "override plugin install directory")
   .action(install);
+
+program
+  .command("pair")
+  .description(
+    "Pair this terminal with a browser tab — the tab will receive live Claude Code events from this session",
+  )
+  .argument("<code>", "6-char pair code from causalist.xyz/pair")
+  .option("--web <url>", "base URL of the Causalist web app", "https://causalist.xyz")
+  .action(pair);
 
 program
   .command("serve")
