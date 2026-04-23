@@ -331,7 +331,7 @@ export function AskView({
             <Sparkle
               size={22}
               weight="duotone"
-              className="mx-auto mb-4 text-[#3DD6D0]"
+              className="mx-auto mb-4 text-[#E838A4]"
             />
             <h2 className="mb-2 font-display text-3xl font-medium tracking-[-0.02em]">
               Oracle has six tools
@@ -454,8 +454,8 @@ function OracleTurnView({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#3DD6D0]/30 bg-[#eafaf9]">
-        <Sparkle size={11} weight="duotone" className="text-[#3DD6D0]" />
+      <div className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#E838A4]/30 bg-[#fbe8f4]">
+        <Sparkle size={11} weight="duotone" className="text-[#E838A4]" />
       </div>
       <div className="flex-1 space-y-3">
         <AnimatePresence initial={false}>
@@ -473,7 +473,7 @@ function OracleTurnView({
                   onNodeClick={onNodeClick}
                 />
                 {streaming && i === turn.content.length - 1 && (
-                  <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-[#3DD6D0] align-middle" />
+                  <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-[#E838A4] align-middle" />
                 )}
               </motion.div>
             ) : (
@@ -510,7 +510,7 @@ function ToolCall({
         ) : (
           <CaretRight size={10} className="text-neutral-400" />
         )}
-        <MagicWand size={11} weight="duotone" className="text-[#3DD6D0]" />
+        <MagicWand size={11} weight="duotone" className="text-[#E838A4]" />
         <span className="font-mono text-neutral-700">{block.name}</span>
         <span className="truncate font-mono text-[11px] text-neutral-400">
           {formatToolArgs(block.input)}
@@ -574,7 +574,7 @@ function RenderWithCitations({
               <button
                 key={j}
                 onClick={() => onNodeClick(node.id)}
-                className="mx-0.5 inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 align-baseline font-mono text-[0.85em] text-neutral-800 transition-all hover:border-[#3DD6D0] hover:shadow-sm"
+                className="mx-0.5 inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 align-baseline font-mono text-[0.85em] text-neutral-800 transition-all hover:border-[#E838A4] hover:shadow-sm"
                 title={node.label}
               >
                 <span

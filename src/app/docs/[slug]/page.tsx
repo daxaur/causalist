@@ -114,7 +114,7 @@ export default async function DocsSectionPage({
                       href={c.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block transition-colors hover:text-[#3DD6D0]"
+                      className="block transition-colors hover:text-[#E838A4]"
                     >
                       <span className="text-neutral-700">{c.authors}</span>{" "}
                       <span className="text-neutral-400">· {c.year}</span>

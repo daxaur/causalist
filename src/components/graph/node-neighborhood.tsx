@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { LAYER_COLORS, type CausalEdge, type CausalNode } from "@/lib/graph/types";
 
-const ACCENT = "#3DD6D0";
+const ACCENT = "#E838A4";
 const W = 300;
 const H = 180;
 const CENTER_X = W / 2;

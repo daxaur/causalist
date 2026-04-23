@@ -193,13 +193,13 @@ function renderInline(text: string): string {
     const c = CITATIONS.find((x) => x.key === key);
     if (!c) return label;
     const tip = `${c.authors} — ${c.title} (${c.venue} ${c.year})`;
-    return `<a href="${c.url}" target="_blank" rel="noopener noreferrer" title="${escapeAttr(tip)}" class="border-b border-[#3DD6D0]/40 text-neutral-800 transition-colors hover:border-[#3DD6D0] hover:text-[#3DD6D0]">${label}</a>`;
+    return `<a href="${c.url}" target="_blank" rel="noopener noreferrer" title="${escapeAttr(tip)}" class="border-b border-[#E838A4]/40 text-neutral-800 transition-colors hover:border-[#E838A4] hover:text-[#E838A4]">${label}</a>`;
   });
 
   // Standard links [text](url)
   out = out.replace(
     /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener noreferrer" class="underline decoration-neutral-300 underline-offset-2 transition-colors hover:decoration-[#3DD6D0] hover:text-[#3DD6D0]">$1</a>',
+    '<a href="$2" target="_blank" rel="noopener noreferrer" class="underline decoration-neutral-300 underline-offset-2 transition-colors hover:decoration-[#E838A4] hover:text-[#E838A4]">$1</a>',
   );
 
   // Bold

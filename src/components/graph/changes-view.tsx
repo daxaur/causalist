@@ -27,7 +27,7 @@ export function ChangesView({
   if (commits.length === 0) {
     return (
       <div className="mx-auto flex min-h-[50vh] max-w-md flex-col items-center justify-center text-center">
-        <GitBranch size={22} weight="duotone" className="mb-4 text-[#3DD6D0]" />
+        <GitBranch size={22} weight="duotone" className="mb-4 text-[#E838A4]" />
         <h2 className="mb-2 font-display text-2xl font-medium tracking-tight">
           Changes timeline
         </h2>
@@ -143,7 +143,7 @@ function Timeline({
                   className={cn(
                     "absolute left-2 top-3 flex h-2.5 w-2.5 -translate-x-1/2 items-center justify-center rounded-full border-2 transition-all",
                     active
-                      ? "border-[#3DD6D0] bg-[#3DD6D0] shadow-[0_0_0_4px_rgba(61,214,208,0.25)]"
+                      ? "border-[#E838A4] bg-[#E838A4] shadow-[0_0_0_4px_rgba(232,56,164,0.25)]"
                       : "border-neutral-300 bg-white",
                   )}
                 />

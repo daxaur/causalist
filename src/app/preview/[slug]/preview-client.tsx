@@ -79,7 +79,7 @@ export function PreviewClient({ preview }: { preview: PreviewMeta }) {
               <Sparkle
                 size={11}
                 weight="duotone"
-                className="text-[#3DD6D0]"
+                className="text-[#E838A4]"
               />
               {preview.tagline}
             </p>
