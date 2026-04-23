@@ -142,6 +142,50 @@ export function CausalGraphViewer({
     return () => clearTimeout(t);
   }, [mode, graph]);
 
+  // Spatial layering: push each semantic layer toward a different
+  // y-anchor so the graph reads top-to-bottom as infra → data → logic
+  // → api → ui → test → config. Gives every repo the same shape
+  // identity regardless of size. 3D only.
+  useEffect(() => {
+    if (mode !== "3d") return;
+    let cancelled = false;
+    (async () => {
+      await new Promise((r) => setTimeout(r, 250));
+      if (cancelled) return;
+      const g = graphRef.current;
+      if (!g || typeof g.d3Force !== "function") return;
+      const dForce = await import("d3-force-3d");
+      const layerY: Record<string, number> = {
+        infra: -180,
+        data: -90,
+        logic: 0,
+        api: 60,
+        ui: 120,
+        test: 180,
+        config: 240,
+      };
+      // Cluster each node toward its layer's y anchor
+      g.d3Force(
+        "layerY",
+        dForce
+          .forceY((n: { layer?: string }) => layerY[n.layer ?? "logic"] ?? 0)
+          .strength(0.09),
+      );
+      // Give everything a gentle radial collide so labels don't overlap
+      g.d3Force(
+        "collide",
+        dForce.forceCollide?.((n: { size?: number }) => (n.size ?? 4) + 4),
+      );
+      g.numDimensions(3);
+      // Reheat briefly so the new forces take effect
+      if (typeof g.d3ReheatSimulation === "function") g.d3ReheatSimulation();
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, graph]);
+
   // Cinematic fly-to on focus change (3D)
   useEffect(() => {
     if (!focusedId || mode !== "3d") return;
