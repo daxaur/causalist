@@ -129,9 +129,9 @@ export function CausalGraphViewer({
         const h = window.innerHeight;
         const bloom = new UnrealBloomPass(
           new THREE.Vector2(w, h),
-          1.35, // strength
-          0.85, // radius
-          0.12, // threshold
+          0.55, // strength — kept subtle so the graph stays readable
+          0.65, // radius
+          0.24, // threshold — higher so only bright parts bloom
         );
         g.postProcessingComposer().addPass(bloom);
         bloomSetupRef.current = true;
@@ -250,35 +250,35 @@ export function CausalGraphViewer({
 
       const imp = importance.byId.get(n.id);
       const tierBoost =
-        imp?.tier === "hot" ? 3.5 : imp?.tier === "core" ? 1.8 : 0;
+        imp?.tier === "hot" ? 2.6 : imp?.tier === "core" ? 1.2 : 0;
       const radius =
         (n.size ?? 4) + (n.kind === "external" ? 1.5 : 0) + tierBoost;
 
-      // Core sphere
+      // Core sphere — quieter emissive, more "material" less "neon"
       const geom = new THREE.SphereGeometry(radius, 20, 20);
       const mat = new THREE.MeshStandardMaterial({
         color: baseHex,
         emissive: baseHex,
         emissiveIntensity: focusedNow
-          ? 1.7
+          ? 0.95
           : selectedNow
-            ? 1.3
+            ? 0.65
             : highlightedNow
-              ? 1.1
-              : 0.55,
-        roughness: 0.35,
-        metalness: 0.15,
+              ? 0.55
+              : 0.22,
+        roughness: 0.5,
+        metalness: 0.12,
       });
       const mesh = new THREE.Mesh(geom, mat);
       group.add(mesh);
 
-      // Outer soft halo for any selected / hover
-      if (selectedNow || highlightedNow) {
-        const haloGeom = new THREE.SphereGeometry(radius * 1.7, 20, 20);
+      // Outer soft halo only for the focused node — everything else stays clean
+      if (focusedNow) {
+        const haloGeom = new THREE.SphereGeometry(radius * 1.6, 20, 20);
         const haloMat = new THREE.MeshBasicMaterial({
           color: ACCENT_HEX,
           transparent: true,
-          opacity: focusedNow ? 0.3 : selectedNow ? 0.22 : 0.16,
+          opacity: 0.18,
         });
         group.add(new THREE.Mesh(haloGeom, haloMat));
       }
@@ -302,23 +302,8 @@ export function CausalGraphViewer({
         group.add(arc);
       }
 
-      // Hot nodes (top 10%) get a thin outer ring even when not selected
-      // — signal their importance at a glance.
-      if (imp?.tier === "hot" && !focusedNow) {
-        const ringGeom = new THREE.TorusGeometry(
-          radius * 1.85,
-          0.09,
-          6,
-          40,
-        );
-        const ringMat = new THREE.MeshBasicMaterial({
-          color: ACCENT_HEX,
-          transparent: true,
-          opacity: 0.55,
-        });
-        const ring = new THREE.Mesh(ringGeom, ringMat);
-        group.add(ring);
-      }
+      // Hot nodes (top 10%) signal importance by size alone — no ring,
+      // no extra glow. Keeps the graph readable.
 
       return group;
     };
@@ -352,10 +337,10 @@ export function CausalGraphViewer({
     linkDirectionalParticles: (l: GraphLink) => {
       const s = typeof l.source === "string" ? l.source : (l.source as VisNode).id;
       const t = typeof l.target === "string" ? l.target : (l.target as VisNode).id;
-      return selectedIds.has(s) || selectedIds.has(t) ? 4 : 0;
+      return selectedIds.has(s) || selectedIds.has(t) ? 2 : 0;
     },
-    linkDirectionalParticleSpeed: 0.007,
-    linkDirectionalParticleWidth: 1.6,
+    linkDirectionalParticleSpeed: 0.006,
+    linkDirectionalParticleWidth: 1.2,
     linkDirectionalParticleColor: () => ACCENT,
     onNodeClick: (
       n: VisNode,

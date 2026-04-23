@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from "react";
 import {
-  ArrowRight,
   Check,
   Copy,
+  FileText,
   Fire,
   Leaf,
   Sparkle,
@@ -12,7 +12,6 @@ import {
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { iconUrlForLanguage, iconUrlForPath } from "@/lib/graph/devicon";
-import { buildFixPrompt } from "@/lib/graph/prompt";
 import type { CausalGraph } from "@/lib/graph/types";
 import {
   LAYER_COLORS,
@@ -23,6 +22,7 @@ import {
 import type { Importance } from "@/lib/graph/importance";
 import { NodeNeighborhood } from "./node-neighborhood";
 import { NodeDeepDive } from "./node-deep-dive";
+import { PromptPreviewModal } from "./prompt-preview";
 
 const EDGE_KIND_LABELS: Record<string, string> = {
   imports: "imports",
@@ -52,7 +52,7 @@ export function NodePanel({
   onClose,
 }: NodePanelProps) {
   const [copied, setCopied] = useState(false);
-  const [promptCopied, setPromptCopied] = useState(false);
+  const [promptOpen, setPromptOpen] = useState(false);
 
   const { incoming, outgoing } = useMemo(() => {
     const incoming: { node: CausalNode; kind: string }[] = [];
@@ -80,12 +80,7 @@ export function NodePanel({
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const onCopyPrompt = () => {
-    const prompt = buildFixPrompt(graph, [node.id]);
-    navigator.clipboard.writeText(prompt);
-    setPromptCopied(true);
-    setTimeout(() => setPromptCopied(false), 1800);
-  };
+  const openPromptPreview = () => setPromptOpen(true);
 
   return (
     <aside className="flex h-full flex-col border-l border-white/10 bg-[#0a0d0f]/95 backdrop-blur-xl">
@@ -167,21 +162,17 @@ export function NodePanel({
           />
         </div>
 
-        {/* Copy fix prompt for this file */}
+        {/* Review prompt — opens a modal so the user can SEE it, not just copy silently */}
         <button
-          onClick={onCopyPrompt}
-          className="mt-3 flex w-full items-center justify-between gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-left text-[11px] text-white/70 transition-colors hover:border-white/20 hover:text-white"
+          onClick={openPromptPreview}
+          className="mt-3 flex w-full items-center justify-between gap-2 rounded-md border border-[#E838A4]/25 bg-[#E838A4]/10 px-3 py-2 text-left text-[11px] text-white/85 transition-colors hover:border-[#E838A4]/50 hover:bg-[#E838A4]/15 hover:text-white"
         >
           <span className="flex items-center gap-1.5">
-            {promptCopied ? (
-              <Check size={11} className="text-emerald-400" />
-            ) : (
-              <Copy size={11} />
-            )}
-            {promptCopied ? "Prompt copied" : "Copy prompt for this file"}
+            <FileText size={11} />
+            Review prompt for this file
           </span>
-          <span className="font-mono text-[9px] text-white/30">
-            paste into Claude Code
+          <span className="font-mono text-[9px] text-white/40">
+            see before you copy
           </span>
         </button>
 
@@ -230,6 +221,13 @@ export function NodePanel({
           </span>
         )}
       </div>
+
+      <PromptPreviewModal
+        open={promptOpen}
+        onClose={() => setPromptOpen(false)}
+        graph={graph}
+        selectedIds={[node.id]}
+      />
     </aside>
   );
 }
