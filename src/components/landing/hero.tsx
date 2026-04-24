@@ -175,13 +175,33 @@ export function Hero({
 
       <motion.div
         variants={item}
-        className="mt-10 flex flex-wrap items-center justify-center gap-2 text-sm"
+        className="mt-6 flex items-center justify-center gap-3"
+      >
+        <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-400">
+          No key yet?
+        </span>
+        <Link
+          href="/app/preview/causalist"
+          className="group inline-flex h-9 items-center gap-2 rounded-md border border-neutral-900 bg-white px-3 text-[13px] font-medium text-neutral-900 transition-all hover:bg-neutral-900 hover:text-white"
+        >
+          <Sparkle size={12} weight="fill" className="text-accent-magenta" />
+          Open the live demo
+          <ArrowRight
+            size={12}
+            className="transition-transform group-hover:translate-x-0.5"
+          />
+        </Link>
+      </motion.div>
+
+      <motion.div
+        variants={item}
+        className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm"
       >
         <span className="mr-1 flex items-center gap-1.5 text-neutral-400">
           <Sparkle size={13} weight="duotone" />
-          Or open a live demo
+          or peek at another:
         </span>
-        {PREVIEWS.map((p, i) => (
+        {PREVIEWS.filter((p) => p.slug !== "causalist").map((p, i) => (
           <motion.span
             key={p.slug}
             initial={{ opacity: 0, y: 6 }}

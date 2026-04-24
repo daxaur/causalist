@@ -1,7 +1,52 @@
 "use client";
 
-import { motion } from "motion/react";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/lib/utils";
+
+/**
+ * Rotating gerund — Claude Code's signature "word, not spinner"
+ * pattern. Cycles every 3s with a 150ms cross-fade. Default verbs
+ * are graph-specific but pass your own for any context.
+ */
+const DEFAULT_VERBS = [
+  "Synthesising",
+  "Linking",
+  "Tracing",
+  "Inferring",
+  "Resolving",
+];
+
+export function RotatingVerb({
+  verbs = DEFAULT_VERBS,
+  intervalMs = 3000,
+  className,
+}: {
+  verbs?: string[];
+  intervalMs?: number;
+  className?: string;
+}) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (verbs.length <= 1) return;
+    const id = setInterval(() => setI((x) => (x + 1) % verbs.length), intervalMs);
+    return () => clearInterval(id);
+  }, [verbs, intervalMs]);
+  return (
+    <AnimatePresence mode="wait">
+      <motion.span
+        key={verbs[i]}
+        initial={{ opacity: 0, y: 2 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -2 }}
+        transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+        className={cn("inline-block", className)}
+      >
+        {verbs[i]}
+      </motion.span>
+    </AnimatePresence>
+  );
+}
 
 /**
  * Three pulsing dots after a label — the "Claude is thinking…"

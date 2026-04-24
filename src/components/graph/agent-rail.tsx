@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { CheckCircle, Sparkle, WarningCircle } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { CausalistSpinner } from "@/components/ui/causalist-loader";
-import { ThinkingDotsAccent } from "@/components/ui/thinking";
+import { RotatingVerb, ThinkingDotsAccent } from "@/components/ui/thinking";
 
 export type AgentStatus = "running" | "done" | "error" | "pending";
 
@@ -28,12 +28,13 @@ export interface AgentState {
   events: AgentEvent[];
 }
 
-/** Elapsed time since `from` ms, ticks every 100ms. */
+/** Elapsed time since `from` ms. 1-second tick — Claude Code's cadence
+ * (the 100ms version felt twitchy). */
 function useElapsed(from: number | undefined, stop: number | undefined): string {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     if (!from || stop) return;
-    const id = setInterval(() => setNow(Date.now()), 100);
+    const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [from, stop]);
   if (!from) return "0:00";
@@ -69,12 +70,21 @@ export function AgentRail({
             {totalDone}/{agents.length}
           </span>
         </div>
-        <div className="mt-1 text-xs text-neutral-600">
+        <div className="mt-1 flex items-center gap-2 text-xs text-neutral-600">
           {running.length > 0 ? (
-            <ThinkingDotsAccent
-              label={`${running.length} working · streaming`}
-              className="text-[12px]"
-            />
+            <>
+              <ThinkingDotsAccent
+                label=""
+                className="text-[12px]"
+              />
+              <RotatingVerb
+                verbs={["Synthesising", "Linking", "Tracing", "Inferring"]}
+                className="font-mono text-[12px] text-accent-magenta"
+              />
+              <span className="font-mono text-[11px] text-neutral-400">
+                · {running.length} agents · esc to cancel
+              </span>
+            </>
           ) : totalDone === agents.length ? (
             <span className="inline-flex items-center gap-1.5 text-emerald-600">
               <CheckCircle size={11} weight="fill" />
@@ -138,11 +148,11 @@ function AgentRow({
           <span className="tabular-nums text-neutral-400">{elapsed}</span>
         </div>
 
-        {/* Track + progress bar — a little thicker so it reads as movement */}
-        <div className="relative mt-2 h-[3px] w-full overflow-hidden rounded-full bg-neutral-100">
+        {/* Thin linear progress underline — Claude Code calm, no sweep */}
+        <div className="relative mt-2 h-px w-full overflow-hidden bg-neutral-100">
           <motion.div
             className={cn(
-              "absolute inset-y-0 left-0 rounded-full",
+              "absolute inset-y-0 left-0",
               agent.status === "error"
                 ? "bg-red-500"
                 : agent.status === "done"
@@ -151,37 +161,44 @@ function AgentRow({
             )}
             initial={{ width: 0 }}
             animate={{ width: `${pct}%` }}
-            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.5, ease: "linear" }}
           />
-          {/* Shimmer sweep while running */}
-          {agent.status === "running" && (
-            <motion.div
-              aria-hidden
-              className="absolute inset-y-0 w-16 bg-gradient-to-r from-transparent via-white/80 to-transparent"
-              animate={{ x: ["-100%", "400%"] }}
-              transition={{ duration: 1.6, ease: "linear", repeat: Infinity }}
-            />
-          )}
         </div>
 
         <AnimatePresence mode="popLayout">
           {last && (
             <motion.div
               key={last.ts + last.text}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className="mt-2 truncate text-[12.5px] text-neutral-800"
+              className="mt-2 flex min-w-0 items-start gap-1.5 font-mono text-[12px] text-neutral-800"
             >
-              {last.text}
+              <span
+                aria-hidden
+                className={cn(
+                  "mt-[1px] shrink-0",
+                  last.kind === "action"
+                    ? "text-accent-magenta"
+                    : last.kind === "error"
+                      ? "text-red-500"
+                      : "text-neutral-400",
+                )}
+              >
+                ●
+              </span>
+              <span className="truncate">{last.text}</span>
             </motion.div>
           )}
         </AnimatePresence>
 
         {lastFinding && lastFinding !== last && (
-          <div className="mt-0.5 truncate text-[11px] text-neutral-400">
-            └─ {lastFinding.text}
+          <div className="mt-0.5 flex items-start gap-1 truncate font-mono text-[11px] text-neutral-400">
+            <span aria-hidden className="shrink-0">
+              ⎿
+            </span>
+            <span className="truncate">{lastFinding.text}</span>
           </div>
         )}
 

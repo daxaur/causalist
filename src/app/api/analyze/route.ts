@@ -1,5 +1,10 @@
 import type { NextRequest } from "next/server";
-import { runAnalyze, type AgentEvent, type AnalyzeInput } from "@/lib/analyze/pipeline";
+import {
+  preflightKey,
+  runAnalyze,
+  type AgentEvent,
+  type AnalyzeInput,
+} from "@/lib/analyze/pipeline";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,6 +42,16 @@ export async function POST(req: NextRequest): Promise<Response> {
     return new Response("body must include { owner, repo, tree[] }", {
       status: 400,
     });
+  }
+
+  // Preflight the Anthropic key so invalid keys return a proper HTTP
+  // status instead of leaking an auth error deep inside the SSE body.
+  const pf = await preflightKey(apiKey);
+  if (!pf.ok) {
+    return Response.json(
+      { error: "anthropic_auth_failed", status: pf.status, message: pf.error },
+      { status: pf.status ?? 401 },
+    );
   }
 
   const encoder = new TextEncoder();
