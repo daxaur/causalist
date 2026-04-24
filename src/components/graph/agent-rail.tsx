@@ -2,13 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import {
-  CheckCircle,
-  CircleNotch,
-  Sparkle,
-  WarningCircle,
-} from "@phosphor-icons/react";
+import { CheckCircle, Sparkle, WarningCircle } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
+import { CausalistSpinner } from "@/components/ui/causalist-loader";
+import { ThinkingDotsAccent } from "@/components/ui/thinking";
 
 export type AgentStatus = "running" | "done" | "error" | "pending";
 
@@ -74,15 +71,15 @@ export function AgentRail({
         </div>
         <div className="mt-1 text-xs text-neutral-600">
           {running.length > 0 ? (
-            <span className="inline-flex items-center gap-1.5">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inset-0 animate-ping rounded-full bg-accent-magenta opacity-75" />
-                <span className="relative rounded-full bg-accent-magenta h-1.5 w-1.5" />
-              </span>
-              {running.length} working · streaming
-            </span>
+            <ThinkingDotsAccent
+              label={`${running.length} working · streaming`}
+              className="text-[12px]"
+            />
           ) : totalDone === agents.length ? (
-            "All done"
+            <span className="inline-flex items-center gap-1.5 text-emerald-600">
+              <CheckCircle size={11} weight="fill" />
+              All done
+            </span>
           ) : (
             "Idle"
           )}
@@ -197,9 +194,7 @@ function AgentRow({
 }
 
 function StatusDot({ status }: { status: AgentStatus }) {
-  if (status === "running") {
-    return <CircleNotch size={10} className="animate-spin text-accent-magenta" />;
-  }
+  if (status === "running") return <CausalistSpinner size={11} />;
   if (status === "done") {
     return <CheckCircle size={10} weight="fill" className="text-emerald-500" />;
   }

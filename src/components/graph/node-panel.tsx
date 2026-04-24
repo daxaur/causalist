@@ -83,13 +83,13 @@ export function NodePanel({
   const openPromptPreview = () => setPromptOpen(true);
 
   return (
-    <aside className="flex h-full flex-col border-l border-white/10 bg-[#0a0d0f]/95 backdrop-blur-xl">
+    <aside className="flex h-full flex-col border-l border-neutral-200 bg-white shadow-[0_0_40px_-12px_rgba(42,36,32,0.12)]">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 border-b border-white/5 p-5">
+      <div className="flex items-start justify-between gap-4 border-b border-neutral-100 p-5">
         <div className="flex min-w-0 flex-col gap-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
             <div
-              className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider"
+              className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider"
               style={{ color: LAYER_COLORS[node.layer] }}
             >
               <span
@@ -97,7 +97,7 @@ export function NodePanel({
                 style={{ backgroundColor: LAYER_COLORS[node.layer] }}
               />
               {LAYER_LABELS[node.layer]}
-              {node.kind && <span className="text-white/30">· {node.kind}</span>}
+              {node.kind && <span className="text-neutral-400">· {node.kind}</span>}
             </div>
             {importance && <ImportanceBadge importance={importance} />}
           </div>
@@ -112,14 +112,14 @@ export function NodePanel({
                 className="mt-1 shrink-0 opacity-90"
               />
             )}
-            <h2 className="break-words font-display text-lg leading-snug text-white">
+            <h2 className="break-words font-display text-lg leading-snug text-neutral-900">
               {node.label}
             </h2>
           </div>
           {node.path && (
             <button
               onClick={onCopy}
-              className="group inline-flex items-center gap-1.5 text-left font-mono text-[11px] text-white/45 transition-colors hover:text-white/80"
+              className="group inline-flex items-center gap-1.5 text-left font-mono text-[11px] text-neutral-400 transition-colors hover:text-neutral-700"
               aria-label="Copy path"
             >
               <code className="break-all">{node.path}</code>
@@ -134,7 +134,7 @@ export function NodePanel({
         <button
           onClick={onClose}
           aria-label="Close panel"
-          className="shrink-0 rounded-md p-1 text-white/50 transition-colors hover:bg-white/5 hover:text-white"
+          className="shrink-0 rounded-md p-1 text-neutral-500 transition-colors hover:bg-neutral-50 hover:text-neutral-900"
         >
           <X size={16} />
         </button>
@@ -143,9 +143,9 @@ export function NodePanel({
       {/* Body */}
       <div className="flex-1 overflow-y-auto px-5 py-5 text-sm">
         {node.summary ? (
-          <p className="leading-relaxed text-white/75">{node.summary}</p>
+          <p className="leading-relaxed text-neutral-600">{node.summary}</p>
         ) : (
-          <p className="text-xs italic text-white/40">
+          <p className="text-xs italic text-neutral-400">
             No summary generated for this node.
           </p>
         )}
@@ -165,13 +165,13 @@ export function NodePanel({
         {/* Review prompt — opens a modal so the user can SEE it, not just copy silently */}
         <button
           onClick={openPromptPreview}
-          className="mt-3 flex w-full items-center justify-between gap-2 rounded-md border border-[#E838A4]/25 bg-[#E838A4]/10 px-3 py-2 text-left text-[11px] text-white/85 transition-colors hover:border-[#E838A4]/50 hover:bg-[#E838A4]/15 hover:text-white"
+          className="mt-3 flex w-full items-center justify-between gap-2 rounded-md border border-accent-magenta/25 bg-accent-magenta/10 px-3 py-2 text-left text-[11px] text-neutral-700 transition-colors hover:border-accent-magenta/50 hover:bg-accent-magenta/10 hover:text-neutral-900"
         >
           <span className="flex items-center gap-1.5">
             <FileText size={11} />
             Review prompt for this file
           </span>
-          <span className="font-mono text-[9px] text-white/40">
+          <span className="font-mono text-[9px] text-neutral-400">
             see before you copy
           </span>
         </button>
@@ -179,7 +179,7 @@ export function NodePanel({
         {/* Visual neighborhood — a mini graph of just this node + neighbors */}
         {(incoming.length > 0 || outgoing.length > 0) && (
           <div className="mt-5">
-            <div className="mb-2 font-mono text-[9px] uppercase tracking-wider text-white/40">
+            <div className="mb-2 font-mono text-[9px] uppercase tracking-wider text-neutral-400">
               neighborhood
             </div>
             <NodeNeighborhood
@@ -213,7 +213,7 @@ export function NodePanel({
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between gap-3 border-t border-white/5 p-4 text-[10px] text-white/40">
+      <div className="flex items-center justify-between gap-3 border-t border-neutral-100 p-4 text-[10px] text-neutral-400">
         <span>{outgoing.length + incoming.length} connections</span>
         {importance && (
           <span className="font-mono">
@@ -244,7 +244,7 @@ function ImportanceBadge({ importance }: { importance: Importance }) {
     return (
       <span
         title={tip}
-        className="inline-flex items-center gap-1 rounded-full border border-[#E838A4]/40 bg-[#E838A4]/15 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-[#FF9CD9]"
+        className="inline-flex items-center gap-1 rounded-full border border-accent-magenta/40 bg-accent-magenta/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-accent-magenta"
       >
         <Fire size={9} weight="fill" />
         hot
@@ -265,7 +265,7 @@ function ImportanceBadge({ importance }: { importance: Importance }) {
   return (
     <span
       title={tip}
-      className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-white/50"
+      className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-neutral-500"
     >
       <Leaf size={9} weight="regular" />
       leaf
@@ -288,14 +288,14 @@ function EdgeList({
 }) {
   return (
     <div className="min-w-0">
-      <div className="mb-1 font-mono text-[9px] uppercase tracking-wider text-white/40">
+      <div className="mb-1 font-mono text-[9px] uppercase tracking-wider text-neutral-400">
         {title}
       </div>
-      <div className="mb-2 text-[10px] leading-relaxed text-white/30">
+      <div className="mb-2 text-[10px] leading-relaxed text-neutral-400">
         {description}
       </div>
       {edges.length === 0 ? (
-        <div className="text-[11px] italic text-white/30">—</div>
+        <div className="text-[11px] italic text-neutral-400">—</div>
       ) : (
         <ul className="space-y-1">
           {edges.slice(0, 12).map(({ node, kind }, i) => (
@@ -303,7 +303,7 @@ function EdgeList({
               <button
                 onClick={() => onSelect(node)}
                 className={cn(
-                  "group flex w-full items-start gap-1.5 rounded px-1.5 py-1 text-left transition-colors hover:bg-white/5",
+                  "group flex w-full items-start gap-1.5 rounded px-1.5 py-1 text-left transition-colors hover:bg-neutral-50",
                 )}
                 title={node.summary ?? node.label}
               >
@@ -312,10 +312,10 @@ function EdgeList({
                   style={{ backgroundColor: LAYER_COLORS[node.layer] }}
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[11px] text-white/80 group-hover:text-white">
+                  <div className="truncate text-[11px] text-neutral-700 group-hover:text-neutral-900">
                     {node.label}
                   </div>
-                  <div className="truncate text-[9px] text-white/35">
+                  <div className="truncate text-[9px] text-neutral-400">
                     {direction === "out" ? "" : "← "}
                     {EDGE_KIND_LABELS[kind] ?? kind}
                   </div>
@@ -324,7 +324,7 @@ function EdgeList({
             </li>
           ))}
           {edges.length > 12 && (
-            <li className="px-1.5 text-[10px] text-white/40">
+            <li className="px-1.5 text-[10px] text-neutral-400">
               +{edges.length - 12} more
             </li>
           )}

@@ -53,14 +53,14 @@ export function NodeNeighborhood({
 
   if (total === 0) {
     return (
-      <div className="flex h-[180px] items-center justify-center rounded-lg border border-white/5 bg-black/20 font-mono text-[10px] text-white/30">
+      <div className="flex h-[180px] items-center justify-center rounded-lg border border-neutral-100 bg-white font-mono text-[10px] text-neutral-400">
         no connections
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-white/10 bg-black/20">
+    <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
       <svg viewBox={`0 0 ${W} ${H}`} className="h-[180px] w-full" role="img">
         <defs>
           <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">

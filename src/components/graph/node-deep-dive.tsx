@@ -2,15 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import {
-  ArrowRight,
-  CircleNotch,
-  Copy,
-  Sparkle,
-  Stop,
-} from "@phosphor-icons/react";
+import { ArrowRight, Copy, Sparkle, Stop } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/lib/settings";
+import { ThinkingDots } from "@/components/ui/thinking";
 import type { CausalGraph, CausalNode } from "@/lib/graph/types";
 import { LAYER_COLORS } from "@/lib/graph/types";
 
@@ -103,10 +98,10 @@ export function NodeDeepDive({
     return (
       <Link
         href="/app/settings"
-        className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-left text-[11px] text-white/60 transition-colors hover:border-[#E838A4]/50 hover:text-white"
+        className="flex items-center justify-between gap-2 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-left text-[11px] text-neutral-500 transition-colors hover:border-accent-magenta/50 hover:text-neutral-900"
       >
         <span className="flex items-center gap-1.5">
-          <Sparkle size={11} weight="duotone" className="text-[#E838A4]" />
+          <Sparkle size={11} weight="duotone" className="text-accent-magenta" />
           Connect your Anthropic key to deep-dive this file
         </span>
         <ArrowRight size={10} />
@@ -118,7 +113,7 @@ export function NodeDeepDive({
     return (
       <button
         onClick={generate}
-        className="flex w-full items-center justify-between gap-2 rounded-md border border-[#E838A4]/30 bg-[#E838A4]/10 px-3 py-2 text-left text-[11px] text-[#FF9CD9] transition-all hover:border-[#E838A4] hover:bg-[#E838A4]/20 hover:text-white"
+        className="flex w-full items-center justify-between gap-2 rounded-md border border-accent-magenta/30 bg-accent-magenta/10 px-3 py-2 text-left text-[11px] text-accent-magenta transition-all hover:border-accent-magenta hover:bg-accent-magenta/20 hover:text-neutral-900"
       >
         <span className="flex items-center gap-1.5">
           <Sparkle size={11} weight="duotone" />
@@ -130,10 +125,10 @@ export function NodeDeepDive({
   }
 
   return (
-    <div className="rounded-md border border-white/10 bg-black/20">
-      <div className="flex items-center justify-between gap-2 border-b border-white/5 px-3 py-2">
-        <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-white/50">
-          <Sparkle size={10} weight="duotone" className="text-[#E838A4]" />
+    <div className="rounded-md border border-neutral-200 bg-white">
+      <div className="flex items-center justify-between gap-2 border-b border-neutral-100 px-3 py-2">
+        <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-neutral-500">
+          <Sparkle size={10} weight="duotone" className="text-accent-magenta" />
           {status === "streaming" ? "streaming" : status === "done" ? "deep dive" : status}
         </div>
         <div className="flex items-center gap-1">
@@ -144,13 +139,13 @@ export function NodeDeepDive({
                   navigator.clipboard.writeText(text);
                 }}
                 title="Copy explanation"
-                className="rounded p-1 text-white/40 hover:bg-white/5 hover:text-white"
+                className="rounded p-1 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-900"
               >
                 <Copy size={10} />
               </button>
               <button
                 onClick={generate}
-                className="rounded px-1.5 py-0.5 text-[10px] text-white/50 hover:bg-white/5 hover:text-white"
+                className="rounded px-1.5 py-0.5 text-[10px] text-neutral-500 hover:bg-neutral-50 hover:text-neutral-900"
               >
                 regen
               </button>
@@ -160,19 +155,16 @@ export function NodeDeepDive({
             <button
               onClick={() => setStatus("done")}
               title="Stop"
-              className="rounded p-1 text-white/40 hover:bg-white/5 hover:text-white"
+              className="rounded p-1 text-neutral-400 hover:bg-neutral-50 hover:text-neutral-900"
             >
               <Stop size={10} weight="fill" />
             </button>
           )}
         </div>
       </div>
-      <div className="max-h-64 overflow-y-auto px-3 py-3 text-[12.5px] leading-[1.7] text-white/85">
+      <div className="max-h-64 overflow-y-auto px-3 py-3 text-[12.5px] leading-[1.7] text-neutral-700">
         {status === "streaming" && text.length === 0 && (
-          <div className="flex items-center gap-1.5 text-white/50">
-            <CircleNotch size={11} className="animate-spin" />
-            <span>thinking…</span>
-          </div>
+          <ThinkingDots label="Thinking" />
         )}
         <RenderWithCitations
           text={text}
@@ -180,9 +172,9 @@ export function NodeDeepDive({
           onCitationClick={onCitationClick}
         />
         {status === "streaming" && text.length > 0 && (
-          <span className="ml-0.5 inline-block h-3 w-[2px] animate-pulse bg-[#E838A4] align-middle" />
+          <span className="ml-0.5 inline-block h-3 w-[2px] animate-pulse bg-accent-magenta align-middle" />
         )}
-        {error && <p className="text-red-400">{error}</p>}
+        {error && <p className="text-red-500">{error}</p>}
       </div>
     </div>
   );
@@ -210,7 +202,7 @@ function RenderWithCitations({
               return (
                 <code
                   key={j}
-                  className="rounded bg-white/8 px-1 py-0.5 font-mono text-[0.88em] text-white/75"
+                  className="rounded bg-neutral-100 px-1 py-0.5 font-mono text-[0.88em] text-neutral-600"
                 >
                   {chunk.id}
                 </code>
@@ -221,7 +213,7 @@ function RenderWithCitations({
                 key={j}
                 onClick={() => onCitationClick?.(node.id)}
                 className={cn(
-                  "mx-0.5 inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-1.5 py-px align-baseline font-mono text-[0.82em] text-white/90 transition-all hover:border-[#E838A4] hover:text-white",
+                  "mx-0.5 inline-flex items-center gap-1 rounded border border-neutral-200 bg-neutral-50 px-1.5 py-px align-baseline font-mono text-[0.82em] text-neutral-800 transition-all hover:border-accent-magenta hover:text-neutral-900",
                 )}
                 title={node.label}
               >
