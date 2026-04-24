@@ -43,7 +43,7 @@ const WORKSPACE: Item[] = [
   },
   {
     label: "Connect Claude Code",
-    href: "/app?tab=claude-code",
+    href: "/app/claude-code",
     icon: (
       <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center overflow-hidden">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -57,7 +57,7 @@ const WORKSPACE: Item[] = [
         />
       </span>
     ),
-    match: () => false,
+    match: (p) => p.startsWith("/app/claude-code"),
   },
 ];
 

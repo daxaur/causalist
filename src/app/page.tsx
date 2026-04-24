@@ -40,23 +40,17 @@ export default function Home() {
           <GitHubStarButton />
           <Link
             href="/app"
-            className="group relative inline-flex h-9 items-center gap-2 overflow-hidden rounded-md bg-neutral-900 pl-4 pr-3 text-sm font-medium text-white shadow-[0_1px_0_rgba(255,255,255,0.06)_inset,0_6px_20px_-8px_rgba(232,56,164,0.35)] transition-all hover:shadow-[0_1px_0_rgba(255,255,255,0.06)_inset,0_10px_24px_-8px_rgba(232,56,164,0.55)]"
+            className="group inline-flex h-9 items-center gap-2 rounded-md bg-neutral-900 px-3.5 text-[13px] font-medium text-white transition-colors hover:bg-neutral-800"
           >
-            <span
-              aria-hidden
-              className="absolute -inset-px rounded-md bg-gradient-to-r from-accent-magenta/0 via-accent-magenta/40 to-accent-magenta/0 opacity-0 transition-opacity group-hover:opacity-100"
-            />
             <Sparkle
-              size={13}
+              size={12}
               weight="fill"
-              className="relative text-accent-magenta"
+              className="text-accent-magenta"
             />
-            <span className="relative">
-              {isConnected ? "Open the app" : "Launch app"}
-            </span>
+            <span>{isConnected ? "Open the app" : "Launch app"}</span>
             <ArrowRight
-              size={13}
-              className="relative text-white/70 transition-transform group-hover:translate-x-0.5"
+              size={12}
+              className="text-white/70 transition-transform group-hover:translate-x-0.5"
             />
           </Link>
         </div>

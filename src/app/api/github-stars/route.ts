@@ -9,12 +9,18 @@ export const revalidate = 600; // 10 min cache
  */
 export async function GET(): Promise<Response> {
   try {
+    // If the repo is private, the unauthenticated API returns 404.
+    // Fall back to a server-side GITHUB_TOKEN when set so the star
+    // count works even before the repo is made public.
+    const headers: Record<string, string> = {
+      "User-Agent": "causalist-web",
+      Accept: "application/vnd.github+json",
+    };
+    const token = process.env.GITHUB_TOKEN ?? process.env.GITHUB_PAT;
+    if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(
       "https://api.github.com/repos/daxaur/causalist",
-      {
-        headers: { "User-Agent": "causalist-web" },
-        next: { revalidate: 600 },
-      },
+      { headers, next: { revalidate: 600 } },
     );
     if (!res.ok) {
       return NextResponse.json({ stars: null }, { status: 200 });
