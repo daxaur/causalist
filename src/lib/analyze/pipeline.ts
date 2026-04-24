@@ -28,6 +28,7 @@ import {
   STRUCTURE_PROMPT,
   ORACLE_PROMPT,
 } from "./prompts";
+import { verifyGraphEdges } from "./ast-verify";
 
 const MODEL = "claude-opus-4-7";
 
@@ -163,7 +164,17 @@ export async function* runAnalyze(
       message: `Oracle fell back to local synthesis: ${errString(e)}`,
     };
   }
-  yield { stage: "oracle", status: "completed", payload: graph };
+  // AST-verify every edge against real source. Edges Oracle hallucinated
+  // get `verified: false`; edges that line up with imports/requires in
+  // the source get `verified: true`. The viewer renders the two classes
+  // differently so users (and agents) can trust-gate.
+  const stats = verifyGraphEdges(graph, input.files);
+  yield {
+    stage: "oracle",
+    status: "completed",
+    payload: graph,
+    message: `${stats.verified}/${stats.total} edges AST-verified`,
+  };
   yield { stage: "done", status: "completed", payload: graph };
   return graph;
 }

@@ -22,6 +22,14 @@ export interface CausalEdge {
   source: string;
   target: string;
   kind: "imports" | "calls" | "reads" | "writes" | "extends";
+  /**
+   * Whether this edge was confirmed by a real AST pass (babel/parser for
+   * JS/TS, regex+import scan for Python) over the actual source code.
+   * Edges without a matching AST entry are LLM-inferred — might be right,
+   * might be hallucinated. The UI renders verified edges solid and
+   * unverified ones dashed so users (and agents) can tell the difference.
+   */
+  verified?: boolean;
 }
 
 export interface CausalGraph {

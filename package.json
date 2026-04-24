@@ -11,6 +11,8 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.117",
     "@anthropic-ai/sdk": "^0.90.0",
+    "@babel/parser": "^7.29.2",
+    "@babel/traverse": "^7.29.0",
     "@base-ui/react": "^1.4.1",
     "@octokit/rest": "^22.0.1",
     "@phosphor-icons/react": "^2.1.10",
@@ -19,6 +21,7 @@
     "@react-three/fiber": "^9.6.0",
     "@supabase/supabase-js": "^2.104.0",
     "@tabler/icons-react": "^3.41.1",
+    "@types/babel__traverse": "^7.28.0",
     "@types/dagre": "^0.7.54",
     "@types/katex": "^0.16.8",
     "@xyflow/react": "^12.10.2",
