@@ -191,7 +191,7 @@ export function Hero({
           className="group inline-flex h-9 items-center gap-2 rounded-md border border-neutral-900 bg-white px-3 text-[13px] font-medium text-neutral-900 transition-all hover:bg-neutral-900 hover:text-white"
         >
           <Sparkle size={12} weight="fill" className="text-accent-magenta" />
-          Open the live demo
+          Tour a demo graph
           <ArrowRight
             size={12}
             className="transition-transform group-hover:translate-x-0.5"
@@ -205,7 +205,7 @@ export function Hero({
       >
         <span className="mr-1 flex items-center gap-1.5 text-neutral-400">
           <Sparkle size={13} weight="duotone" />
-          or peek at another:
+          hover to peek · click for full view:
         </span>
         {PREVIEWS.filter((p) => p.slug !== "causalist").map((p, i) => (
           <motion.span

@@ -125,7 +125,18 @@ export function CausalGraphViewer({
   compact?: boolean;
 }) {
   const [mode, setMode] = useState<"3d" | "2d">("3d");
-  const [sidebarOpen, setSidebarOpen] = useState(!compact);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    if (compact) return false;
+    if (typeof window === "undefined") return true;
+    const stored = window.localStorage.getItem("causalist:sidebarOpen");
+    return stored === null ? true : stored === "1";
+  });
+  useEffect(() => {
+    if (compact) return;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("causalist:sidebarOpen", sidebarOpen ? "1" : "0");
+    }
+  }, [sidebarOpen, compact]);
   // Multi-select: Set of selected node ids.
   // The "focused" node (for the detail panel) is the most recently clicked.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -768,6 +779,12 @@ export function CausalGraphViewer({
     ];
   }, [graph, selectedIds, focusMode, focusedId]);
 
+  // Right panel is shown whenever a node is focused or multi-select has entries.
+  // When open, top-right badges and the bottom selection toolbar shift left so
+  // they're not hidden behind the 420px panel.
+  const panelOpen = !!focused || selectedIds.size > 0;
+  const rightOverlayOffsetPx = panelOpen ? 436 : 16;
+
   return (
     <div
       ref={beamContainerRef}
@@ -1016,7 +1033,10 @@ export function CausalGraphViewer({
 
           {!compact && (
             <>
-              <div className="pointer-events-auto absolute right-4 top-14">
+              <div
+                className="pointer-events-auto absolute top-14 transition-[right] duration-200"
+                style={{ right: `${rightOverlayOffsetPx}px` }}
+              >
                 <ImportanceStats
                   summary={importance}
                   totalNodes={graph.nodes.length}
@@ -1026,6 +1046,7 @@ export function CausalGraphViewer({
               <FirstHotTooltip
                 enabled={importance.hotIds.size > 0}
                 hotCount={importance.hotIds.size}
+                rightOffset={rightOverlayOffsetPx}
               />
             </>
           )}
@@ -1046,6 +1067,18 @@ export function CausalGraphViewer({
           </div>
         )}
 
+        {compact && (
+          <div className="pointer-events-none absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 items-center gap-2 rounded-full border border-neutral-200 bg-white/85 px-3 py-1 font-mono text-[10px] text-neutral-400 backdrop-blur md:flex">
+            <span>tip</span>
+            <span className="text-neutral-300">·</span>
+            <Hint keys={["j", "k"]} label="walk" />
+            <span className="text-neutral-300">·</span>
+            <Hint keys={["."]} label="focus" />
+            <span className="text-neutral-300">·</span>
+            <Hint keys={["⌘", "K"]} label="cmd" />
+          </div>
+        )}
+
         {!compact && (
           <div className="pointer-events-none absolute bottom-4 right-4 z-10 hidden items-center gap-3 rounded-full border border-neutral-200 bg-white/80 px-3 py-1.5 font-mono text-[10px] text-neutral-500 backdrop-blur md:flex">
             <Hint keys={["j", "k"]} label="walk" />
@@ -1059,8 +1092,13 @@ export function CausalGraphViewer({
         )}
 
         {/* Selection toolbar — sits well above the mode switcher (which
-            lives at fixed bottom-6) and above the node panel footer. */}
-        <div className="pointer-events-none absolute bottom-20 left-1/2 z-30 -translate-x-1/2">
+            lives at fixed bottom-6) and above the node panel footer.
+            When the right panel is open, we shift left so it centers
+            in the remaining canvas instead of hiding behind the panel. */}
+        <div
+          className="pointer-events-none absolute bottom-20 z-30 -translate-x-1/2 transition-[left] duration-200"
+          style={{ left: panelOpen ? `calc(50% - 210px)` : "50%" }}
+        >
           <SelectionToolbar
             graph={graph}
             selectedIds={selectedIds}

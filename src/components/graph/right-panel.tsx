@@ -111,7 +111,7 @@ export function RightPanel({
           ))}
 
         {tab === "ask" && (
-          <div className="h-full overflow-y-auto">
+          <div className="h-full">
             <AskView graph={graph} onHighlightNodes={onHighlightNodes} />
           </div>
         )}

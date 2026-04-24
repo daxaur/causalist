@@ -325,7 +325,7 @@ export function AskView({
 
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col px-6 pt-6">
-      <div ref={scrollRef} className="flex-1 space-y-6 overflow-y-auto pb-40 pr-2">
+      <div ref={scrollRef} className="flex-1 space-y-6 overflow-y-auto pb-4 pr-2">
         {history.length === 0 && !isStreaming && (
           <motion.div
             initial={{ opacity: 0, y: 6 }}
@@ -395,10 +395,10 @@ export function AskView({
         )}
       </div>
 
-      {/* Composer, pinned */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-20 z-20 flex justify-center px-4">
-        <div className="pointer-events-auto w-full max-w-2xl">
-          <div className="flex items-center gap-2 rounded-2xl border border-neutral-200 bg-white/95 p-2 shadow-lg shadow-black/5 backdrop-blur">
+      {/* Composer — sticky to bottom of the panel */}
+      <div className="sticky bottom-0 -mx-6 border-t border-neutral-200 bg-white/95 px-4 py-3 backdrop-blur">
+        <div className="mx-auto w-full max-w-2xl">
+          <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-sm">
             <input
               autoFocus
               value={question}

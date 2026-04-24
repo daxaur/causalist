@@ -47,7 +47,7 @@ export default function Home() {
               weight="fill"
               className="text-accent-magenta"
             />
-            <span>{isConnected ? "Open the app" : "Launch app"}</span>
+            <span>{isConnected ? "My projects" : "Launch app"}</span>
             <ArrowRight
               size={12}
               className="text-white/70 transition-transform group-hover:translate-x-0.5"
@@ -148,9 +148,9 @@ function Footer() {
             title="Product"
             links={[
               { label: "Open the app", href: "/app" },
-              { label: "Live demos", href: "/app?tab=previews" },
-              { label: "Reference graphs", href: "/app?tab=reference" },
-              { label: "Saved library", href: "/app?tab=library" },
+              { label: "Live demo", href: "/app/preview/causalist" },
+              { label: "Reference graphs", href: "/app/reference" },
+              { label: "Settings", href: "/app/settings" },
             ]}
           />
           <FooterColumn
