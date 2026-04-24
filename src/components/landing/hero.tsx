@@ -10,6 +10,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PREVIEWS } from "@/lib/graph/previews";
 import { PreviewDialog } from "./preview-dialog";
+import { PreviewMini } from "./preview-mini";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 
 const GITHUB_URL = /github\.com\/([^/\s]+)\/([^/\s?#]+)/;
 
@@ -212,14 +218,39 @@ export function Hero({
               ease: [0.16, 1, 0.3, 1],
             }}
           >
-            <PreviewDialog preview={p}>
-              <button
-                type="button"
-                className="rounded-full border border-neutral-200 bg-white/80 px-3 py-1 font-mono text-xs text-neutral-700 backdrop-blur-sm transition-all hover:border-accent-magenta hover:text-neutral-900 hover:shadow-sm"
+            <HoverCard>
+              <HoverCardTrigger
+                render={
+                  <PreviewDialog preview={p}>
+                    <button
+                      type="button"
+                      className="rounded-full border border-neutral-200 bg-white/80 px-3 py-1 font-mono text-xs text-neutral-700 backdrop-blur-sm transition-all hover:border-accent-magenta hover:text-neutral-900 hover:shadow-sm"
+                    >
+                      {p.title}
+                    </button>
+                  </PreviewDialog>
+                }
+              />
+              <HoverCardContent
+                side="top"
+                className="w-[340px] overflow-hidden p-0"
               >
-                {p.title}
-              </button>
-            </PreviewDialog>
+                <PreviewMini preview={p} width={340} height={190} />
+                <div className="flex items-center justify-between border-t border-neutral-100 bg-white px-3 py-2">
+                  <div>
+                    <div className="font-display text-[13px] font-medium text-neutral-900">
+                      {p.title}
+                    </div>
+                    <div className="font-mono text-[10px] text-neutral-400">
+                      {p.graph.nodes.length} nodes · {p.graph.edges.length} edges
+                    </div>
+                  </div>
+                  <span className="font-mono text-[10px] text-neutral-400">
+                    click to open
+                  </span>
+                </div>
+              </HoverCardContent>
+            </HoverCard>
           </motion.span>
         ))}
       </motion.div>

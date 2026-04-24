@@ -28,7 +28,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useGraphKeyboard } from "@/lib/graph/filters";
 import { buildFixPrompt } from "@/lib/graph/prompt";
-import { NodePanel } from "./node-panel";
+import { RightPanel } from "./right-panel";
 import { LayerLegend } from "./layer-legend";
 import { FileTree } from "./file-tree";
 import { SelectionToolbar } from "./selection-toolbar";
@@ -106,6 +106,7 @@ export function CausalGraphViewer({
   visibleIds,
   onAskAboutSelection,
   showAgentBeam = true,
+  compact = false,
 }: {
   graph: CausalGraph;
   highlightedIds?: string[];
@@ -117,9 +118,14 @@ export function CausalGraphViewer({
    * Off by default inside the landing-page PreviewDialog since a cold
    * visitor has no MCP wired up and the badge just reads as clutter. */
   showAgentBeam?: boolean;
+  /** Compact mode (landing-page PreviewDialog) — hide file-tree sidebar,
+   * top bar extras, importance stats, keyboard hint strip, legend.
+   * Keep just the 3D/2D toggle + the graph itself. Implies
+   * showAgentBeam=false, sidebarOpen=false. */
+  compact?: boolean;
 }) {
   const [mode, setMode] = useState<"3d" | "2d">("3d");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(!compact);
   // Multi-select: Set of selected node ids.
   // The "focused" node (for the detail panel) is the most recently clicked.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -137,9 +143,10 @@ export function CausalGraphViewer({
     stack: [],
     index: -1,
   });
+  const [agentHighlight, setAgentHighlight] = useState<Set<string>>(new Set());
   const externalHighlight = useMemo(
-    () => new Set(highlightedIds ?? []),
-    [highlightedIds],
+    () => new Set([...(highlightedIds ?? []), ...agentHighlight]),
+    [highlightedIds, agentHighlight],
   );
   const focused = focusedId
     ? graph.nodes.find((n) => n.id === focusedId) ?? null
@@ -184,9 +191,13 @@ export function CausalGraphViewer({
   useEffect(() => {
     const g = graphRef.current;
     if (!g) return;
-    const t = setTimeout(() => g.zoomToFit?.(500, 80), 300);
+    // Compact mode (inside a Dialog) needs more time for the portal
+    // to finish layout before zoomToFit can read accurate container
+    // dimensions. Bump from 300 → 600ms to avoid mis-centered zoom.
+    const delay = compact ? 600 : 300;
+    const t = setTimeout(() => g.zoomToFit?.(500, 80), delay);
     return () => clearTimeout(t);
-  }, [mode, graph]);
+  }, [mode, graph, compact]);
 
   // Spatial layering: push each semantic layer toward a different
   // y-anchor so the graph reads top-to-bottom as infra → data → logic
@@ -783,20 +794,22 @@ export function CausalGraphViewer({
 
       {/* File-tree sidebar — slightly warmer than the canvas so the
           tree reads as a separate surface, not a ghost overlay. */}
-      <aside
-        className={cn(
-          "relative z-[2] flex shrink-0 flex-col border-r border-neutral-200 bg-white transition-all duration-300",
-          sidebarOpen ? "w-64" : "w-0",
-        )}
-      >
-        {sidebarOpen && (
-          <FileTree
-            nodes={graph.nodes}
-            selectedId={focusedId}
-            onSelect={(n) => handleNodeClick(n)}
-          />
-        )}
-      </aside>
+      {!compact && (
+        <aside
+          className={cn(
+            "relative z-[2] flex shrink-0 flex-col border-r border-neutral-200 bg-white transition-all duration-300",
+            sidebarOpen ? "w-64" : "w-0",
+          )}
+        >
+          {sidebarOpen && (
+            <FileTree
+              nodes={graph.nodes}
+              selectedId={focusedId}
+              onSelect={(n) => handleNodeClick(n)}
+            />
+          )}
+        </aside>
+      )}
 
       {/* Main viewer */}
       <div className="relative flex-1">
@@ -938,27 +951,35 @@ export function CausalGraphViewer({
 
         {/* Top overlay */}
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between p-4">
-          <div className="pointer-events-auto flex items-center gap-2">
-            <button
-              onClick={() => setSidebarOpen((v) => !v)}
-              aria-label="Toggle file tree"
-              aria-pressed={sidebarOpen}
-              className={cn(
-                "flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 bg-white/80 backdrop-blur transition-colors",
-                sidebarOpen ? "text-neutral-900" : "text-neutral-500 hover:text-neutral-900",
-              )}
-            >
-              <SidebarSimple size={14} />
-            </button>
-            <div className="rounded-md border border-neutral-200 bg-white/80 px-3 py-1.5 font-mono text-xs text-neutral-700 backdrop-blur">
-              {graph.repo}
-              {graph.commit ? (
-                <span className="text-neutral-400">@{graph.commit.slice(0, 7)}</span>
-              ) : null}
+          {!compact && (
+            <div className="pointer-events-auto flex items-center gap-2">
+              <button
+                onClick={() => setSidebarOpen((v) => !v)}
+                aria-label="Toggle file tree"
+                aria-pressed={sidebarOpen}
+                className={cn(
+                  "flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 bg-white/80 backdrop-blur transition-colors",
+                  sidebarOpen ? "text-neutral-900" : "text-neutral-500 hover:text-neutral-900",
+                )}
+              >
+                <SidebarSimple size={14} />
+              </button>
+              <div className="rounded-md border border-neutral-200 bg-white/80 px-3 py-1.5 font-mono text-xs text-neutral-700 backdrop-blur">
+                {graph.repo}
+                {graph.commit ? (
+                  <span className="text-neutral-400">@{graph.commit.slice(0, 7)}</span>
+                ) : null}
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="pointer-events-auto flex items-center gap-1 rounded-md border border-neutral-200 bg-white/80 p-1 backdrop-blur">
+          {/* Mode toggle — always visible (compact keeps just this) */}
+          <div
+            className={cn(
+              "pointer-events-auto flex items-center gap-1 rounded-md border border-neutral-200 bg-white/80 p-1 backdrop-blur",
+              compact && "ml-auto",
+            )}
+          >
             <ModeButton
               active={mode === "3d"}
               onClick={() => setMode("3d")}
@@ -971,61 +992,71 @@ export function CausalGraphViewer({
               label="2D"
               icon={<SquaresFour size={13} weight={mode === "2d" ? "fill" : "regular"} />}
             />
-            <div className="mx-1 h-4 w-px bg-neutral-200" />
-            <div className="flex items-center gap-1.5 px-2 font-mono text-[10px] text-neutral-500">
-              <List size={11} />
-              {graph.nodes.length} · {graph.edges.length}
+            {!compact && (
+              <>
+                <div className="mx-1 h-4 w-px bg-neutral-200" />
+                <div className="flex items-center gap-1.5 px-2 font-mono text-[10px] text-neutral-500">
+                  <List size={11} />
+                  {graph.nodes.length} · {graph.edges.length}
+                </div>
+                <div className="mx-1 h-4 w-px bg-neutral-200" />
+                <button
+                  onClick={() => setHelpOpen(true)}
+                  aria-label="Keyboard shortcuts"
+                  className="flex items-center gap-1 rounded px-2 py-1 font-mono text-[10px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+                >
+                  <Keyboard size={11} />
+                  <kbd className="rounded border border-neutral-300 px-1 text-[9px]">
+                    ?
+                  </kbd>
+                </button>
+              </>
+            )}
+          </div>
+
+          {!compact && (
+            <>
+              <div className="pointer-events-auto absolute right-4 top-14">
+                <ImportanceStats
+                  summary={importance}
+                  totalNodes={graph.nodes.length}
+                />
+              </div>
+
+              <FirstHotTooltip
+                enabled={importance.hotIds.size > 0}
+                hotCount={importance.hotIds.size}
+              />
+            </>
+          )}
+        </div>
+
+        {/* Legend — editorial noise; hide in compact */}
+        {!compact && (
+          <div className="pointer-events-none absolute bottom-4 left-4 z-10">
+            <div className="pointer-events-auto">
+              <LayerLegend
+                layers={layers.map((l) => ({
+                  key: l,
+                  label: LAYER_LABELS[l],
+                  color: LAYER_COLORS[l],
+                }))}
+              />
             </div>
-            <div className="mx-1 h-4 w-px bg-neutral-200" />
-            <button
-              onClick={() => setHelpOpen(true)}
-              aria-label="Keyboard shortcuts"
-              className="flex items-center gap-1 rounded px-2 py-1 font-mono text-[10px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
-            >
-              <Keyboard size={11} />
-              <kbd className="rounded border border-neutral-300 px-1 text-[9px]">
-                ?
-              </kbd>
-            </button>
           </div>
+        )}
 
-          <div className="pointer-events-auto absolute right-4 top-14">
-            <ImportanceStats
-              summary={importance}
-              totalNodes={graph.nodes.length}
-            />
+        {!compact && (
+          <div className="pointer-events-none absolute bottom-4 right-4 z-10 hidden items-center gap-3 rounded-full border border-neutral-200 bg-white/80 px-3 py-1.5 font-mono text-[10px] text-neutral-500 backdrop-blur md:flex">
+            <Hint keys={["j", "k"]} label="walk" />
+            <span className="text-neutral-300">·</span>
+            <Hint keys={["."]} label="focus" />
+            <span className="text-neutral-300">·</span>
+            <Hint keys={["⌘", "K"]} label="cmd" />
+            <span className="text-neutral-300">·</span>
+            <Hint keys={["?"]} label="help" />
           </div>
-
-          <FirstHotTooltip
-            enabled={importance.hotIds.size > 0}
-            hotCount={importance.hotIds.size}
-          />
-        </div>
-
-        {/* Legend */}
-        <div className="pointer-events-none absolute bottom-4 left-4 z-10">
-          <div className="pointer-events-auto">
-            <LayerLegend
-              layers={layers.map((l) => ({
-                key: l,
-                label: LAYER_LABELS[l],
-                color: LAYER_COLORS[l],
-              }))}
-            />
-          </div>
-        </div>
-
-        {/* Always-visible keyboard hint strip — makes the viewer feel
-            controllable at a glance without requiring a modal open. */}
-        <div className="pointer-events-none absolute bottom-4 right-4 z-10 hidden items-center gap-3 rounded-full border border-neutral-200 bg-white/80 px-3 py-1.5 font-mono text-[10px] text-neutral-500 backdrop-blur md:flex">
-          <Hint keys={["j", "k"]} label="walk" />
-          <span className="text-neutral-300">·</span>
-          <Hint keys={["."]} label="focus" />
-          <span className="text-neutral-300">·</span>
-          <Hint keys={["⌘", "K"]} label="cmd" />
-          <span className="text-neutral-300">·</span>
-          <Hint keys={["?"]} label="help" />
-        </div>
+        )}
 
         {/* Selection toolbar — sits well above the mode switcher (which
             lives at fixed bottom-6) and above the node panel footer. */}
@@ -1040,22 +1071,28 @@ export function CausalGraphViewer({
           />
         </div>
 
-        {/* Side panel */}
-        {focused && (
-          <div className="absolute right-0 top-0 z-20 h-full w-full max-w-sm">
-            <NodePanel
-              node={focused}
-              allNodes={graph.nodes}
-              allEdges={graph.edges}
-              importance={importance.byId.get(focused.id)}
-              graph={graph}
-              onSelect={(n) => handleNodeClick(n)}
-              onClose={() => {
-                setFocusedId(null);
-                setSelectedIds(new Set());
-              }}
-            />
-          </div>
+        {/* Side panel — IDE-style tabs: Inspector · Ask · Agents */}
+        {(focused || selectedIds.size > 0) && (
+          <RightPanel
+            graph={graph}
+            focusedNode={focused}
+            selectedIds={selectedIds}
+            importance={importance}
+            onSelect={(n) => handleNodeClick(n)}
+            onClose={() => {
+              setFocusedId(null);
+              setSelectedIds(new Set());
+              setAgentHighlight(new Set());
+            }}
+            onHighlightNodes={(ids) => setAgentHighlight(new Set(ids))}
+            onAssign={(ids, kind) => {
+              if (kind === "risky") {
+                toast.warning(`Flagged risky`, {
+                  description: `${ids.length} node${ids.length === 1 ? "" : "s"} need attention`,
+                });
+              }
+            }}
+          />
         )}
 
         {/* Focus mode label */}
@@ -1069,7 +1106,7 @@ export function CausalGraphViewer({
             Hidden on preview dialogs (showAgentBeam=false) where a
             cold visitor has no MCP wired and the badge reads as
             clutter. Visible on real repo/reference routes. */}
-        {showAgentBeam && (
+        {showAgentBeam && !compact && (
           <>
             <div
               ref={beamFromRef}
