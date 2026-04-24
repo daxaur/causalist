@@ -50,7 +50,18 @@ interface CausalGraph {
   edges: CausalEdge[];
 }
 
+// The MCP server can pull the graph three ways:
+//   1. --graph <path>     — static local file. Never auto-refreshes.
+//   2. --session <id>     — pulls from causalist.xyz/api/session/<id>/graph.
+//   3. ~/.causalist/session.json — same as 2, auto-discovered.
+//
+// For (2) and (3), we refresh from the web on a TTL so tool calls
+// made after a repo change see the new graph. TTL is short (10s) so
+// the agent's "is this still true?" model of the world stays honest.
 let CACHED_GRAPH: CausalGraph | null = null;
+let CACHED_AT = 0;
+let SESSION_SRC: { session: string; web: string } | null = null;
+const REFRESH_TTL_MS = 10_000;
 
 const TOOLS = [
   {
@@ -167,7 +178,28 @@ const TOOLS = [
   },
 ];
 
-function requireGraph(): CausalGraph {
+async function requireGraph(): Promise<CausalGraph> {
+  // If we have a session source, refresh from the web on a TTL so the
+  // agent never sees a stale graph after the user has remapped.
+  if (SESSION_SRC && Date.now() - CACHED_AT > REFRESH_TTL_MS) {
+    try {
+      const res = await fetch(
+        `${SESSION_SRC.web.replace(/\/$/, "")}/api/session/${SESSION_SRC.session}/graph`,
+      );
+      if (res.ok) {
+        const payload = (await res.json()) as { graph?: CausalGraph } | CausalGraph;
+        const g = (payload as { graph?: CausalGraph }).graph ?? (payload as CausalGraph);
+        if (g?.nodes) {
+          CACHED_GRAPH = g;
+          CACHED_AT = Date.now();
+        }
+      }
+    } catch (e) {
+      process.stderr.write(
+        `[causalist-mcp] refresh failed: ${e instanceof Error ? e.message : String(e)}\n`,
+      );
+    }
+  }
   if (!CACHED_GRAPH) {
     throw new Error(
       "No graph loaded. Pair the CLI (`causalist pair <code>`) and run `causalist map <repo>` first, or start the MCP server with --graph /path/to/graph.json",
@@ -176,8 +208,11 @@ function requireGraph(): CausalGraph {
   return CACHED_GRAPH;
 }
 
-function exec(name: string, args: Record<string, unknown>): unknown {
-  const g = requireGraph();
+async function exec(
+  name: string,
+  args: Record<string, unknown>,
+): Promise<unknown> {
+  const g = await requireGraph();
   switch (name) {
     case "query_node": {
       const node = g.nodes.find((n) => n.id === args.id);
@@ -391,14 +426,26 @@ function exec(name: string, args: Record<string, unknown>): unknown {
 }
 
 async function loadSessionGraph(web: string, session: string): Promise<void> {
+  SESSION_SRC = { web, session };
   const url = `${web.replace(/\/$/, "")}/api/session/${session}/graph`;
   try {
     const res = await fetch(url);
     if (res.ok) {
-      CACHED_GRAPH = (await res.json()) as CausalGraph;
+      const payload = (await res.json()) as { graph?: CausalGraph } | CausalGraph;
+      const g = (payload as { graph?: CausalGraph }).graph ?? (payload as CausalGraph);
+      if (g?.nodes) {
+        CACHED_GRAPH = g;
+        CACHED_AT = Date.now();
+      }
+    } else {
+      process.stderr.write(
+        `[causalist-mcp] initial fetch from ${url} returned ${res.status}\n`,
+      );
     }
-  } catch {
-    // best effort
+  } catch (e) {
+    process.stderr.write(
+      `[causalist-mcp] initial fetch failed: ${e instanceof Error ? e.message : String(e)}\n`,
+    );
   }
 }
 
@@ -445,7 +492,7 @@ async function main() {
 
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
     try {
-      const result = exec(req.params.name, req.params.arguments ?? {});
+      const result = await exec(req.params.name, req.params.arguments ?? {});
       return {
         content: [{ type: "text", text: JSON.stringify(result) }],
       };

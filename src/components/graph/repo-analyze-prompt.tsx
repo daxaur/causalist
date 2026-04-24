@@ -151,6 +151,62 @@ export function RepoAnalyzePrompt({
         "finding",
       );
 
+      // 1.5) Fetch the most graph-worthy source files so the Dependency
+      // agent can actually extract edges. Without this, runDependency
+      // returns [] and the graph is all islands (no arrows). Audit
+      // finding — this was the #1 demo-breaker.
+      const fileCandidates = entries
+        .filter((e) => e.type === "file" && !!e.path)
+        .filter((e) => {
+          const p = e.path.toLowerCase();
+          if (/\.(ts|tsx|js|jsx|py|rs|go|java|rb|kt|swift)$/.test(p))
+            return true;
+          if (/package\.json$|pyproject\.toml$|cargo\.toml$/.test(p))
+            return true;
+          return false;
+        })
+        .filter((e) => {
+          if (typeof e.size === "number" && e.size > 50_000) return false;
+          // Skip noisy paths that never carry signal.
+          if (/(^|\/)(node_modules|dist|build|\.next|\.venv|\.git)\//.test(
+            e.path,
+          ))
+            return false;
+          if (/(^|\/)__tests__|\.(spec|test)\./.test(e.path)) return false;
+          return true;
+        })
+        .slice(0, 25);
+
+      pushEvent(
+        "dependency",
+        `Reading ${fileCandidates.length} source files for edge extraction`,
+        "action",
+      );
+
+      const files: { path: string; content: string }[] = [];
+      for (const c of fileCandidates) {
+        try {
+          const { data } = await octokit.repos.getContent({
+            owner,
+            repo,
+            path: c.path,
+            ref: commitSha,
+          });
+          if (
+            !Array.isArray(data) &&
+            "content" in data &&
+            typeof data.content === "string"
+          ) {
+            const text = atob(data.content.replace(/\n/g, ""));
+            // Trim any single file past 30KB to keep the analyze payload
+            // under Vercel's 4.5 MB body cap with plenty of headroom.
+            files.push({ path: c.path, content: text.slice(0, 30_000) });
+          }
+        } catch {
+          // skip file; don't kill the run
+        }
+      }
+
       // 2) POST /api/analyze, stream SSE, dispatch to agents
       setStage("running");
       updateAgent("structure", { status: "running", startedAt: Date.now() });
@@ -169,6 +225,7 @@ export function RepoAnalyzePrompt({
           repo,
           commit: commitSha,
           tree: entries.slice(0, 1500), // cap payload
+          files,
         }),
       });
       if (!res.body) throw new Error("Analyze endpoint returned no body");

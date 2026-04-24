@@ -3,6 +3,10 @@ import { runAnalyze, type AgentEvent, type AnalyzeInput } from "@/lib/analyze/pi
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// The 4-agent pipeline (Structure + Dependency + Semantic in parallel,
+// then Oracle) can run 60–200s on real repos. Default Vercel timeout
+// would kill it mid-Oracle.
+export const maxDuration = 300;
 
 /**
  * POST /api/analyze

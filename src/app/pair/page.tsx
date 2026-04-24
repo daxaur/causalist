@@ -195,7 +195,7 @@ export default function PairPage() {
                 </p>
               </div>
               <Link
-                href="/dashboard"
+                href="/app"
                 className="inline-flex h-10 items-center gap-1.5 rounded-md bg-neutral-900 px-4 text-sm text-white transition-colors hover:bg-neutral-800"
               >
                 Open dashboard

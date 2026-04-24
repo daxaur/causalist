@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest): Promise<Response> {
   if (!oauthConfigured()) {
     return NextResponse.redirect(
-      new URL("/settings?oauth=unconfigured", req.url),
+      new URL("/app/settings?oauth=unconfigured", req.url),
     );
   }
 
@@ -28,15 +28,15 @@ export async function GET(req: NextRequest): Promise<Response> {
   const expected = req.cookies.get(STATE_COOKIE)?.value;
 
   if (!code || !state) {
-    return NextResponse.redirect(new URL("/settings?oauth=bad", req.url));
+    return NextResponse.redirect(new URL("/app/settings?oauth=bad", req.url));
   }
   if (!expected || expected !== state) {
-    return NextResponse.redirect(new URL("/settings?oauth=state", req.url));
+    return NextResponse.redirect(new URL("/app/settings?oauth=state", req.url));
   }
 
   try {
     const token = await exchangeCodeForToken(code);
-    const res = NextResponse.redirect(new URL("/dashboard?oauth=ok", req.url));
+    const res = NextResponse.redirect(new URL("/app?oauth=ok", req.url));
     res.cookies.set(TOKEN_COOKIE, token.access_token, {
       httpOnly: true,
       sameSite: "lax",
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       e instanceof Error ? e.message : "unknown error",
     );
     return NextResponse.redirect(
-      new URL(`/settings?oauth=failed&err=${msg}`, req.url),
+      new URL(`/app/settings?oauth=failed&err=${msg}`, req.url),
     );
   }
 }
