@@ -1,5 +1,5 @@
 {
-  "name": "causalist",
+  "name": "causalist-cli",
   "version": "0.1.0",
   "description": "Paste a GitHub URL, get a 3D causal graph. CLI for the Causalist web app and MCP server.",
   "bin": {

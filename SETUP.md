@@ -18,8 +18,8 @@ npm will pop a browser tab for 2FA. Confirm in the browser, terminal finishes.
 Verify:
 
 ```bash
-npm view causalist version                    # expect 0.1.0
-npx -y causalist@latest --help                # prints command list
+npm view causalist-cli version                    # expect 0.1.0
+npx -y causalist-cli@latest --help                # prints command list
 ```
 
 ---

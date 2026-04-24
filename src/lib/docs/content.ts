@@ -349,7 +349,7 @@ Paste a GitHub URL at [causalist.xyz/&lt;owner&gt;/&lt;repo&gt;](https://causali
 
 ### CLI
 \`\`\`bash
-npm install -g causalist
+npm install -g causalist-cli
 export ANTHROPIC_API_KEY=sk-ant-...
 causalist map vercel/next.js --open
 \`\`\`

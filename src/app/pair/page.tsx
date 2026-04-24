@@ -161,7 +161,7 @@ export default function PairPage() {
                   )}
                 </button>
                 <p className="mt-2 text-[11px] text-neutral-400">
-                  Requires <code className="font-mono">npm install -g causalist</code>.
+                  Requires <code className="font-mono">npm install -g causalist-cli</code>.
                 </p>
               </details>
             </motion.div>
