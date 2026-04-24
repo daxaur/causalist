@@ -105,6 +105,7 @@ export function CausalGraphViewer({
   diff,
   visibleIds,
   onAskAboutSelection,
+  showAgentBeam = true,
 }: {
   graph: CausalGraph;
   highlightedIds?: string[];
@@ -112,6 +113,10 @@ export function CausalGraphViewer({
   /** If set, nodes NOT in the set are dimmed (not hidden). From filter panel. */
   visibleIds?: Set<string>;
   onAskAboutSelection?: (ids: string[]) => void;
+  /** Show the "Claude Code" avatar + beam-to-focused-node overlay.
+   * Off by default inside the landing-page PreviewDialog since a cold
+   * visitor has no MCP wired up and the badge just reads as clutter. */
+  showAgentBeam?: boolean;
 }) {
   const [mode, setMode] = useState<"3d" | "2d">("3d");
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -1061,45 +1066,50 @@ export function CausalGraphViewer({
         )}
 
         {/* Claude Code avatar + beam to the currently-focused node.
-            The beam only renders when a node is focused so judges
-            immediately see "Claude Code is pointing at this file." */}
-        <div
-          ref={beamFromRef}
-          className="absolute left-4 top-4 z-20 flex h-10 items-center gap-2 rounded-full border border-neutral-200 bg-white/90 pl-1 pr-3 shadow-sm backdrop-blur"
-        >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-neutral-200 bg-white">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/claude-code.png"
-              alt="Claude Code"
-              width={22}
-              height={22}
-              className="h-5 w-5 object-contain"
+            Hidden on preview dialogs (showAgentBeam=false) where a
+            cold visitor has no MCP wired and the badge reads as
+            clutter. Visible on real repo/reference routes. */}
+        {showAgentBeam && (
+          <>
+            <div
+              ref={beamFromRef}
+              className="absolute left-4 top-4 z-20 flex h-10 items-center gap-2 rounded-full border border-neutral-200 bg-white/90 pl-1 pr-3 shadow-sm backdrop-blur"
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-neutral-200 bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/claude-code.png"
+                  alt="Claude Code"
+                  width={22}
+                  height={22}
+                  className="h-5 w-5 object-contain"
+                />
+              </span>
+              <span className="font-mono text-[11px] text-neutral-700">
+                Claude Code
+              </span>
+            </div>
+            <div
+              ref={beamToRef}
+              aria-hidden
+              className="pointer-events-none absolute h-1 w-1 -translate-x-1/2 -translate-y-1/2"
+              style={{ left: "-100px", top: "-100px" }}
             />
-          </span>
-          <span className="font-mono text-[11px] text-neutral-700">
-            Claude Code
-          </span>
-        </div>
-        <div
-          ref={beamToRef}
-          aria-hidden
-          className="pointer-events-none absolute h-1 w-1 -translate-x-1/2 -translate-y-1/2"
-          style={{ left: "-100px", top: "-100px" }}
-        />
-        {focusedId && (
-          <AnimatedBeam
-            containerRef={beamContainerRef}
-            fromRef={beamFromRef}
-            toRef={beamToRef}
-            pathColor="rgba(42,36,32,0.12)"
-            pathWidth={1.5}
-            pathOpacity={1}
-            gradientStartColor="#E838A4"
-            gradientStopColor="#FF9CD9"
-            duration={3}
-            curvature={60}
-          />
+            {focusedId && (
+              <AnimatedBeam
+                containerRef={beamContainerRef}
+                fromRef={beamFromRef}
+                toRef={beamToRef}
+                pathColor="rgba(42,36,32,0.12)"
+                pathWidth={1.5}
+                pathOpacity={1}
+                gradientStartColor="#E838A4"
+                gradientStopColor="#FF9CD9"
+                duration={3}
+                curvature={60}
+              />
+            )}
+          </>
         )}
 
         {/* Help overlay (?) */}

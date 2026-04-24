@@ -4,7 +4,6 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   ArrowRight,
-  GearSix,
   GithubLogo,
   Sparkle,
 } from "@phosphor-icons/react";
@@ -59,19 +58,6 @@ export default function Home() {
               size={13}
               className="relative text-white/70 transition-transform group-hover:translate-x-0.5"
             />
-          </Link>
-          <Link
-            href="/app/settings"
-            aria-label="Keys and settings"
-            className="relative flex h-9 w-9 items-center justify-center rounded-md border border-neutral-200 bg-white/80 text-neutral-500 backdrop-blur-sm transition-colors hover:border-neutral-300 hover:text-neutral-900"
-          >
-            <GearSix size={15} />
-            {!settings.anthropicKey && (
-              <span
-                aria-hidden="true"
-                className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-amber-400 ring-2 ring-white"
-              />
-            )}
           </Link>
         </div>
       </nav>

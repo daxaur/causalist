@@ -153,7 +153,7 @@ function SidebarNavLink({ item }: { item: Item }) {
     <Link
       href={item.href}
       className={cn(
-        "group/sidebar flex items-center gap-3 rounded-md px-2 py-2 transition-colors",
+        "group/sidebar flex items-center gap-3 overflow-hidden rounded-md px-1.5 py-2 transition-colors",
         active
           ? "bg-accent-magenta/8 text-accent-magenta"
           : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900",
@@ -193,10 +193,10 @@ function Footer({ open }: { open: boolean }) {
     return (
       <Link
         href="/app/settings"
-        className="flex items-center gap-3 overflow-hidden rounded-md px-2 py-2 transition-colors hover:bg-neutral-100"
+        className="flex items-center gap-3 overflow-hidden rounded-md px-1.5 py-2 transition-colors hover:bg-neutral-100"
       >
         <span
-          className="relative block h-[22px] w-[22px] shrink-0 overflow-hidden rounded-full bg-neutral-100 ring-1 ring-neutral-200"
+          className="relative block h-[20px] w-[20px] shrink-0 overflow-hidden rounded-full bg-neutral-100 ring-1 ring-neutral-200"
           aria-hidden
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -227,9 +227,9 @@ function Footer({ open }: { open: boolean }) {
   return (
     <Link
       href="/api/auth/github/login"
-      className="flex items-center gap-3 overflow-hidden rounded-md px-2 py-2 transition-colors hover:bg-neutral-100"
+      className="flex items-center gap-3 overflow-hidden rounded-md px-1.5 py-2 transition-colors hover:bg-neutral-100"
     >
-      <div className="flex h-[22px] w-[22px] shrink-0 items-center justify-center">
+      <div className="flex h-[20px] w-[20px] shrink-0 items-center justify-center">
         <GithubLogo className="h-[18px] w-[18px] text-neutral-700" weight="fill" />
       </div>
       <motion.span

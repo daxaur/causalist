@@ -357,10 +357,15 @@ function ClaudeCodeTab() {
             title="Add the Causalist MCP server"
             body={
               <>
-                One line in your Claude Code MCP config (
-                <code className="font-mono text-[12px]">~/.claude/mcp.json</code>
-                ):
-                <pre className="mt-2 overflow-x-auto rounded-md border border-neutral-200 bg-neutral-50 p-3 font-mono text-[11.5px] text-neutral-800">
+                One command — Claude Code handles the config for you:
+                <pre className="mt-2 overflow-x-auto rounded-md border border-neutral-200 bg-neutral-900 p-3 font-mono text-[11.5px] text-white">
+{`claude mcp add causalist -- npx -y causalist-mcp@latest`}
+                </pre>
+                <div className="mt-2 text-[11px] text-neutral-400">
+                  Prefer to edit the config yourself? Drop this into{" "}
+                  <code className="font-mono">~/.claude/mcp.json</code>:
+                </div>
+                <pre className="mt-1 overflow-x-auto rounded-md border border-neutral-200 bg-neutral-50 p-3 font-mono text-[11.5px] text-neutral-800">
 {`{
   "mcpServers": {
     "causalist": {
@@ -370,12 +375,14 @@ function ClaudeCodeTab() {
   }
 }`}
                 </pre>
-                Claude Code now has 10 graph-reading tools:{" "}
-                <code className="font-mono text-[12px]">query_node</code>,{" "}
-                <code className="font-mono text-[12px]">get_neighbors</code>,{" "}
-                <code className="font-mono text-[12px]">find_path</code>,{" "}
-                <code className="font-mono text-[12px]">blast_radius</code>,
-                and more.
+                <div className="mt-2">
+                  Claude Code now has 10 graph-reading tools:{" "}
+                  <code className="font-mono text-[12px]">query_node</code>,{" "}
+                  <code className="font-mono text-[12px]">get_neighbors</code>,{" "}
+                  <code className="font-mono text-[12px]">find_path</code>,{" "}
+                  <code className="font-mono text-[12px]">blast_radius</code>,
+                  and more.
+                </div>
               </>
             }
           />
