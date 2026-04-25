@@ -21,6 +21,7 @@ import {
 import { Logo } from "@/components/brand/logo";
 import { GitHubStarButton } from "@/components/landing/github-star-button";
 import { useGithubAuth } from "@/hooks/use-github-auth";
+import { usePairStatus } from "@/hooks/use-pair-status";
 import { cn } from "@/lib/utils";
 
 type Item = {
@@ -214,6 +215,7 @@ function SidebarNavLink({ item }: { item: Item }) {
 
 function Footer({ open }: { open: boolean }) {
   const auth = useGithubAuth();
+  const pair = usePairStatus();
   const connected = auth.authenticated;
 
   if (connected && auth.avatar_url) {
@@ -232,6 +234,12 @@ function Footer({ open }: { open: boolean }) {
             alt=""
             className="absolute inset-0 h-full w-full object-cover"
           />
+          {pair.paired && (
+            <span
+              aria-label="Claude Code paired"
+              className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full border border-white bg-emerald-500"
+            />
+          )}
         </span>
         <motion.div
           animate={{
@@ -244,7 +252,7 @@ function Footer({ open }: { open: boolean }) {
             {auth.login}
           </div>
           <div className="truncate font-mono text-[10px] text-neutral-400">
-            github
+            {pair.paired ? "github · claude paired" : "github"}
           </div>
         </motion.div>
       </Link>

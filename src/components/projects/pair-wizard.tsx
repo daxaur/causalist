@@ -73,6 +73,9 @@ export function PairWizard({ children }: { children: ReactElement }) {
     const onPaired = () => {
       if (typeof window !== "undefined") {
         window.localStorage.setItem("causalist:pair:session", sessionId);
+        // Notify the same tab so usePairStatus listeners flip instantly
+        // — `storage` events only fire across tabs.
+        window.dispatchEvent(new Event("causalist:pair:changed"));
       }
       setPhase("paired");
       setPairing(false);
