@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { Info, Sparkle, X } from "@phosphor-icons/react";
+import { Info, Lightning, X } from "@phosphor-icons/react";
 import type { CausalGraph, CausalNode } from "@/lib/graph/types";
 import type { ImportanceSummary } from "@/lib/graph/importance";
 import { NodePanel } from "./node-panel";
@@ -58,12 +58,7 @@ export function RightPanel({
           <TabButton
             active={tab === "agent"}
             onClick={() => setTab("agent")}
-            icon={
-              <span className="relative inline-flex">
-                <Sparkle size={12} weight="fill" className="text-accent-magenta" />
-                <span className="absolute -right-0.5 -top-0.5 h-1 w-1 rounded-full bg-accent-magenta animate-pulse" />
-              </span>
-            }
+            icon={<Lightning size={12} weight="fill" />}
             label="Agent"
             badge={selectedIds.size > 0 ? String(selectedIds.size) : undefined}
           />

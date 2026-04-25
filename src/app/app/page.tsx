@@ -18,6 +18,7 @@ import { useSettings } from "@/lib/settings";
 import { useLibrary } from "@/lib/library/store";
 import type { LibraryIndexEntry } from "@/lib/library/types";
 import { NewProjectModal } from "@/components/projects/new-project-modal";
+import { PairWizard } from "@/components/projects/pair-wizard";
 
 /**
  * Projects — the central hub. New Project CTA opens a modal; below it
@@ -99,36 +100,39 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        {/* Connect Claude Code — slim, optional */}
-        <Link
-          href="/app/claude-code"
-          className="group mb-8 flex items-center gap-4 rounded-xl border border-neutral-200 bg-white p-4 transition-all hover:border-accent-magenta/40 hover:shadow-[0_2px_12px_rgba(0,0,0,0.04)]"
-        >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-white">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/claude-code.png"
-              alt=""
-              width={28}
-              height={28}
-              className="h-7 w-7 object-contain"
+        {/* Pair Claude Code — opens a 3-step modal wizard. Click instead
+            of routing so the friction stays low; the full setup guide
+            is one link away if they want it. */}
+        <PairWizard>
+          <button
+            type="button"
+            className="group mb-8 flex w-full items-center gap-4 rounded-xl border border-neutral-200 bg-white p-4 text-left transition-all hover:border-accent-magenta/40 hover:shadow-[0_2px_12px_rgba(0,0,0,0.04)]"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-white">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/claude-code.png"
+                alt=""
+                width={28}
+                height={28}
+                className="h-7 w-7 object-contain"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 font-display text-[14px] font-medium text-neutral-900">
+                Pair Claude Code
+                <Sparkle size={10} weight="fill" className="text-accent-magenta" />
+              </div>
+              <div className="mt-0.5 text-[12px] text-neutral-500">
+                Two commands. Eleven graph tools, the SKILL.md, ready in 30 seconds.
+              </div>
+            </div>
+            <ArrowRight
+              size={14}
+              className="shrink-0 text-neutral-400 transition-transform group-hover:translate-x-0.5 group-hover:text-accent-magenta"
             />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 font-display text-[14px] font-medium text-neutral-900">
-              Connect Claude Code
-              <Sparkle size={10} weight="fill" className="text-accent-magenta" />
-            </div>
-            <div className="mt-0.5 text-[12px] text-neutral-500">
-              Give your agent the full causal graph + 10 query tools. Three-step
-              install.
-            </div>
-          </div>
-          <ArrowRight
-            size={14}
-            className="shrink-0 text-neutral-400 transition-transform group-hover:translate-x-0.5 group-hover:text-accent-magenta"
-          />
-        </Link>
+          </button>
+        </PairWizard>
 
         {/* Saved projects */}
         <section className="mb-12">

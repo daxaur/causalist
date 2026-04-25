@@ -398,17 +398,14 @@ export function AgentAssignPanel({
         )}
       </div>
 
-      {/* Run feed */}
+      {/* Run feed — chat-style thread per run */}
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
-          Activity {runs.length > 0 ? `· ${runs.length}` : ""}
-        </div>
         {runs.length === 0 ? (
           <div className="rounded-md border border-dashed border-neutral-200 px-4 py-6 text-center text-[11px] text-neutral-400">
-            No runs yet.
+            Runs will appear here as a thread.
           </div>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-6">
             <AnimatePresence initial={false}>
               {runs.map((r) => (
                 <motion.li
@@ -416,157 +413,240 @@ export function AgentAssignPanel({
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  className="rounded-md border border-neutral-200 bg-white p-3"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      {r.status === "running" ? (
-                        <CausalistSpinner size={11} />
-                      ) : r.status === "error" ? (
-                        <Warning size={11} weight="fill" className="text-red-500" />
-                      ) : (
-                        <CheckCircle
-                          size={11}
-                          weight="fill"
-                          className="text-emerald-500"
-                        />
-                      )}
-                      <span className="truncate font-mono text-[11px] text-neutral-700">
-                        {r.plan}
-                      </span>
-                    </div>
-                    {r.status === "running" && (
-                      <button
-                        onClick={() => cancel(r.id)}
-                        aria-label="Cancel"
-                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
-                      >
-                        <Stop size={10} weight="fill" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="mt-1 font-mono text-[10px] text-neutral-400">
-                    {r.nodeIds.length} node{r.nodeIds.length === 1 ? "" : "s"} ·{" "}
-                    {r.filesLoaded}/{r.nodeIds.length} loaded
-                  </div>
-
-                  {r.status === "running" && (
-                    <div className="mt-2 flex items-center gap-1.5 font-mono text-[11px] text-accent-magenta">
-                      <RotatingVerb
-                        verbs={[
-                          r.filesLoaded < r.nodeIds.length ? "Reading" : "Reasoning",
-                          "Tracing",
-                          "Cross-checking",
-                          "Synthesising",
-                        ]}
-                      />
-                    </div>
-                  )}
-
-                  {r.errorMsg && (
-                    <p className="mt-2 font-mono text-[10px] text-red-500">
-                      {r.errorMsg}
-                    </p>
-                  )}
-
-                  {r.summary && r.status === "done" && (
-                    <p className="mt-2 text-[11px] leading-snug text-neutral-700">
-                      {r.summary}
-                    </p>
-                  )}
-
-                  {r.findings.length > 0 && (
-                    <ul className="mt-2 space-y-1">
-                      {r.findings.slice(-6).map((f, i) => (
-                        <li
-                          key={i}
-                          className="flex items-start gap-1.5 text-[11px]"
-                        >
-                          <span
-                            aria-hidden
-                            className={cn(
-                              "mt-[3px] shrink-0",
-                              f.kind === "risky"
-                                ? "text-amber-500"
-                                : f.kind === "fixed"
-                                  ? "text-accent-magenta"
-                                  : "text-emerald-500",
-                            )}
-                          >
-                            {f.kind === "risky" ? (
-                              <Warning size={9} weight="fill" />
-                            ) : (
-                              <CheckCircle size={9} weight="fill" />
-                            )}
-                          </span>
-                          <span className="min-w-0 flex-1 text-neutral-600">
-                            <span className="font-mono text-neutral-900">
-                              {nodesById.get(f.nodeId)?.label ??
-                                f.path.split("/").pop() ??
-                                f.nodeId.slice(0, 24)}
-                            </span>
-                            <span className="mx-1 text-neutral-300">·</span>
-                            <span>{f.note}</span>
-                          </span>
-                        </li>
-                      ))}
-                      {r.findings.length > 6 && (
-                        <li className="font-mono text-[10px] text-neutral-400">
-                          +{r.findings.length - 6} more
-                        </li>
-                      )}
-                    </ul>
-                  )}
-
-                  {r.status === "done" && r.patches.length > 0 && (
-                    <div className="mt-3 rounded-md border border-neutral-100 bg-[#FAFAF8] p-2.5">
-                      <div className="font-mono text-[10px] uppercase tracking-wider text-neutral-400">
-                        {r.patches.length} patch
-                        {r.patches.length === 1 ? "" : "es"}
-                      </div>
-                      <ul className="mt-1.5 space-y-0.5">
-                        {r.patches.slice(0, 4).map((p, i) => (
-                          <li
-                            key={i}
-                            className="flex items-center gap-1.5 truncate font-mono text-[10px] text-neutral-600"
-                          >
-                            <span className="h-1 w-1 rounded-full bg-accent-magenta" />
-                            <span className="truncate">{p.path}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      {r.prUrl ? (
-                        <a
-                          href={r.prUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-2 inline-flex h-7 items-center gap-1 rounded-md bg-emerald-600 px-2.5 text-[11px] font-medium text-white transition-colors hover:bg-emerald-700"
-                        >
-                          <CheckCircle size={11} weight="fill" />
-                          PR opened
-                          <ArrowUpRight size={11} />
-                        </a>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => openPr(r)}
-                          disabled={r.pushing || !auth.authenticated || !isRealRepo}
-                          className="mt-2 inline-flex h-7 items-center gap-1 rounded-md bg-neutral-900 px-2.5 text-[11px] font-medium text-white transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <GithubLogo size={11} weight="fill" />
-                          {r.pushing ? "Pushing…" : "Open PR"}
-                          <ArrowUpRight size={11} />
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  <RunThread
+                    run={r}
+                    nodesById={nodesById}
+                    canPush={auth.authenticated && isRealRepo}
+                    onCancel={() => cancel(r.id)}
+                    onOpenPr={() => openPr(r)}
+                  />
                 </motion.li>
               ))}
             </AnimatePresence>
           </ul>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Chat-style thread for one agent run. The user's plan sits at the top
+ * as a dark bubble; below it the agent's steps (file_loaded, finding,
+ * patch) render as small status cards in time order. Summary + patches
+ * + Open PR appear at the bottom once the run finishes.
+ */
+function RunThread({
+  run: r,
+  nodesById,
+  canPush,
+  onCancel,
+  onOpenPr,
+}: {
+  run: Run;
+  nodesById: Map<string, { label: string }>;
+  canPush: boolean;
+  onCancel: () => void;
+  onOpenPr: () => void;
+}) {
+  const meta = `${r.nodeIds.length} node${r.nodeIds.length === 1 ? "" : "s"} · ${new Date(r.startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+
+  return (
+    <div className="space-y-2">
+      {/* User bubble — the plan */}
+      <div className="flex justify-end">
+        <div className="max-w-[88%] rounded-2xl rounded-br-sm bg-neutral-900 px-3 py-2 text-[12.5px] leading-snug text-white shadow-sm">
+          {r.plan}
+        </div>
+      </div>
+      <div className="flex justify-end font-mono text-[9px] text-neutral-400">
+        {meta}
+      </div>
+
+      {/* Agent thread */}
+      <div className="space-y-1.5">
+        {/* file_loaded steps as a single collapsed line so the feed
+            doesn't drown in I/O noise */}
+        {r.filesLoaded > 0 && (
+          <StepCard
+            status={r.filesLoaded < r.nodeIds.length ? "running" : "done"}
+            label={`Read ${r.filesLoaded} of ${r.nodeIds.length} file${r.nodeIds.length === 1 ? "" : "s"}`}
+            sub={r.status === "running" && r.filesLoaded < r.nodeIds.length ? "fetching" : undefined}
+          />
+        )}
+
+        {/* While model is reasoning post-load, show a thinking row */}
+        {r.status === "running" && r.filesLoaded >= r.nodeIds.length && (
+          <StepCard
+            status="running"
+            label={
+              <span className="inline-flex items-center gap-1.5">
+                <RotatingVerb
+                  verbs={["Reasoning", "Tracing", "Cross-checking", "Synthesising"]}
+                />
+              </span>
+            }
+          />
+        )}
+
+        {/* Findings as steps */}
+        {r.findings.map((f, i) => (
+          <StepCard
+            key={`f-${i}`}
+            status={f.kind === "risky" ? "warn" : f.kind === "fixed" ? "fixed" : "done"}
+            label={
+              <span>
+                <span
+                  className={cn(
+                    "font-medium",
+                    f.kind === "risky"
+                      ? "text-amber-700"
+                      : f.kind === "fixed"
+                        ? "text-accent-magenta"
+                        : "text-neutral-900",
+                  )}
+                >
+                  {f.kind === "risky" ? "Flagged" : f.kind === "fixed" ? "Patched" : "Reviewed"}
+                </span>{" "}
+                <span className="font-mono text-neutral-700">
+                  {nodesById.get(f.nodeId)?.label ?? f.path.split("/").pop() ?? f.nodeId.slice(0, 24)}
+                </span>
+              </span>
+            }
+            sub={f.note}
+          />
+        ))}
+
+        {/* Patch step rows */}
+        {r.patches.map((p, i) => (
+          <StepCard
+            key={`p-${i}`}
+            status="fixed"
+            label={
+              <span>
+                <span className="font-medium text-accent-magenta">Patched</span>{" "}
+                <code className="font-mono text-[11.5px] text-neutral-700">
+                  {p.path}
+                </code>
+              </span>
+            }
+            sub={p.summary}
+          />
+        ))}
+      </div>
+
+      {/* Errors */}
+      {r.errorMsg && (
+        <div className="rounded-md border border-red-200 bg-red-50/60 px-3 py-2 text-[11px] text-red-700">
+          <span className="font-medium">Error:</span> {r.errorMsg}
+        </div>
+      )}
+
+      {/* Agent summary bubble */}
+      {r.summary && r.status === "done" && (
+        <div className="flex justify-start">
+          <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-neutral-200 bg-white px-3 py-2 text-[12.5px] leading-snug text-neutral-700 shadow-sm">
+            {r.summary}
+          </div>
+        </div>
+      )}
+
+      {/* Action row — Open PR */}
+      {r.status === "done" && r.patches.length > 0 && (
+        <div className="flex items-center justify-end gap-2 pt-1">
+          {r.prUrl ? (
+            <a
+              href={r.prUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-emerald-600 px-3 text-[11.5px] font-medium text-white transition-colors hover:bg-emerald-700"
+            >
+              <CheckCircle size={11} weight="fill" />
+              PR opened
+              <ArrowUpRight size={11} />
+            </a>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenPr}
+              disabled={r.pushing || !canPush}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-neutral-900 px-3 text-[11.5px] font-medium text-white transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <GithubLogo size={11} weight="fill" />
+              {r.pushing ? "Pushing…" : `Open PR (${r.patches.length})`}
+              <ArrowUpRight size={11} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Cancel only while running */}
+      {r.status === "running" && (
+        <div className="flex justify-end pt-1">
+          <button
+            onClick={onCancel}
+            type="button"
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-neutral-200 bg-white px-2 text-[10.5px] text-neutral-500 transition-colors hover:border-neutral-300 hover:text-neutral-900"
+          >
+            <Stop size={10} weight="fill" />
+            cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type StepStatus = "running" | "done" | "warn" | "fixed";
+
+function StepCard({
+  status,
+  label,
+  sub,
+}: {
+  status: StepStatus;
+  label: React.ReactNode;
+  sub?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-2 rounded-lg border border-neutral-200 bg-white px-2.5 py-2 text-[12px]">
+      <StatusGlyph status={status} />
+      <div className="min-w-0 flex-1">
+        <div className="leading-snug">{label}</div>
+        {sub && (
+          <div className="mt-0.5 truncate text-[11px] text-neutral-500">{sub}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatusGlyph({ status }: { status: StepStatus }) {
+  if (status === "running") {
+    return (
+      <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center">
+        <CausalistSpinner size={10} />
+      </div>
+    );
+  }
+  if (status === "warn") {
+    return (
+      <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+        <Warning size={9} weight="fill" />
+      </div>
+    );
+  }
+  if (status === "fixed") {
+    return (
+      <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent-magenta/15 text-accent-magenta">
+        <Sparkle size={9} weight="fill" />
+      </div>
+    );
+  }
+  return (
+    <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+      <CheckCircle size={9} weight="fill" />
     </div>
   );
 }
