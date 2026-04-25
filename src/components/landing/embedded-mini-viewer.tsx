@@ -3,9 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { motion } from "motion/react";
-import { ArrowUpRight, GithubLogo } from "@phosphor-icons/react";
-import { LAYER_COLORS } from "@/lib/graph/types";
+import { motion, AnimatePresence } from "motion/react";
+import {
+  ArrowUpRight,
+  Cursor,
+  Fire,
+  GithubLogo,
+  X,
+} from "@phosphor-icons/react";
+import { LAYER_COLORS, LAYER_LABELS, type SemanticLayer } from "@/lib/graph/types";
 import { rankImportance } from "@/lib/graph/importance";
 import type { PreviewMeta } from "@/lib/graph/previews";
 import { cn } from "@/lib/utils";
@@ -19,8 +25,10 @@ const ACCENT = "#E838A4";
 
 /**
  * Embedded interactive 3D miniature for the landing page. Pills above
- * act as tabs that swap which preview's graph is loaded. Drag, click,
- * hover, orbit — all real, in-page, no modal.
+ * act as tabs that swap which preview's graph is loaded. The viewer
+ * teaches itself: a layer legend at the bottom maps colors → meaning,
+ * and clicking any node pops a small card explaining that file's tier
+ * and layer. Drag, orbit, and click all happen in place.
  */
 export function EmbeddedMiniViewer({ previews }: { previews: PreviewMeta[] }) {
   const [activeSlug, setActiveSlug] = useState(previews[0]?.slug ?? "");
@@ -29,6 +37,17 @@ export function EmbeddedMiniViewer({ previews }: { previews: PreviewMeta[] }) {
   const graphRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 720, h: 420 });
+
+  type SelectedNode = {
+    id: string;
+    label: string;
+    layer: SemanticLayer;
+    summary?: string;
+    tier: "hot" | "core" | "leaf";
+    fanIn: number;
+    fanOut: number;
+  };
+  const [selected, setSelected] = useState<SelectedNode | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -42,6 +61,32 @@ export function EmbeddedMiniViewer({ previews }: { previews: PreviewMeta[] }) {
   }, []);
 
   const importance = useMemo(() => rankImportance(active.graph), [active]);
+  const nodesById = useMemo(
+    () => new Map(active.graph.nodes.map((n) => [n.id, n])),
+    [active],
+  );
+
+  // Only show legend rows for layers that actually appear in this graph
+  // — keeps the demo focused, no empty UI.
+  const presentLayers = useMemo(() => {
+    const set = new Set<SemanticLayer>();
+    for (const n of active.graph.nodes) set.add(n.layer);
+    return Array.from(set);
+  }, [active]);
+
+  // Hot/core/leaf counts for the importance hint at top-right.
+  const tiers = useMemo(() => {
+    let hot = 0,
+      core = 0,
+      leaf = 0;
+    for (const n of active.graph.nodes) {
+      const t = importance.byId.get(n.id)?.tier;
+      if (t === "hot") hot++;
+      else if (t === "core") core++;
+      else leaf++;
+    }
+    return { hot, core, leaf };
+  }, [active, importance]);
 
   const data = useMemo(
     () => ({
@@ -58,13 +103,30 @@ export function EmbeddedMiniViewer({ previews }: { previews: PreviewMeta[] }) {
     [active],
   );
 
-  // Re-frame when the active graph changes.
+  // Reset selection + reframe when the active graph changes.
   useEffect(() => {
+    setSelected(null);
     const ref = graphRef.current;
     if (!ref) return;
     const t = setTimeout(() => ref.zoomToFit?.(800, 60), 700);
     return () => clearTimeout(t);
   }, [active.slug, size.w, size.h]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleNodeClick = (n: any) => {
+    const node = nodesById.get(n.id);
+    if (!node) return;
+    const imp = importance.byId.get(n.id);
+    setSelected({
+      id: node.id,
+      label: node.label,
+      layer: node.layer,
+      summary: node.summary,
+      tier: imp?.tier ?? "leaf",
+      fanIn: imp?.fanIn ?? 0,
+      fanOut: imp?.fanOut ?? 0,
+    });
+  };
 
   return (
     <div className="w-full">
@@ -165,8 +227,114 @@ export function EmbeddedMiniViewer({ previews }: { previews: PreviewMeta[] }) {
               linkDirectionalParticles={0}
               enableNodeDrag={true}
               enableNavigationControls={true}
+              onNodeClick={handleNodeClick}
             />
           )}
+
+          {/* Importance hint — top-right */}
+          <div className="pointer-events-none absolute right-3 top-3 flex items-center gap-2 rounded-md border border-neutral-200 bg-white/85 px-2 py-1 font-mono text-[10px] text-neutral-500 backdrop-blur">
+            <span className="flex items-center gap-1 text-accent-magenta">
+              <Fire size={9} weight="fill" />
+              {tiers.hot} hot
+            </span>
+            <span className="text-neutral-300">·</span>
+            <span className="text-amber-600">{tiers.core} core</span>
+            <span className="text-neutral-300">·</span>
+            <span>{tiers.leaf} leaf</span>
+          </div>
+
+          {/* "Click a node" prompt — bottom-right, only when nothing
+              selected. Lets viewers know the canvas is interactive. */}
+          {!selected && (
+            <div className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white/85 px-2.5 py-1 font-mono text-[10px] text-neutral-500 backdrop-blur">
+              <Cursor size={9} weight="duotone" />
+              click any node to inspect
+            </div>
+          )}
+
+          {/* Selected node card — top-left */}
+          <AnimatePresence>
+            {selected && (
+              <motion.div
+                initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                className="pointer-events-auto absolute left-3 top-3 max-w-[260px] rounded-lg border border-neutral-200 bg-white/95 p-2.5 shadow-md backdrop-blur"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate font-mono text-[11.5px] font-medium text-neutral-900">
+                      {selected.label}
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[10px] text-neutral-500">
+                      <span
+                        className="inline-block h-1.5 w-1.5 rounded-full"
+                        style={{
+                          backgroundColor:
+                            selected.tier === "hot"
+                              ? ACCENT
+                              : LAYER_COLORS[selected.layer],
+                        }}
+                      />
+                      <span>{LAYER_LABELS[selected.layer]}</span>
+                      <span className="text-neutral-300">·</span>
+                      <span
+                        className={cn(
+                          selected.tier === "hot" && "text-accent-magenta",
+                          selected.tier === "core" && "text-amber-600",
+                          selected.tier === "leaf" && "text-neutral-500",
+                        )}
+                      >
+                        {selected.tier}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(null)}
+                    aria-label="Close"
+                    className="-m-1 rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+                  >
+                    <X size={10} />
+                  </button>
+                </div>
+                {selected.summary && (
+                  <p className="mt-2 text-[11px] leading-snug text-neutral-600">
+                    {selected.summary}
+                  </p>
+                )}
+                <div className="mt-2 flex items-center gap-3 font-mono text-[10px] text-neutral-400">
+                  <span>{selected.fanIn} in</span>
+                  <span>·</span>
+                  <span>{selected.fanOut} out</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Legend strip — color → layer. Only layers that exist in this
+            graph; the strip auto-shrinks for lighter previews. */}
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 border-t border-neutral-100 bg-white/80 px-3 py-2 font-mono text-[10px] text-neutral-500 backdrop-blur">
+          <span className="text-neutral-400">layer:</span>
+          {presentLayers.map((l) => (
+            <span key={l} className="inline-flex items-center gap-1.5">
+              <span
+                className="inline-block h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: LAYER_COLORS[l] }}
+              />
+              {LAYER_LABELS[l]}
+            </span>
+          ))}
+          <span className="ml-2 text-neutral-300">·</span>
+          <span className="inline-flex items-center gap-1.5 text-accent-magenta">
+            <span
+              className="inline-block h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: ACCENT }}
+            />
+            hot (top 10% by fan-in)
+          </span>
         </div>
       </motion.div>
 
