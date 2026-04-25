@@ -176,6 +176,23 @@ const TOOLS = [
       required: ["source", "target"],
     },
   },
+  {
+    name: "create_project",
+    description:
+      "Push a new project entry to the paired browser's Projects list. Use when the user asks Claude Code to register a repo as a Causalist project.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        owner: { type: "string", description: "GitHub owner (username or org)" },
+        repo: { type: "string", description: "GitHub repo name" },
+        nickname: {
+          type: "string",
+          description: "Optional friendly name shown in the projects list.",
+        },
+      },
+      required: ["owner", "repo"],
+    },
+  },
 ];
 
 async function requireGraph(): Promise<CausalGraph> {
@@ -419,6 +436,52 @@ async function exec(
           : "No matching edge",
         data: matches,
       };
+    }
+    case "create_project": {
+      if (!SESSION_SRC) {
+        return {
+          ok: false,
+          summary:
+            "Not paired — start the MCP server with --session <id> or run `causalist init` first.",
+        };
+      }
+      const owner = String(args.owner ?? "").trim();
+      const repo = String(args.repo ?? "").trim();
+      if (!owner || !repo) {
+        return { ok: false, summary: "Both owner and repo are required" };
+      }
+      const url = `${SESSION_SRC.web.replace(/\/$/, "")}/api/projects/push`;
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session: SESSION_SRC.session,
+            project: {
+              owner,
+              repo,
+              nickname: args.nickname,
+              addedAt: Date.now(),
+            },
+          }),
+        });
+        if (!res.ok) {
+          return {
+            ok: false,
+            summary: `Push failed: ${res.status} ${res.statusText}`,
+          };
+        }
+        return {
+          ok: true,
+          summary: `Project "${owner}/${repo}" pushed to the browser.`,
+          data: { owner, repo },
+        };
+      } catch (e) {
+        return {
+          ok: false,
+          summary: `Push error: ${e instanceof Error ? e.message : String(e)}`,
+        };
+      }
     }
     default:
       throw new Error(`Unknown tool: ${name}`);

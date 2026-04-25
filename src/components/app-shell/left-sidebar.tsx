@@ -6,9 +6,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import {
+  BookOpen,
+  FolderOpen,
   GearSix,
   GithubLogo,
-  HouseSimple,
 } from "@phosphor-icons/react";
 import {
   Sidebar,
@@ -16,6 +17,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/brand/logo";
+import { GitHubStarButton } from "@/components/landing/github-star-button";
 import { useGithubAuth } from "@/hooks/use-github-auth";
 import { cn } from "@/lib/utils";
 
@@ -26,38 +28,24 @@ type Item = {
   match?: (pathname: string) => boolean;
 };
 
-// Intentionally short — 4 items total. Saved graphs and reference
-// are reachable as tabs on Home, not as their own sidebar links.
+// Universal sidebar: same shape on /, /app/*, /docs/*. Two real
+// destinations (Projects + Documentation) plus Settings; the brand
+// header itself acts as the home affordance.
 const WORKSPACE: Item[] = [
   {
-    label: "Home",
+    label: "Projects",
     href: "/app",
-    icon: <HouseSimple className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
-    match: (p) => p === "/app",
+    icon: <FolderOpen className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
+    match: (p) =>
+      p === "/app" ||
+      /^\/app\/[^/]+\/[^/]+/.test(p) ||
+      p.startsWith("/app/preview"),
   },
   {
-    label: "Your repos",
-    href: "/app?tab=repos",
-    icon: <GithubLogo className="h-[18px] w-[18px] shrink-0" weight="fill" />,
-    match: (p) => /^\/app\/[^/]+\/[^/]+/.test(p),
-  },
-  {
-    label: "Connect Claude Code",
-    href: "/app/claude-code",
-    icon: (
-      <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/claude-code.png"
-          alt=""
-          width={18}
-          height={18}
-          className="h-[18px] w-[18px] object-contain"
-          style={{ maxHeight: "18px", maxWidth: "18px" }}
-        />
-      </span>
-    ),
-    match: (p) => p.startsWith("/app/claude-code"),
+    label: "Documentation",
+    href: "/docs/foundations",
+    icon: <BookOpen className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
+    match: (p) => p.startsWith("/docs") || p.startsWith("/app/reference"),
   },
 ];
 
@@ -77,6 +65,7 @@ export function LeftSidebar({ children }: { children: ReactNode }) {
         <SidebarBody className="justify-between gap-6 border-r border-neutral-200 !bg-white">
           <div className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
             <BrandHeader open={open} />
+            <StarRow open={open} />
 
             <SidebarSection label="Workspace" open={open}>
               {WORKSPACE.map((item) => (
@@ -117,6 +106,21 @@ function BrandHeader({ open }: { open: boolean }) {
         causalist
       </motion.span>
     </Link>
+  );
+}
+
+function StarRow({ open }: { open: boolean }) {
+  // Only render the full star button when sidebar is expanded — when
+  // collapsed, the brand row alone is enough chrome at the top.
+  if (!open) return null;
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="mt-3"
+    >
+      <GitHubStarButton variant="sidebar" />
+    </motion.div>
   );
 }
 
@@ -186,9 +190,6 @@ function Footer({ open }: { open: boolean }) {
   const auth = useGithubAuth();
   const connected = auth.authenticated;
 
-  // Wrapping the avatar in a fixed-size shrink-0 box prevents flex
-  // math from warping it into a rectangle when the sidebar width
-  // animates down to 60px.
   if (connected && auth.avatar_url) {
     return (
       <Link
@@ -244,4 +245,3 @@ function Footer({ open }: { open: boolean }) {
     </Link>
   );
 }
-

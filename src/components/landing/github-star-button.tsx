@@ -2,8 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { GithubLogo, Star } from "@phosphor-icons/react";
+import { cn } from "@/lib/utils";
 
-export function GitHubStarButton() {
+export function GitHubStarButton({
+  variant = "default",
+}: {
+  /** "default" — landing nav; "sidebar" — full-width inside the left sidebar. */
+  variant?: "default" | "sidebar";
+}) {
   const [stars, setStars] = useState<number | null>(null);
 
   useEffect(() => {
@@ -19,28 +25,49 @@ export function GitHubStarButton() {
     };
   }, []);
 
+  const isSidebar = variant === "sidebar";
+
   return (
     <a
       href="https://github.com/daxaur/causalist"
       target="_blank"
       rel="noopener noreferrer"
-      className="group hidden items-center overflow-hidden rounded-md border border-neutral-200 bg-white/80 text-xs text-neutral-600 backdrop-blur-sm transition-colors hover:border-neutral-300 hover:text-neutral-900 sm:inline-flex"
-      aria-label="Star Causalist on GitHub"
-    >
-      <span className="flex items-center gap-1.5 px-2.5 py-1.5">
-        <GithubLogo size={12} weight="fill" />
-        <span>Star</span>
-      </span>
-      {typeof stars === "number" && (
-        <span className="flex items-center gap-1 border-l border-neutral-200 px-2.5 py-1.5 font-mono">
-          <Star
-            size={11}
-            weight="fill"
-            className="text-amber-400 transition-transform group-hover:scale-110"
-          />
-          {formatCount(stars)}
-        </span>
+      className={cn(
+        "group inline-flex items-center overflow-hidden rounded-md border border-neutral-200 bg-white text-neutral-600 transition-colors hover:border-accent-magenta/60 hover:text-neutral-900",
+        isSidebar
+          ? "w-full text-[12px]"
+          : "h-10 text-[13px] shadow-sm hover:shadow",
       )}
+      aria-label={
+        typeof stars === "number"
+          ? `Star Causalist on GitHub — ${stars} stars`
+          : "Star Causalist on GitHub"
+      }
+    >
+      <span
+        className={cn(
+          "flex items-center gap-1.5",
+          isSidebar ? "px-2 py-1.5" : "px-3 py-2",
+        )}
+      >
+        <GithubLogo size={isSidebar ? 12 : 14} weight="fill" />
+        <span className="font-medium">Star</span>
+      </span>
+      <span
+        className={cn(
+          "ml-auto flex items-center gap-1 border-l border-neutral-200 font-mono",
+          isSidebar ? "px-2 py-1.5" : "px-3 py-2",
+        )}
+      >
+        <Star
+          size={isSidebar ? 11 : 13}
+          weight="fill"
+          className="text-amber-400 transition-transform group-hover:scale-110"
+        />
+        <span className="tabular-nums">
+          {typeof stars === "number" ? formatCount(stars) : "—"}
+        </span>
+      </span>
     </a>
   );
 }

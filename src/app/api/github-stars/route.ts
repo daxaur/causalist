@@ -16,7 +16,10 @@ export async function GET(): Promise<Response> {
       "User-Agent": "causalist-web",
       Accept: "application/vnd.github+json",
     };
-    const token = process.env.GITHUB_TOKEN ?? process.env.GITHUB_PAT;
+    const token =
+      process.env.GITHUB_TOKEN ??
+      process.env.GITHUB_PAT ??
+      process.env.GH_TOKEN;
     if (token) headers.Authorization = `Bearer ${token}`;
     const res = await fetch(
       "https://api.github.com/repos/daxaur/causalist",

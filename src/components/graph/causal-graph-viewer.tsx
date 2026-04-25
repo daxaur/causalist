@@ -7,6 +7,7 @@ import {
   Keyboard,
   List,
   SidebarSimple,
+  Sparkle,
   SquaresFour,
 } from "@phosphor-icons/react";
 import {
@@ -137,6 +138,7 @@ export function CausalGraphViewer({
       window.localStorage.setItem("causalist:sidebarOpen", sidebarOpen ? "1" : "0");
     }
   }, [sidebarOpen, compact]);
+  const [panelManuallyOpen, setPanelManuallyOpen] = useState(false);
   // Multi-select: Set of selected node ids.
   // The "focused" node (for the detail panel) is the most recently clicked.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -779,10 +781,10 @@ export function CausalGraphViewer({
     ];
   }, [graph, selectedIds, focusMode, focusedId]);
 
-  // Right panel is shown whenever a node is focused or multi-select has entries.
-  // When open, top-right badges and the bottom selection toolbar shift left so
-  // they're not hidden behind the 420px panel.
-  const panelOpen = !!focused || selectedIds.size > 0;
+  // Right panel is shown whenever a node is focused, multi-select has entries,
+  // or the user has manually opened it. When open, top-right badges and the
+  // bottom selection toolbar shift left so they're not hidden behind the 420px panel.
+  const panelOpen = !!focused || selectedIds.size > 0 || panelManuallyOpen;
   const rightOverlayOffsetPx = panelOpen ? 436 : 16;
 
   return (
@@ -1050,6 +1052,20 @@ export function CausalGraphViewer({
               />
             </>
           )}
+
+          {/* Persistent panel toggle — visible when no node is selected,
+              so users can open Ask / Agents without picking a node first. */}
+          {!compact && !panelOpen && (
+            <button
+              type="button"
+              onClick={() => setPanelManuallyOpen(true)}
+              aria-label="Open inspector panel"
+              className="pointer-events-auto absolute right-4 top-4 z-20 inline-flex h-9 items-center gap-1.5 rounded-md border border-neutral-200 bg-white/90 px-3 font-mono text-[11px] text-neutral-600 shadow-sm backdrop-blur transition-colors hover:border-accent-magenta/40 hover:text-neutral-900"
+            >
+              <Sparkle size={11} weight="duotone" className="text-accent-magenta" />
+              Open panel
+            </button>
+          )}
         </div>
 
         {/* Legend — editorial noise; hide in compact */}
@@ -1080,7 +1096,10 @@ export function CausalGraphViewer({
         )}
 
         {!compact && (
-          <div className="pointer-events-none absolute bottom-4 right-4 z-10 hidden items-center gap-3 rounded-full border border-neutral-200 bg-white/80 px-3 py-1.5 font-mono text-[10px] text-neutral-500 backdrop-blur md:flex">
+          <div
+            className="pointer-events-none absolute bottom-4 z-10 hidden items-center gap-3 rounded-full border border-neutral-200 bg-white/85 px-3 py-1.5 font-mono text-[10px] text-neutral-500 backdrop-blur transition-[right] duration-200 lg:flex"
+            style={{ right: `${rightOverlayOffsetPx}px` }}
+          >
             <Hint keys={["j", "k"]} label="walk" />
             <span className="text-neutral-300">·</span>
             <Hint keys={["."]} label="focus" />
@@ -1110,7 +1129,7 @@ export function CausalGraphViewer({
         </div>
 
         {/* Side panel — IDE-style tabs: Inspector · Ask · Agents */}
-        {(focused || selectedIds.size > 0) && (
+        {panelOpen && (
           <RightPanel
             graph={graph}
             focusedNode={focused}
@@ -1121,12 +1140,17 @@ export function CausalGraphViewer({
               setFocusedId(null);
               setSelectedIds(new Set());
               setAgentHighlight(new Set());
+              setPanelManuallyOpen(false);
             }}
             onHighlightNodes={(ids) => setAgentHighlight(new Set(ids))}
             onAssign={(ids, kind) => {
               if (kind === "risky") {
                 toast.warning(`Flagged risky`, {
                   description: `${ids.length} node${ids.length === 1 ? "" : "s"} need attention`,
+                });
+              } else if (kind === "fixed") {
+                toast.success(`Patched`, {
+                  description: `${ids.length} node${ids.length === 1 ? "" : "s"} fixed by agent`,
                 });
               }
             }}

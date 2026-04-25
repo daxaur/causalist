@@ -43,7 +43,7 @@ export function RightPanel({
   /** Bubble node-id highlights up to the viewer for chain coloring */
   onHighlightNodes?: (ids: string[]) => void;
   /** Called when agent-panel wants to "mark this node as touched" */
-  onAssign?: (ids: string[], status: "reviewed" | "risky") => void;
+  onAssign?: (ids: string[], status: "reviewed" | "risky" | "fixed") => void;
 }) {
   const [tab, setTab] = useState<Tab>("inspector");
 

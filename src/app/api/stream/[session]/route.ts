@@ -35,8 +35,13 @@ export async function GET(
       }, 15000);
 
       const unsubscribe = subscribe(session, (event: StreamEvent) => {
+        // Default channel is "tool" (Claude Code hook events). Custom
+        // channels — e.g. "project_added" pushed via /api/projects/push
+        // — set their own `event` so the browser can `addEventListener`
+        // for the specific name.
+        const channel = typeof event.event === "string" ? event.event : "tool";
         controller.enqueue(
-          encoder.encode(`event: tool\ndata: ${JSON.stringify(event)}\n\n`),
+          encoder.encode(`event: ${channel}\ndata: ${JSON.stringify(event)}\n\n`),
         );
       });
 

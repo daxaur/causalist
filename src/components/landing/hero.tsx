@@ -1,21 +1,16 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { motion } from "motion/react";
-import { ArrowRight, Sparkle } from "@phosphor-icons/react";
+import { ArrowRight } from "@phosphor-icons/react";
 import { AnimatedShinyText } from "@/components/ui/animated-shiny-text";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PREVIEWS } from "@/lib/graph/previews";
-import { PreviewDialog } from "./preview-dialog";
-import { PreviewMini } from "./preview-mini";
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card";
+import { EmbeddedMiniViewer } from "./embedded-mini-viewer";
 
 const GITHUB_URL = /github\.com\/([^/\s]+)\/([^/\s?#]+)/;
 
@@ -88,7 +83,13 @@ export function Hero({
         className="mb-8 rounded-full border border-neutral-200 bg-white/80 px-4 py-1.5 backdrop-blur-sm"
       >
         <AnimatedShinyText className="inline-flex items-center gap-2 text-xs">
-          <Sparkle size={11} weight="duotone" />
+          <Image
+            src="/claude-mark.svg"
+            alt="Claude"
+            width={12}
+            height={12}
+            className="h-3 w-3"
+          />
           Built with Claude Opus 4.7
         </AnimatedShinyText>
       </motion.div>
@@ -116,7 +117,7 @@ export function Hero({
 
       <motion.p
         variants={item}
-        className="mb-12 max-w-xl text-center text-[15px] leading-relaxed text-neutral-500"
+        className="mb-12 max-w-2xl text-center text-base leading-relaxed text-neutral-500 sm:text-lg"
       >
         Paste a GitHub URL. Claude agents map your entire codebase into an
         interactive 3D causal graph — a galaxy of files, connected by what
@@ -179,80 +180,14 @@ export function Hero({
         )}
       </motion.div>
 
-      <motion.div
-        variants={item}
-        className="mt-6 flex items-center justify-center gap-3"
-      >
-        <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-400">
-          No key yet?
-        </span>
-        <Link
-          href="/app/preview/causalist"
-          className="group inline-flex h-9 items-center gap-2 rounded-md border border-neutral-900 bg-white px-3 text-[13px] font-medium text-neutral-900 transition-all hover:bg-neutral-900 hover:text-white"
-        >
-          <Sparkle size={12} weight="fill" className="text-accent-magenta" />
-          Tour a demo graph
-          <ArrowRight
-            size={12}
-            className="transition-transform group-hover:translate-x-0.5"
-          />
-        </Link>
-      </motion.div>
-
-      <motion.div
-        variants={item}
-        className="mt-6 flex flex-wrap items-center justify-center gap-2 text-sm"
-      >
-        <span className="mr-1 flex items-center gap-1.5 text-neutral-400">
-          <Sparkle size={13} weight="duotone" />
-          hover to peek · click for full view:
-        </span>
-        {PREVIEWS.filter((p) => p.slug !== "causalist").map((p, i) => (
-          <motion.span
-            key={p.slug}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{
-              delay: 0.85 + i * 0.08,
-              duration: 0.5,
-              ease: [0.16, 1, 0.3, 1],
-            }}
-          >
-            <HoverCard>
-              <HoverCardTrigger
-                render={
-                  <PreviewDialog preview={p}>
-                    <button
-                      type="button"
-                      className="rounded-full border border-neutral-200 bg-white/80 px-3 py-1 font-mono text-xs text-neutral-700 backdrop-blur-sm transition-all hover:border-accent-magenta hover:text-neutral-900 hover:shadow-sm"
-                    >
-                      {p.title}
-                    </button>
-                  </PreviewDialog>
-                }
-              />
-              <HoverCardContent
-                side="top"
-                className="w-[340px] overflow-hidden p-0"
-              >
-                <PreviewMini preview={p} width={340} height={190} />
-                <div className="flex items-center justify-between border-t border-neutral-100 bg-white px-3 py-2">
-                  <div>
-                    <div className="font-display text-[13px] font-medium text-neutral-900">
-                      {p.title}
-                    </div>
-                    <div className="font-mono text-[10px] text-neutral-400">
-                      {p.graph.nodes.length} nodes · {p.graph.edges.length} edges
-                    </div>
-                  </div>
-                  <span className="font-mono text-[10px] text-neutral-400">
-                    click to open
-                  </span>
-                </div>
-              </HoverCardContent>
-            </HoverCard>
-          </motion.span>
-        ))}
+      {/* Embedded interactive miniature — pills act as tabs swapping
+          which graph is loaded. No popup, no off-right floating;
+          drag/click/hover all happen in place. */}
+      <motion.div variants={item} className="mt-16 w-full">
+        <div className="mb-3 text-center font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-400">
+          Or browse a real graph
+        </div>
+        <EmbeddedMiniViewer previews={PREVIEWS} />
       </motion.div>
     </motion.section>
   );

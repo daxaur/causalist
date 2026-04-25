@@ -2,77 +2,23 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import {
-  ArrowRight,
-  GithubLogo,
-  Sparkle,
-} from "@phosphor-icons/react";
+import { GithubLogo } from "@phosphor-icons/react";
 import { ConstellationBackground } from "@/components/landing/constellation-bg";
-import { FeaturesBento } from "@/components/landing/features-bento";
-import { GitHubStarButton } from "@/components/landing/github-star-button";
 import { Hero } from "@/components/landing/hero";
 import { LanguageMarquee } from "@/components/landing/language-marquee";
 import { Logo } from "@/components/brand/logo";
-import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useSettings } from "@/lib/settings";
 
 export default function Home() {
   const settings = useSettings();
-  const auth = useGithubAuth();
-  const isConnected = auth.authenticated || Boolean(settings.githubToken);
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#FAFAF8]">
+    <main className="relative h-full overflow-y-auto bg-[#FAFAF8]">
       <ConstellationBackground />
-
-      <nav className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-8 sm:py-6">
-        <Link
-          href="/"
-          className="flex items-center gap-2.5 text-neutral-900 transition-opacity hover:opacity-80"
-        >
-          <Logo size={22} />
-          <span className="font-display text-[17px] font-medium tracking-tight">
-            causalist
-          </span>
-        </Link>
-
-        <div className="flex items-center gap-2 sm:gap-3">
-          <GitHubStarButton />
-          <Link
-            href="/app"
-            className="group inline-flex h-9 items-center gap-2 rounded-md bg-neutral-900 px-3.5 text-[13px] font-medium text-white transition-colors hover:bg-neutral-800"
-          >
-            <Sparkle
-              size={12}
-              weight="fill"
-              className="text-accent-magenta"
-            />
-            <span>{isConnected ? "My projects" : "Launch app"}</span>
-            <ArrowRight
-              size={12}
-              className="text-white/70 transition-transform group-hover:translate-x-0.5"
-            />
-          </Link>
-        </div>
-      </nav>
 
       <Hero anthropicKeyPresent={Boolean(settings.anthropicKey)} />
 
-      {/* Features BentoGrid with AnimatedBeam */}
-      <section className="relative z-10 px-6 pb-20 sm:px-8">
-        <div className="mx-auto mb-10 max-w-5xl">
-          <p className="font-mono text-[11px] uppercase tracking-wider text-neutral-400">
-            In ninety seconds
-          </p>
-          <h2 className="mt-2 max-w-2xl font-display text-3xl font-medium leading-tight tracking-[-0.02em] text-neutral-900 sm:text-4xl">
-            From a URL to a graph you can actually{" "}
-            <em className="font-normal text-neutral-500">read</em>.
-          </h2>
-        </div>
-        <FeaturesBento />
-      </section>
-
-      {/* Language marquee */}
+      {/* Language marquee — kept as a quiet ribbon under the hero. */}
       <section className="relative z-10 border-t border-neutral-200/70 bg-white/60 py-10 backdrop-blur-sm">
         <p className="mb-6 text-center font-mono text-[11px] uppercase tracking-wider text-neutral-400">
           Causalist speaks every language in your repo
@@ -156,10 +102,10 @@ function Footer() {
           <FooterColumn
             title="Developers"
             links={[
-              { label: "Agent API", href: "/agents" },
               { label: "Pair your terminal", href: "/pair" },
               { label: "Docs", href: "/docs/foundations" },
               { label: "MCP server", href: "https://www.npmjs.com/package/causalist-mcp", external: true },
+              { label: "GitHub", href: "https://github.com/daxaur/causalist", external: true },
             ]}
           />
           <FooterColumn

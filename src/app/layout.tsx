@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { HeaderActionsProvider, SiteHeader } from "@/components/nav/site-header";
+import { LeftSidebar } from "@/components/app-shell/left-sidebar";
 import { Toaster } from "@/components/ui/sonner";
 
 const jetbrainsMono = JetBrains_Mono({
@@ -40,10 +40,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-white text-neutral-900 antialiased font-sans">
-        <HeaderActionsProvider>
-          <SiteHeader />
-          {children}
-        </HeaderActionsProvider>
+        <LeftSidebar>{children}</LeftSidebar>
         <Toaster position="bottom-right" richColors closeButton />
       </body>
     </html>

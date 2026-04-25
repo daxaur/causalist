@@ -5,102 +5,52 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
-  CircleNotch,
   Clock,
   Folders,
   GithubLogo,
-  Key,
-  MagnifyingGlass,
+  Plus,
   Sparkle,
-  Star,
-  Warning,
+  Terminal,
 } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
 import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useSettings } from "@/lib/settings";
 import { useLibrary } from "@/lib/library/store";
 import type { LibraryIndexEntry } from "@/lib/library/types";
-import { cn } from "@/lib/utils";
-
-interface Repo {
-  id: number;
-  fullName: string;
-  description: string | null;
-  stars: number;
-  language: string | null;
-  isPrivate: boolean;
-  updatedAt: string;
-}
+import { PREVIEWS } from "@/lib/graph/previews";
+import { NewProjectModal } from "@/components/projects/new-project-modal";
 
 /**
- * Home — IDE-style hub. Left column: user's repos. Right column:
- * saved graphs (their library). A single "Connect Claude Code" card
- * at the top links to /app/claude-code. Everything else (references,
- * demos) lives on the landing page or in deep routes — Home stays
- * focused on *your project*.
+ * Projects — the central hub. New Project CTA opens a modal; below it
+ * sits the user's saved graphs (their localStorage library), then a
+ * row of featured demo graphs. Repository discovery happens INSIDE the
+ * modal, not as a sidebar duplicate.
  */
-export default function HomePage() {
+export default function ProjectsPage() {
   const settings = useSettings();
   const auth = useGithubAuth();
-  const [repos, setRepos] = useState<Repo[]>([]);
-  const [loadingRepos, setLoadingRepos] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
   const { entries: libraryEntries, loading: loadingLib } = useLibrary();
-
-  const githubToken = auth.token ?? settings.githubToken;
+  const [query, setQuery] = useState("");
+  const [bus, setBus] = useState<{ events: number }>({ events: 0 });
   const isConnected = auth.authenticated || Boolean(settings.githubToken);
 
+  // Live SSE listener — when the MCP server pushes a new project to
+  // this paired browser, the library refreshes and the new entry
+  // appears here without a manual reload.
   useEffect(() => {
-    if (!githubToken) return;
-    let cancelled = false;
-    const load = async () => {
-      setLoadingRepos(true);
-      setError(null);
-      try {
-        const { Octokit } = await import("@octokit/rest");
-        const octokit = new Octokit({ auth: githubToken });
-        const { data } = await octokit.repos.listForAuthenticatedUser({
-          per_page: 100,
-          sort: "updated",
-          affiliation: "owner,collaborator,organization_member",
-        });
-        if (cancelled) return;
-        setRepos(
-          data.map((r) => ({
-            id: r.id,
-            fullName: r.full_name,
-            description: r.description,
-            stars: r.stargazers_count ?? 0,
-            language: r.language,
-            isPrivate: r.private,
-            updatedAt: r.updated_at ?? "",
-          })),
-        );
-      } catch (e) {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Failed to load repos");
-      } finally {
-        if (!cancelled) setLoadingRepos(false);
-      }
-    };
-    load();
+    if (typeof window === "undefined") return;
+    const sessionId = window.localStorage.getItem("causalist:pair:session");
+    if (!sessionId) return;
+    const es = new EventSource(`/api/stream/${sessionId}`);
+    const onProject = () => setBus((b) => ({ events: b.events + 1 }));
+    es.addEventListener("project_added", onProject);
     return () => {
-      cancelled = true;
+      es.removeEventListener("project_added", onProject);
+      es.close();
     };
-  }, [githubToken]);
+  }, []);
 
-  const filteredRepos = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return repos;
-    return repos.filter(
-      (r) =>
-        r.fullName.toLowerCase().includes(q) ||
-        (r.description ?? "").toLowerCase().includes(q),
-    );
-  }, [repos, query]);
-
-  const filteredLibrary = useMemo(() => {
+  const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return libraryEntries;
     return libraryEntries.filter(
@@ -112,37 +62,45 @@ export default function HomePage() {
 
   return (
     <div className="h-full overflow-y-auto bg-[#FAFAF8]">
-      <div className="mx-auto w-full max-w-6xl px-6 py-10 sm:px-8">
-        {/* Page heading + global search */}
+      <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:px-8">
+        {/* Header */}
         <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
           <div>
             <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
-              Home
+              Workspace
             </div>
             <h1 className="mt-1 font-display text-3xl font-medium tracking-[-0.02em] sm:text-4xl">
-              Your projects
+              Projects
             </h1>
             <p className="mt-2 text-[13px] text-neutral-500">
-              {isConnected
-                ? `${repos.length || "—"} repo${repos.length === 1 ? "" : "s"} · ${libraryEntries.length} saved graph${libraryEntries.length === 1 ? "" : "s"}`
-                : "Connect GitHub to see the repos you can map."}
+              {libraryEntries.length === 0
+                ? "Drop in a GitHub URL to map your first codebase."
+                : `${libraryEntries.length} project${libraryEntries.length === 1 ? "" : "s"} mapped${bus.events > 0 ? ` · ${bus.events} live update${bus.events === 1 ? "" : "s"}` : ""}`}
             </p>
           </div>
-          <div className="relative w-full md:w-72">
-            <MagnifyingGlass
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
-            />
-            <Input
-              placeholder="Search repos + saved"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="h-10 pl-9"
-            />
+
+          <div className="flex items-center gap-2">
+            {libraryEntries.length > 0 && (
+              <Input
+                placeholder="Search projects"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="h-10 w-56"
+              />
+            )}
+            <NewProjectModal>
+              <button
+                type="button"
+                className="group inline-flex h-10 items-center gap-2 rounded-md bg-neutral-900 px-4 text-[13px] font-medium text-white transition-colors hover:bg-neutral-800"
+              >
+                <Plus size={13} weight="bold" />
+                New project
+              </button>
+            </NewProjectModal>
           </div>
         </div>
 
-        {/* Claude Code banner — thin, not another card mass */}
+        {/* Connect Claude Code — slim, optional */}
         <Link
           href="/app/claude-code"
           className="group mb-8 flex items-center gap-4 rounded-xl border border-neutral-200 bg-white p-4 transition-all hover:border-accent-magenta/40 hover:shadow-[0_2px_12px_rgba(0,0,0,0.04)]"
@@ -160,14 +118,10 @@ export default function HomePage() {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 font-display text-[14px] font-medium text-neutral-900">
               Connect Claude Code
-              <Sparkle
-                size={10}
-                weight="fill"
-                className="text-accent-magenta"
-              />
+              <Sparkle size={10} weight="fill" className="text-accent-magenta" />
             </div>
             <div className="mt-0.5 text-[12px] text-neutral-500">
-              Give your agent a typed causal graph of this project. Three-step
+              Give your agent the full causal graph + 10 query tools. Three-step
               install.
             </div>
           </div>
@@ -177,111 +131,96 @@ export default function HomePage() {
           />
         </Link>
 
-        {/* Two-column: repos | saved graphs */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1fr]">
-          {/* Repos */}
-          <section>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
-                <GithubLogo size={11} weight="fill" />
-                Your repos
-                {repos.length > 0 && (
-                  <span className="text-neutral-300">· {repos.length}</span>
-                )}
-              </h2>
-              {!loadingRepos && isConnected && repos.length > 0 && (
-                <span className="font-mono text-[10px] text-neutral-400">
-                  {filteredRepos.length === repos.length
-                    ? ""
-                    : `${filteredRepos.length} shown`}
+        {/* Saved projects */}
+        <section className="mb-12">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
+              <Folders size={11} weight="duotone" />
+              Your projects
+              {libraryEntries.length > 0 && (
+                <span className="text-neutral-300">
+                  · {libraryEntries.length}
                 </span>
               )}
+            </h2>
+          </div>
+
+          {loadingLib ? (
+            <div className="rounded-xl border border-dashed border-neutral-200 p-10 text-center text-sm text-neutral-400">
+              Loading…
             </div>
+          ) : filtered.length === 0 ? (
+            <EmptyState isConnected={isConnected} />
+          ) : (
+            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {filtered.map((e) => (
+                <SavedRow key={e.id} entry={e} />
+              ))}
+            </ul>
+          )}
+        </section>
 
-            {!isConnected ? (
-              <MissingTokenCard />
-            ) : loadingRepos ? (
-              <LoadingList />
-            ) : error ? (
-              <ErrorCard message={error} />
-            ) : filteredRepos.length === 0 ? (
-              <EmptyHint
-                message={
-                  query ? "No repos match." : "No repositories found."
-                }
-              />
-            ) : (
-              <ul className="space-y-1.5">
-                {filteredRepos.slice(0, 20).map((r) => (
-                  <RepoRow key={r.id} repo={r} />
-                ))}
-              </ul>
-            )}
-          </section>
+        {/* Featured graphs */}
+        <section className="mb-12">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
+              <Sparkle size={11} weight="fill" className="text-accent-magenta" />
+              Featured graphs
+            </h2>
+            <Link
+              href="/app/reference"
+              className="font-mono text-[10px] text-neutral-400 transition-colors hover:text-accent-magenta"
+            >
+              + reference graphs by language
+            </Link>
+          </div>
+          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {PREVIEWS.map((p) => (
+              <li key={p.slug}>
+                <Link
+                  href={`/app/preview/${p.slug}`}
+                  className="group block rounded-lg border border-neutral-200 bg-white p-3.5 transition-all hover:border-accent-magenta/40 hover:shadow-[0_1px_0_rgba(0,0,0,0.02)]"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-display text-[13px] font-medium text-neutral-900">
+                      {p.title}
+                    </span>
+                    <ArrowUpRight
+                      size={12}
+                      className="text-neutral-300 transition-transform group-hover:translate-x-0.5 group-hover:text-accent-magenta"
+                    />
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-[11px] text-neutral-500">
+                    {p.tagline}
+                  </p>
+                  <div className="mt-2 font-mono text-[10px] text-neutral-400">
+                    {p.graph.nodes.length} nodes · {p.graph.edges.length} edges
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
 
-          {/* Saved graphs */}
-          <section>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
-                <Folders size={11} weight="duotone" />
-                Saved graphs
-                {libraryEntries.length > 0 && (
-                  <span className="text-neutral-300">
-                    · {libraryEntries.length}
-                  </span>
-                )}
-              </h2>
-            </div>
-
-            {loadingLib ? (
-              <div className="rounded-xl border border-dashed border-neutral-200 p-10 text-center text-sm text-neutral-400">
-                Loading…
-              </div>
-            ) : filteredLibrary.length === 0 ? (
-              <EmptyHint message="Nothing saved yet. Analyze a repo to build your first graph." />
-            ) : (
-              <ul className="space-y-1.5">
-                {filteredLibrary.slice(0, 20).map((e) => (
-                  <SavedRow key={e.id} entry={e} />
-                ))}
-              </ul>
-            )}
-          </section>
-        </div>
-
-        {/* Docs strip at the bottom */}
-        <div className="mt-12 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-neutral-200 pt-6 text-[12px] text-neutral-500">
+        {/* Docs strip */}
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-neutral-200 pt-6 text-[12px] text-neutral-500">
           <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
             Docs
           </span>
-          <Link
-            href="/docs/foundations"
-            className="transition-colors hover:text-accent-magenta"
-          >
+          <Link href="/docs/foundations" className="transition-colors hover:text-accent-magenta">
             Causal foundations
           </Link>
-          <Link
-            href="/docs/graph-schema"
-            className="transition-colors hover:text-accent-magenta"
-          >
+          <Link href="/docs/graph-schema" className="transition-colors hover:text-accent-magenta">
             Graph schema
           </Link>
-          <Link
-            href="/docs/retrieval"
-            className="transition-colors hover:text-accent-magenta"
-          >
+          <Link href="/docs/retrieval" className="transition-colors hover:text-accent-magenta">
             Retrieval model
           </Link>
           <Link
-            href="/agents"
-            className="transition-colors hover:text-accent-magenta"
-          >
-            Agent API
-          </Link>
-          <Link
             href="/pair"
-            className="transition-colors hover:text-accent-magenta"
+            className="ml-auto inline-flex items-center gap-1 font-mono text-[10px] text-neutral-400 transition-colors hover:text-accent-magenta"
           >
+            <Terminal size={10} />
             Pair terminal
           </Link>
         </div>
@@ -290,56 +229,12 @@ export default function HomePage() {
   );
 }
 
-function RepoRow({ repo }: { repo: Repo }) {
-  return (
-    <li>
-      <Link
-        href={`/app/${repo.fullName}`}
-        className="group flex items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-white px-3.5 py-2.5 transition-all hover:border-neutral-300 hover:shadow-[0_1px_0_rgba(0,0,0,0.02)]"
-      >
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-[13px]">
-            <span className="truncate font-mono text-neutral-900">
-              {repo.fullName}
-            </span>
-            {repo.isPrivate && (
-              <span className="rounded-sm border border-neutral-200 px-1 py-px font-mono text-[9px] text-neutral-500">
-                private
-              </span>
-            )}
-          </div>
-          {repo.description && (
-            <p className="mt-0.5 truncate text-[11px] text-neutral-500">
-              {repo.description}
-            </p>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-3 text-[10px] text-neutral-400">
-          {repo.language && (
-            <span className="font-mono">{repo.language}</span>
-          )}
-          {repo.stars > 0 && (
-            <span className="flex items-center gap-0.5">
-              <Star size={9} weight="fill" className="text-amber-400" />
-              {repo.stars.toLocaleString()}
-            </span>
-          )}
-          <ArrowRight
-            size={12}
-            className="text-neutral-300 transition-transform group-hover:translate-x-0.5 group-hover:text-neutral-900"
-          />
-        </div>
-      </Link>
-    </li>
-  );
-}
-
 function SavedRow({ entry }: { entry: LibraryIndexEntry }) {
   return (
     <li>
       <Link
         href={`/app/${entry.owner}/${entry.repo}`}
-        className="group flex items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-white px-3.5 py-2.5 transition-all hover:border-neutral-300 hover:shadow-[0_1px_0_rgba(0,0,0,0.02)]"
+        className="group flex items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-white px-3.5 py-2.5 transition-all hover:border-accent-magenta/40 hover:shadow-[0_1px_0_rgba(0,0,0,0.02)]"
       >
         <div className="min-w-0">
           <div className="truncate font-mono text-[13px] text-neutral-900">
@@ -369,72 +264,25 @@ function SavedRow({ entry }: { entry: LibraryIndexEntry }) {
   );
 }
 
-function LoadingList() {
+function EmptyState({ isConnected }: { isConnected: boolean }) {
   return (
-    <div className="space-y-1.5">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div
-          key={i}
-          className="flex animate-pulse items-center justify-between rounded-lg border border-neutral-200 bg-white px-3.5 py-3"
-        >
-          <div className="flex flex-col gap-1.5">
-            <div className="h-2.5 w-40 rounded bg-neutral-100" />
-            <div className="h-2 w-56 rounded bg-neutral-100" />
-          </div>
-          <CircleNotch size={12} className="animate-spin text-neutral-300" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ErrorCard({ message }: { message: string }) {
-  return (
-    <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50/50 p-4">
-      <Warning size={14} weight="fill" className="mt-0.5 text-red-500" />
-      <div>
-        <p className="text-[13px] text-red-700">
-          Couldn&rsquo;t load repositories
-        </p>
-        <p className="mt-1 font-mono text-[11px] text-red-500">{message}</p>
-        <Link
-          href="/app/settings"
-          className="mt-2 inline-flex items-center gap-1 text-[11px] text-red-700 underline underline-offset-2 hover:text-red-900"
-        >
-          Check your GitHub token
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-function MissingTokenCard() {
-  return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-6 text-center">
+    <div className="rounded-xl border border-dashed border-neutral-200 bg-white p-10 text-center">
       <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200 text-neutral-700">
-        <GithubLogo size={16} weight="duotone" />
+        <Folders size={16} weight="duotone" />
       </div>
-      <h3 className="font-display text-[14px] font-medium">
-        Connect GitHub
+      <h3 className="font-display text-[15px] font-medium text-neutral-900">
+        No projects yet
       </h3>
-      <p className="mx-auto mt-1.5 max-w-xs text-[12px] text-neutral-500">
-        Your repositories live behind GitHub. Token stays in your browser.
+      <p className="mx-auto mt-1.5 max-w-sm text-[12px] text-neutral-500">
+        Hit <span className="font-mono text-neutral-700">New project</span> to
+        map a repo, or pair Claude Code to push graphs straight into this list.
       </p>
-      <Link
-        href="/app/settings"
-        className="mt-4 inline-flex h-9 items-center gap-1.5 rounded-md bg-neutral-900 px-3 text-[12px] text-white transition-colors hover:bg-neutral-800"
-      >
-        <Key size={12} />
-        Add token
-      </Link>
-    </div>
-  );
-}
-
-function EmptyHint({ message }: { message: string }) {
-  return (
-    <div className="rounded-lg border border-dashed border-neutral-200 p-6 text-center text-[12px] text-neutral-500">
-      {message}
+      {!isConnected && (
+        <p className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-[#FAFAF8] px-3 py-1 font-mono text-[10px] text-neutral-500">
+          <GithubLogo size={10} weight="fill" />
+          Optional: connect GitHub in Settings to read private repos.
+        </p>
+      )}
     </div>
   );
 }
