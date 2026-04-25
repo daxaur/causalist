@@ -10,6 +10,8 @@ import {
   FolderOpen,
   GearSix,
   GithubLogo,
+  Plugs,
+  Plus,
 } from "@phosphor-icons/react";
 import {
   Sidebar,
@@ -28,9 +30,10 @@ type Item = {
   match?: (pathname: string) => boolean;
 };
 
-// Universal sidebar: same shape on /, /app/*, /docs/*. Two real
-// destinations (Projects + Documentation) plus Settings; the brand
-// header itself acts as the home affordance.
+// Universal sidebar: same shape on /, /app/*, /docs/*. Brand at top
+// acts as Home. Workspace lives up top (the user's day-to-day);
+// Resources (docs, integrations, settings) sit at the bottom so they
+// stay out of the way until you reach for them.
 const WORKSPACE: Item[] = [
   {
     label: "Projects",
@@ -42,18 +45,35 @@ const WORKSPACE: Item[] = [
       p.startsWith("/app/preview"),
   },
   {
+    label: "New project",
+    href: "/app?new=1",
+    icon: <Plus className="h-[18px] w-[18px] shrink-0" weight="bold" />,
+    match: () => false,
+  },
+];
+
+const RESOURCES: Item[] = [
+  {
     label: "Documentation",
     href: "/docs/foundations",
     icon: <BookOpen className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
     match: (p) => p.startsWith("/docs") || p.startsWith("/app/reference"),
   },
-];
-
-const ACCOUNT: Item[] = [
+  {
+    label: "Connect Claude Code",
+    href: "/app/claude-code",
+    icon: (
+      <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center">
+        <Plugs className="h-[16px] w-[16px]" weight="duotone" />
+      </span>
+    ),
+    match: (p) => p.startsWith("/app/claude-code") || p === "/pair",
+  },
   {
     label: "Settings",
     href: "/app/settings",
     icon: <GearSix className="h-[18px] w-[18px] shrink-0" weight="duotone" />,
+    match: (p) => p === "/app/settings",
   },
 ];
 
@@ -72,15 +92,16 @@ export function LeftSidebar({ children }: { children: ReactNode }) {
                 <SidebarNavLink key={item.href} item={item} />
               ))}
             </SidebarSection>
+          </div>
 
-            <SidebarSection label="Account" open={open}>
-              {ACCOUNT.map((item) => (
+          <div className="flex flex-col gap-3">
+            <SidebarSection label="Resources" open={open} compact>
+              {RESOURCES.map((item) => (
                 <SidebarNavLink key={item.href} item={item} />
               ))}
             </SidebarSection>
+            <Footer open={open} />
           </div>
-
-          <Footer open={open} />
         </SidebarBody>
       </Sidebar>
 
@@ -128,13 +149,15 @@ function SidebarSection({
   label,
   open,
   children,
+  compact = false,
 }: {
   label: string;
   open: boolean;
   children: ReactNode;
+  compact?: boolean;
 }) {
   return (
-    <div className="mt-8 flex flex-col">
+    <div className={cn("flex flex-col", compact ? "mt-0" : "mt-8")}>
       <motion.span
         animate={{
           opacity: open ? 1 : 0,

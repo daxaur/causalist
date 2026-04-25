@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   GithubLogo,
@@ -33,6 +33,18 @@ export function NewProjectModal({ children }: { children: ReactElement }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<"url" | "pair">("url");
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Open automatically when the sidebar links here with ?new=1 — the
+  // url query is the cheapest cross-component channel for "open me."
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setOpen(true);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("new");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, [searchParams]);
 
   const [repoUrl, setRepoUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
