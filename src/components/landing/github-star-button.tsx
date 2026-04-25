@@ -35,8 +35,8 @@ export function GitHubStarButton({
       className={cn(
         "group inline-flex items-center overflow-hidden rounded-md border border-neutral-200 bg-white text-neutral-600 transition-colors hover:border-accent-magenta/60 hover:text-neutral-900",
         isSidebar
-          ? "w-full text-[12px]"
-          : "h-10 text-[13px] shadow-sm hover:shadow",
+          ? "h-7 text-[11px]"
+          : "h-9 text-[12px] shadow-sm hover:shadow",
       )}
       aria-label={
         typeof stars === "number"
@@ -47,20 +47,20 @@ export function GitHubStarButton({
       <span
         className={cn(
           "flex items-center gap-1.5",
-          isSidebar ? "px-2 py-1.5" : "px-3 py-2",
+          isSidebar ? "px-2" : "px-2.5",
         )}
       >
-        <GithubLogo size={isSidebar ? 12 : 14} weight="fill" />
+        <GithubLogo size={isSidebar ? 11 : 13} weight="fill" />
         <span className="font-medium">Star</span>
       </span>
       <span
         className={cn(
           "ml-auto flex items-center gap-1 border-l border-neutral-200 font-mono",
-          isSidebar ? "px-2 py-1.5" : "px-3 py-2",
+          isSidebar ? "px-2" : "px-2.5",
         )}
       >
         <Star
-          size={isSidebar ? 11 : 13}
+          size={isSidebar ? 10 : 12}
           weight="fill"
           className="text-amber-400 transition-transform group-hover:scale-110"
         />

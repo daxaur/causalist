@@ -121,66 +121,82 @@ We don't claim what we haven't earned yet — but the architecture is ready for 
   {
     slug: "graph-schema",
     title: "Graph schema",
-    subtitle: "Nodes, edges, layers, confidence",
+    subtitle: "Nodes, edges, semantic layers, AST verification",
     body: `
-## The four semantic layers
+## Seven semantic layers
 
-Causalist inherits [Tracey's](https://github.com/CTRLabs/tracey) multi-layer separation, informed by [MAGMA](https://arxiv.org/abs/2601.03236)'s finding that orthogonal graphs for different signal types beat a flat unified memory.
+Every node carries a \`layer\` tag. The Structure agent picks one of seven, deliberately small enough that an LLM can pick reliably and large enough that the viewer can render distinct colors per layer.
 
-| Layer | Source | Examples |
-|-------|--------|----------|
-| **Code** | Static AST + filesystem | files, functions, classes, imports |
-| **Execution** | Runtime + tool calls | observations, errors, tool-use events |
-| **Knowledge** | LLM reasoning | bugs, solutions, patterns, decisions |
-| **Project** | User messages | tasks, constraints, goals |
+| Layer | What lives here |
+|-------|-----------------|
+| \`infra\` | Build, CI, deployment, hosting glue |
+| \`data\` | Schemas, migrations, persistence |
+| \`logic\` | Core domain code |
+| \`api\` | HTTP routes, RPC handlers, controllers |
+| \`ui\` | React/Vue/Svelte components, templates, styles |
+| \`test\` | Tests and test fixtures |
+| \`config\` | Settings, env, lockfiles, manifests |
 
-In the viewer, each layer gets its own color; selecting a node reveals only edges within its layer plus cross-layer "explains" bridges.
+The viewer paints each layer its own color (see \`LAYER_COLORS\` in \`src/lib/graph/types.ts\`).
 
 ## Node kinds
 
-Every node has a \`kind\`:
+\`\`\`ts
+interface CausalNode {
+  id: string;
+  label: string;
+  path?: string;
+  layer: SemanticLayer;
+  language?: string;
+  kind?: "file" | "module" | "function" | "type" | "external";
+  size?: number;
+  summary?: string;
+}
+\`\`\`
 
-- \`file\` — a source file
-- \`module\` — a logical unit (package, directory with a role)
-- \`function\` / \`type\` — AST-level entities
-- \`external\` — npm/cargo/pip dependencies
+- \`file\` / \`module\` — source files or logical units (a directory with a role).
+- \`function\` / \`type\` — AST-level entities for languages where we resolve them.
+- \`external\` — npm / cargo / pip dependencies.
 
 ## Edge kinds
 
-Edges are typed. This is the key thing most dependency-graph tools miss — not all "X depends on Y" relationships are the same.
+Causalist ships five edge kinds. Each is **typed** — most "dep graph" tools collapse everything into a single "depends on" relationship and lose the structure that makes the graph useful.
 
 | Edge | Semantics |
 |------|-----------|
-| \`imports\` | \`X\` statically imports \`Y\`. From AST. Highest trust. |
-| \`calls\` | \`X\` invokes \`Y\` at runtime. From AST + call-site resolution. |
-| \`reads\` | \`X\` reads state from \`Y\` (DB row, config key, cache). Often inferred. |
-| \`writes\` | \`X\` mutates \`Y\`. Narrower than reads; invariant-critical. |
+| \`imports\` | \`X\` statically imports \`Y\` (AST-derivable in JS/TS via \`@babel/parser\`, regex+import scan in Python). |
+| \`calls\` | \`X\` invokes \`Y\`. Higher-level than \`imports\`; LLM-inferred today. |
+| \`reads\` | \`X\` reads state from \`Y\` (DB row, config key, cache). |
+| \`writes\` | \`X\` mutates \`Y\`. Narrower than \`reads\`; invariant-critical for security audits. |
 | \`extends\` | \`X\` inherits / implements / conforms to \`Y\`. |
-| \`caused\` | Execution-layer: event $e_1$ directly triggered $e_2$. |
-| \`explains\` | Knowledge-layer: learned pattern $p$ accounts for observation $o$. |
 
-## Confidence scoring
+\`\`\`ts
+interface CausalEdge {
+  source: string;
+  target: string;
+  kind: "imports" | "calls" | "reads" | "writes" | "extends";
+  verified?: boolean;
+}
+\`\`\`
 
-Each edge carries a confidence score $c \\in [0, 1]$:
+## AST verification
 
-$$
-c_{\\text{edge}} \\;=\\; c_{\\text{source}} \\cdot e^{-\\lambda (t - t_0)}
-$$
+Every edge gets a \`verified\` flag after the Oracle agent finishes. The verifier (\`src/lib/analyze/ast-verify.ts\`) walks the real source via \`@babel/parser\` for JS/TS and a line-scan for Python, then stamps:
 
-- $c_{\\text{source}}$ depends on provenance: AST-derived edges start at $1.0$, LLM-inferred at $0.6$.
-- The decay $e^{-\\lambda (t - t_0)}$ means edges not touched for a long time lose trust. A file refactor that nobody has looked at for six months has a softer claim on the graph than yesterday's lint rule.
+- \`verified: true\` — the AST contains a matching import/require/dynamic import statement that justifies the edge.
+- \`verified: false\` — Oracle proposed the edge but no AST entry backs it up.
 
-Edges below threshold are dimmed in the viewer. Queries with \`min_confidence\` filter them out of reasoning context.
+The viewer renders verified edges as solid lines and unverified ones at lower opacity with a thinner stroke, so users (and downstream agents) can trust-gate the graph at a glance. We chose this binary signal over a continuous confidence score because it's cheap to verify and unambiguous to display.
 
-## Structural invariants
+## Importance tiers
 
-The verifier checks three properties after every update:
+The viewer ranks every node by fan-in (how many edges point at it) and bins them:
 
-1. **Acyclicity** on causal edges — cycles indicate incorrectly-directed edges. A cycle $A \\to B \\to A$ on \`caused\` edges is a contradiction by definition.
-2. **No contradictions** — $X$ cannot both \`prevent\` and \`cause\` $Y$ at overlapping timestamps.
-3. **Typed consistency** — a node of \`kind: "external"\` cannot appear as the target of an \`extends\` edge from a local node in a language without multiple inheritance.
+- \`hot\` — top ~10%, the load-bearing files. Painted magenta.
+- \`core\` — the next ~15%.
+- \`leaf\` — everything else; nothing depends on these (safe to refactor).
 
-Violations don't halt the agent; they get surfaced as warnings you can investigate.
+See \`src/lib/graph/importance.ts::rankImportance\`. The Agents tab uses this implicitly — selecting a hot node and assigning a Refactor agent is more interesting than picking a leaf.
 `,
   },
   {
@@ -241,13 +257,14 @@ with ties broken by descending PPR score. Cycles (which shouldn't exist but do d
     title: "Verification",
     subtitle: "Contradictions, DAG invariants, interventional edges",
     body: `
-## Structural verification
+## What we verify today
 
-Every time the graph is updated, Causalist runs:
+After the Oracle agent emits a graph, we run two real checks before handing it back to the browser:
 
-1. **Cycle detection on causal edges.** \`caused\`, \`prevented\`, and \`causes-to-fail\` must form a DAG. We use [Tarjan's SCC algorithm](https://en.wikipedia.org/wiki/Tarjan%27s_strongly_connected_components_algorithm) in $O(V + E)$; any non-singleton SCC is a contradiction.
-2. **Pairwise contradiction detection.** Edges $(X, Y, \\text{cause})$ and $(X, Y, \\text{prevent})$ with overlapping timestamps are incompatible; we surface both and ask the user (or the agent's introspection loop) to resolve.
-3. **Confidence floor.** Edges below $c = 0.2$ are dimmed in the viewer; edges below $c = 0.05$ are dropped from reasoning context entirely.
+1. **Edge-endpoint sanity.** Every edge whose source or target isn't in the node list is dropped. This catches Oracle hallucinations where the model invents a node id that didn't appear in Structure's output.
+2. **AST verification** (\`src/lib/analyze/ast-verify.ts\`). For every edge, we parse the real source files using \`@babel/parser\` (JS/TS) or a Python import scan and check whether the edge is justified by a matching \`import\` / \`require\` / dynamic \`import()\`. Edges that pass get \`verified: true\`; edges that don't get rendered as faint dashed lines so the user (and any downstream agent) can tell what's grounded versus inferred.
+
+That's it for the launch verifier. It's deliberately cheap — runs on every analyze, no extra LLM cost. The next two sections describe where this is going.
 
 ## From structural to interventional
 
@@ -345,46 +362,57 @@ With [prompt caching](https://docs.anthropic.com/en/docs/build-with-claude/promp
 Causalist ships three ways to invoke it, all backed by the same core library:
 
 ### Web app
-Paste a GitHub URL at [causalist.xyz/&lt;owner&gt;/&lt;repo&gt;](https://causalist.xyz). Instant previews for hand-curated demos; live analyze for any public repo when you supply your Anthropic key.
+Paste a GitHub URL at [causalist.xyz](https://causalist.xyz) and Claude maps the repo. Hand-curated demos load instantly; live analyze of any public repo runs when you add your Anthropic key in Settings.
 
 ### CLI
 \`\`\`bash
 npm install -g causalist-cli
-export ANTHROPIC_API_KEY=sk-ant-...
-causalist map vercel/next.js --open
+causalist pair <code>          # pair this terminal with the browser
+causalist map vercel/next.js   # analyze a repo
+causalist serve --graph ./graph.json  # serve a local graph for the MCP server
 \`\`\`
 
-Universal shell interface — works with Claude Code, Cursor, Hermes, Aider, or any agent that can spawn subprocesses.
+Run \`causalist install\` to print the MCP config snippet for Claude Code.
 
-### Claude Code plugin
+### Claude Code MCP server
 \`\`\`bash
-causalist install
-# prints: /plugin install --local ~/.causalist/plugin
+claude mcp add causalist -- npx -y causalist-mcp@latest
 \`\`\`
 
-Drop into Claude Code. You get \`/causalist:map <repo>\` and an MCP server exposing \`map_repo\`, \`query_node\`, \`blast_radius\`, and \`simulate\`.
+The \`causalist-mcp\` package exposes the eleven tools below over stdio. Once paired, Claude Code's \`create_project\` tool pushes new graphs straight into your browser's Projects list.
 
 ## Live streaming
 
-While Claude Code works on a local repository, the plugin's \`PostToolUse\` hook posts every tool-use event to \`https://causalist.xyz/api/ingest/<session>\`. The browser viewer subscribes via Server-Sent Events at \`/api/stream/<session>\` and highlights nodes in real time — you can open the repo's graph in another tab and *watch Claude work.*
+When Claude Code is paired with the browser, its \`PostToolUse\` hook posts tool-use events to \`https://causalist.xyz/api/ingest/<session>\`. The browser viewer subscribes via Server-Sent Events at \`/api/stream/<session>\` and highlights nodes in real time — open the repo's graph in another tab and *watch Claude work.*
 
-The pairing flow (browser shows a 6-char code, CLI calls \`causalist pair ABC123\`) is how the browser and local session agree on a \`sessionId\` without requiring a user account.
+The pairing flow (browser shows a code, CLI calls \`causalist pair ABC123\`) is how the browser and local session agree on a \`sessionId\` without requiring a user account.
 
-## MCP tools (stable)
+## MCP tools (eleven, stable)
 
 | Tool | What it does |
 |------|-------------|
-| \`map_repo(url)\` | Fetch + analyze, returns the full graph |
-| \`query_node(id)\` | Node metadata + summary + language |
+| \`query_node(id)\` | Node metadata, layer, summary |
 | \`get_neighbors(id, direction)\` | Incoming or outgoing edges with kinds |
 | \`find_path(source, target)\` | Shortest causal path between two nodes |
-| \`verify_edge(source, target)\` | Check the edge exists and return its confidence |
-| \`blast_radius(id, depth)\` | Everything reachable within $k$ hops via \`calls\` / \`writes\` |
-| \`simulate(intervention)\` | Extended-thinking "what if?" counterfactual |
+| \`find_nodes_by_layer(layer)\` | Filter nodes by semantic layer |
+| \`blast_radius(id, depth)\` | Everything that transitively depends on a node |
+| \`affected_tests(changedIds)\` | "3 tests not 300" — only the tests reachable from your changes |
+| \`find_writers(target)\` | Audit query — every node that writes to a target |
+| \`similar_nodes(id)\` | Structurally similar nodes (same layer / kind / degree) |
+| \`topo_order(ids)\` | Topological layering of a subgraph |
+| \`verify_edge(source, target, kind?)\` | Confirm an edge exists |
+| \`create_project(owner, repo)\` | Push a new project into the paired browser's list |
 
-## API
+## Live agent runs (web)
 
-The \`POST /api/analyze\` route is a public Server-Sent Events endpoint. Pass \`Authorization: Bearer <your-anthropic-key>\` and a JSON body \`{owner, repo, commit, tree, files?}\`; receive \`agent\` events as each of the four agents completes, then a \`done\` event with the final graph.
+The web app exposes two endpoints for the Agents tab:
+
+- \`POST /api/agent/run\` — SSE. Body \`{ agent, repo, branch, selectedNodeIds, nodePathMap, apiKey }\`. Streams \`file_loaded\`, \`finding\`, \`patch\`, \`done\`, \`error\` events as the Auditor / Security / Performance / Refactor agent works through the selected files.
+- \`POST /api/agent/push-pr\` — uses your GitHub OAuth cookie to create a branch via the Git Tree+Commit API and open a real pull request.
+
+## Analyze API
+
+\`POST /api/analyze\` is a public SSE endpoint. Pass \`Authorization: Bearer <your-anthropic-key>\` and a JSON body \`{owner, repo, commit, tree, files?}\`; receive \`agent\` events as each of the four pipeline agents completes, then a \`done\` event with the final graph.
 `,
   },
 ];

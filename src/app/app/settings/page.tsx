@@ -10,10 +10,12 @@ import {
   Shield,
   Trash,
 } from "@phosphor-icons/react";
+import Link from "next/link";
 import { Logo } from "@/components/brand/logo";
 import { PageHeader, PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useGithubAuth } from "@/hooks/use-github-auth";
 import {
   clearSettings,
   saveSettings,
@@ -22,11 +24,13 @@ import {
 
 export default function SettingsPage() {
   const settings = useSettings();
+  const auth = useGithubAuth();
   const [anthropicKey, setAnthropicKey] = useState("");
   const [githubToken, setGithubToken] = useState("");
   const [showAnthropic, setShowAnthropic] = useState(false);
   const [showGithub, setShowGithub] = useState(false);
   const [saved, setSaved] = useState(false);
+  const githubConnected = auth.authenticated || Boolean(settings.githubToken);
 
   useEffect(() => {
     setAnthropicKey(settings.anthropicKey);
@@ -64,7 +68,8 @@ export default function SettingsPage() {
         }
       />
       <div>
-        {/* Anthropic */}
+        {/* Anthropic — gated on GitHub connection so the demo path is
+            ordered: connect identity first, then add agent compute. */}
         <section className="mb-10 rounded-2xl border border-neutral-200 p-6">
           <div className="mb-4 flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
@@ -73,54 +78,79 @@ export default function SettingsPage() {
               </div>
               <div>
                 <h2 className="font-display text-lg font-medium">
-                  Anthropic API key
+                  Your Anthropic API key
                 </h2>
                 <p className="mt-1 text-sm text-neutral-500">
-                  Used for Structure / Dependency / Semantic / Oracle agents.
-                  Claude Opus 4.7.
+                  Powers the four-agent pipeline (Structure / Dependency /
+                  Semantic / Oracle) and per-node review agents. Calls go
+                  directly from your browser to api.anthropic.com — your key
+                  never leaves this device.
                 </p>
               </div>
             </div>
-            {settings.anthropicKey && (
+            {settings.anthropicKey && githubConnected && (
               <span className="flex shrink-0 items-center gap-1 text-xs text-emerald-600">
                 <CheckCircle size={14} weight="fill" />
                 Set
               </span>
             )}
           </div>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Input
-                type={showAnthropic ? "text" : "password"}
-                placeholder="sk-ant-api03-…"
-                value={anthropicKey}
-                onChange={(e) => setAnthropicKey(e.target.value)}
-                autoComplete="off"
-                spellCheck={false}
-                className="h-11 pr-10 font-mono text-sm"
-              />
-              <button
-                type="button"
-                onClick={() => setShowAnthropic((v) => !v)}
-                aria-label={showAnthropic ? "Hide key" : "Show key"}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-neutral-400 hover:text-neutral-700"
+
+          {!githubConnected ? (
+            <div className="rounded-lg border border-dashed border-neutral-200 bg-neutral-50/50 p-5 text-center">
+              <p className="text-sm text-neutral-600">
+                Connect GitHub first.
+              </p>
+              <p className="mx-auto mt-1 max-w-sm text-[12px] text-neutral-500">
+                Causalist needs to know who you are before it stores a key for
+                you — it&rsquo;s also what makes &ldquo;Open PR&rdquo; in the
+                Agents tab work.
+              </p>
+              <Link
+                href="/api/auth/github/login"
+                className="mt-4 inline-flex h-10 items-center gap-1.5 rounded-md bg-neutral-900 px-4 text-[13px] text-white transition-colors hover:bg-neutral-800"
               >
-                {showAnthropic ? <EyeSlash size={16} /> : <Eye size={16} />}
-              </button>
+                <GithubLogo size={14} weight="fill" />
+                Connect GitHub
+              </Link>
             </div>
-          </div>
-          <p className="mt-3 text-xs text-neutral-400">
-            Get one at{" "}
-            <a
-              href="https://console.anthropic.com/settings/keys"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline underline-offset-2 hover:text-neutral-700"
-            >
-              console.anthropic.com/settings/keys
-            </a>
-            .
-          </p>
+          ) : (
+            <>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    type={showAnthropic ? "text" : "password"}
+                    placeholder="sk-ant-api03-…"
+                    value={anthropicKey}
+                    onChange={(e) => setAnthropicKey(e.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="h-11 pr-10 font-mono text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAnthropic((v) => !v)}
+                    aria-label={showAnthropic ? "Hide key" : "Show key"}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-neutral-400 hover:text-neutral-700"
+                  >
+                    {showAnthropic ? <EyeSlash size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+              <p className="mt-3 text-xs text-neutral-400">
+                Get one at{" "}
+                <a
+                  href="https://console.anthropic.com/settings/keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-neutral-700"
+                >
+                  console.anthropic.com/settings/keys
+                </a>
+                .
+              </p>
+            </>
+          )}
         </section>
 
         {/* GitHub */}

@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
+  CaretLeft,
   Cube,
   Keyboard,
   List,
   SidebarSimple,
-  Sparkle,
   SquaresFour,
 } from "@phosphor-icons/react";
 import {
@@ -1053,17 +1053,17 @@ export function CausalGraphViewer({
             </>
           )}
 
-          {/* Persistent panel toggle — visible when no node is selected,
-              so users can open Ask / Agents without picking a node first. */}
+          {/* Persistent panel toggle — small arrow tab pinned to the
+              right edge so it never collides with top-bar overlays. */}
           {!compact && !panelOpen && (
             <button
               type="button"
               onClick={() => setPanelManuallyOpen(true)}
               aria-label="Open inspector panel"
-              className="pointer-events-auto absolute right-4 top-4 z-20 inline-flex h-9 items-center gap-1.5 rounded-md border border-neutral-200 bg-white/90 px-3 font-mono text-[11px] text-neutral-600 shadow-sm backdrop-blur transition-colors hover:border-accent-magenta/40 hover:text-neutral-900"
+              title="Open inspector"
+              className="pointer-events-auto absolute right-0 top-1/2 z-20 flex h-12 w-6 -translate-y-1/2 items-center justify-center rounded-l-md border border-r-0 border-neutral-200 bg-white/95 text-neutral-500 shadow-sm backdrop-blur transition-colors hover:bg-accent-magenta hover:text-white"
             >
-              <Sparkle size={11} weight="duotone" className="text-accent-magenta" />
-              Open panel
+              <CaretLeft size={12} weight="bold" />
             </button>
           )}
         </div>
@@ -1172,7 +1172,7 @@ export function CausalGraphViewer({
           <>
             <div
               ref={beamFromRef}
-              className="absolute left-4 top-4 z-20 flex h-10 items-center gap-2 rounded-full border border-neutral-200 bg-white/90 pl-1 pr-3 shadow-sm backdrop-blur"
+              className="absolute left-4 top-16 z-20 flex h-10 items-center gap-2 rounded-full border border-neutral-200 bg-white/90 pl-1 pr-3 shadow-sm backdrop-blur"
             >
               <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-neutral-200 bg-white">
                 {/* eslint-disable-next-line @next/next/no-img-element */}

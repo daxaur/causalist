@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export async function GET(): Promise<Response> {
   if (!oauthConfigured()) {
     return NextResponse.redirect(
-      new URL("/settings?oauth=unconfigured", defaultOrigin()),
+      new URL("/app/settings?oauth=unconfigured", defaultOrigin()),
     );
   }
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { GithubLogo } from "@phosphor-icons/react";
 import { ConstellationBackground } from "@/components/landing/constellation-bg";
+import { GitHubStarButton } from "@/components/landing/github-star-button";
 import { Hero } from "@/components/landing/hero";
 import { LanguageMarquee } from "@/components/landing/language-marquee";
 import { Logo } from "@/components/brand/logo";
@@ -15,6 +16,11 @@ export default function Home() {
   return (
     <main className="relative h-full overflow-y-auto bg-[#FAFAF8]">
       <ConstellationBackground />
+
+      {/* Floating star button, top-right */}
+      <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
+        <GitHubStarButton />
+      </div>
 
       <Hero anthropicKeyPresent={Boolean(settings.anthropicKey)} />
 

@@ -193,7 +193,7 @@ function Footer({ open }: { open: boolean }) {
   if (connected && auth.avatar_url) {
     return (
       <Link
-        href="/app/settings"
+        href="/app/profile"
         className="flex items-center gap-3 overflow-hidden rounded-md px-1.5 py-2 transition-colors hover:bg-neutral-100"
       >
         <span

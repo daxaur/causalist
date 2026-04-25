@@ -17,7 +17,6 @@ import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useSettings } from "@/lib/settings";
 import { useLibrary } from "@/lib/library/store";
 import type { LibraryIndexEntry } from "@/lib/library/types";
-import { PREVIEWS } from "@/lib/graph/previews";
 import { NewProjectModal } from "@/components/projects/new-project-modal";
 
 /**
@@ -158,48 +157,6 @@ export default function ProjectsPage() {
               ))}
             </ul>
           )}
-        </section>
-
-        {/* Featured graphs */}
-        <section className="mb-12">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
-              <Sparkle size={11} weight="fill" className="text-accent-magenta" />
-              Featured graphs
-            </h2>
-            <Link
-              href="/app/reference"
-              className="font-mono text-[10px] text-neutral-400 transition-colors hover:text-accent-magenta"
-            >
-              + reference graphs by language
-            </Link>
-          </div>
-          <ul className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            {PREVIEWS.map((p) => (
-              <li key={p.slug}>
-                <Link
-                  href={`/app/preview/${p.slug}`}
-                  className="group block rounded-lg border border-neutral-200 bg-white p-3.5 transition-all hover:border-accent-magenta/40 hover:shadow-[0_1px_0_rgba(0,0,0,0.02)]"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-display text-[13px] font-medium text-neutral-900">
-                      {p.title}
-                    </span>
-                    <ArrowUpRight
-                      size={12}
-                      className="text-neutral-300 transition-transform group-hover:translate-x-0.5 group-hover:text-accent-magenta"
-                    />
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-[11px] text-neutral-500">
-                    {p.tagline}
-                  </p>
-                  <div className="mt-2 font-mono text-[10px] text-neutral-400">
-                    {p.graph.nodes.length} nodes · {p.graph.edges.length} edges
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
         </section>
 
         {/* Docs strip */}

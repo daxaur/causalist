@@ -10,17 +10,17 @@ import { rankImportance } from "@/lib/graph/importance";
 import type { PreviewMeta } from "@/lib/graph/previews";
 import { cn } from "@/lib/utils";
 
-const ForceGraph2D = dynamic(
-  () => import("react-force-graph-2d").then((m) => m.default),
+const ForceGraph3D = dynamic(
+  () => import("react-force-graph-3d").then((m) => m.default),
   { ssr: false },
 );
 
 const ACCENT = "#E838A4";
 
 /**
- * Single embedded ForceGraph2D for the landing page. Pills above act as
- * tabs that swap which preview's graph is loaded. Real interactions:
- * drag, click, hover. Click "Open in app" routes to the full-screen view.
+ * Embedded interactive 3D miniature for the landing page. Pills above
+ * act as tabs that swap which preview's graph is loaded. Drag, click,
+ * hover, orbit — all real, in-page, no modal.
  */
 export function EmbeddedMiniViewer({ previews }: { previews: PreviewMeta[] }) {
   const [activeSlug, setActiveSlug] = useState(previews[0]?.slug ?? "");
@@ -28,10 +28,8 @@ export function EmbeddedMiniViewer({ previews }: { previews: PreviewMeta[] }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: 720, h: 380 });
-  const [hoverNode, setHoverNode] = useState<string | null>(null);
+  const [size, setSize] = useState({ w: 720, h: 420 });
 
-  // Resize observer so the graph fills its container responsively.
   useEffect(() => {
     if (!containerRef.current) return;
     const el = containerRef.current;
@@ -60,13 +58,11 @@ export function EmbeddedMiniViewer({ previews }: { previews: PreviewMeta[] }) {
     [active],
   );
 
-  // Re-warm the simulation when the active graph changes so the layout
-  // converges quickly after a tab swap.
+  // Re-frame when the active graph changes.
   useEffect(() => {
     const ref = graphRef.current;
     if (!ref) return;
-    ref.d3ReheatSimulation?.();
-    const t = setTimeout(() => ref.zoomToFit?.(400, 60), 600);
+    const t = setTimeout(() => ref.zoomToFit?.(800, 60), 700);
     return () => clearTimeout(t);
   }, [active.slug, size.w, size.h]);
 
@@ -94,7 +90,6 @@ export function EmbeddedMiniViewer({ previews }: { previews: PreviewMeta[] }) {
         })}
       </div>
 
-      {/* Viewer */}
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -136,68 +131,47 @@ export function EmbeddedMiniViewer({ previews }: { previews: PreviewMeta[] }) {
         {/* Canvas */}
         <div
           ref={containerRef}
-          className="relative h-[380px] w-full bg-[radial-gradient(circle_at_50%_30%,#FFF_0%,#F4F1EE_70%,#EAE6E0_100%)]"
+          className="relative h-[420px] w-full bg-[radial-gradient(circle_at_50%_30%,#FFF_0%,#F4F1EE_70%,#EAE6E0_100%)]"
         >
           {size.w > 0 && (
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            <ForceGraph2D
+            <ForceGraph3D
               ref={graphRef}
               graphData={data}
               width={size.w}
               height={size.h}
               backgroundColor="rgba(0,0,0,0)"
+              showNavInfo={false}
               cooldownTicks={120}
-              d3AlphaDecay={0.03}
               nodeRelSize={4}
-              linkColor={() => "rgba(42,36,32,0.18)"}
+              nodeOpacity={0.95}
+              nodeResolution={12}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              linkWidth={(l: any) => {
-                const sid = typeof l.source === "string" ? l.source : l.source?.id;
-                const tid = typeof l.target === "string" ? l.target : l.target?.id;
-                return hoverNode && (sid === hoverNode || tid === hoverNode)
-                  ? 1.6
-                  : 0.7;
-              }}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D) => {
-                if (typeof node.x !== "number" || typeof node.y !== "number") return;
+              nodeColor={(node: any) => {
                 const tier = importance.byId.get(node.id)?.tier;
-                const isHot = tier === "hot";
-                const isCore = tier === "core";
-                const r = isHot ? 5.5 : isCore ? 4 : 2.6;
-                const fill = isHot
-                  ? ACCENT
-                  : LAYER_COLORS[node.layer as keyof typeof LAYER_COLORS] ??
-                    "#94a3b8";
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
-                ctx.fillStyle = fill;
-                ctx.shadowBlur = isHot ? 14 : 0;
-                ctx.shadowColor = ACCENT;
-                ctx.fill();
-                ctx.shadowBlur = 0;
-                if (hoverNode === node.id) {
-                  ctx.lineWidth = 1.5;
-                  ctx.strokeStyle = "#2A2420";
-                  ctx.stroke();
-                  ctx.font = "11px ui-monospace,Menlo,monospace";
-                  ctx.fillStyle = "#2A2420";
-                  ctx.textAlign = "center";
-                  ctx.textBaseline = "top";
-                  ctx.fillText(node.label, node.x, node.y + r + 4);
-                }
+                if (tier === "hot") return ACCENT;
+                return (
+                  LAYER_COLORS[node.layer as keyof typeof LAYER_COLORS] ??
+                  "#94a3b8"
+                );
               }}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              onNodeHover={(n: any) => setHoverNode(n?.id ?? null)}
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              onNodeClick={(n: any) => setHoverNode(n.id)}
+              nodeVal={(node: any) => {
+                const tier = importance.byId.get(node.id)?.tier;
+                return tier === "hot" ? 4 : tier === "core" ? 2 : 1;
+              }}
+              linkColor={() => "rgba(42,36,32,0.18)"}
+              linkOpacity={0.5}
+              linkDirectionalParticles={0}
+              enableNodeDrag={true}
+              enableNavigationControls={true}
             />
           )}
         </div>
       </motion.div>
 
       <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
-        drag · click · hover — it's the real graph
+        drag · orbit · click — it&rsquo;s the real 3D graph
       </p>
     </div>
   );
