@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  *
  * GitHub redirects here after the user approves. We verify the state
  * cookie, exchange the code for an access token, drop it into an
- * httpOnly cookie, and bounce to /dashboard.
+ * httpOnly cookie, and bounce to /app.
  */
 export async function GET(req: NextRequest): Promise<Response> {
   if (!oauthConfigured()) {

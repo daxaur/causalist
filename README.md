@@ -26,12 +26,12 @@ graph. Explore the architecture, understand connections, review PRs visually.
 Every repository gets a shareable link:
 
 ```
-causalist.dev/<owner>/<repo>
+causalist.xyz/app/<owner>/<repo>
 ```
 
 If that repo has been mapped before, it loads instantly. If not, you add your
 Anthropic API key in settings and Causalist generates the graph in your browser
-— four Claude agents running in parallel:
+— four Claude Opus 4.7 agents running in parallel:
 
 | Agent          | Role                                                   |
 |----------------|--------------------------------------------------------|
@@ -40,30 +40,32 @@ Anthropic API key in settings and Causalist generates the graph in your browser
 | **Semantic**   | Labels each node with plain English + layer class      |
 | **Oracle**     | Synthesizes the graph and answers "what if?" questions |
 
-The graph renders as a galaxy — files, functions, and modules color-coded by
-semantic layer, connected by imports/calls with directional particles flowing
-along each edge.
+Every edge is then **AST-verified** with `@babel/parser` (JS/TS) or a Python
+import scan, so each one is stamped `verified: true|false` for the agent and
+the human to trust-gate.
+
+The graph renders as a 3D galaxy — files and modules color-coded by semantic
+layer, with hot (top 10% by fan-in) nodes painted magenta.
 
 ## Surfaces
 
-Three interfaces share one core library:
+Three interfaces share one core graph:
 
-| Surface       | Who it's for                              | How                                                    |
-|---------------|-------------------------------------------|--------------------------------------------------------|
-| **Web app**   | Humans in a browser                       | Paste a URL, browse the graph                          |
-| **CLI**       | Humans in a terminal                      | `causalist map <url>` — writes JSON, opens browser     |
-| **Claude Code plugin** | Claude Code users                | `/causalist:map <url>` from inside any Claude session  |
+| Surface | Who it's for | How |
+|---|---|---|
+| **Web app** | Humans in a browser | Paste a URL, browse the graph in 3D |
+| **CLI + Skill** | Claude Code | `npm i -g causalist-cli && causalist install` — eleven graph-query subcommands + a `SKILL.md` that teaches the agent when to use them |
+| **MCP server** | Cursor, Claude.ai web, anything without a shell | `claude mcp add causalist -- npx -y causalist-mcp@latest --session <code>` |
 
-The plugin bundles a skill, an MCP server, and the CLI binary into one
-installable Claude Code plugin.
+Anthropic's modern stack ([Code Execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp), Nov 2025) prefers code/CLI over tool-call JSON for coding agents. We ship both and let the client pick.
 
 ## Try it
 
-The live app will be at **`causalist.dev`** once deployed. In the meantime two
-pre-rendered previews are available locally:
+Live at **[causalist.xyz](https://causalist.xyz)**. Three pre-rendered previews:
 
-- `/preview/causalist` — the app, mapping itself
-- `/preview/next-js` — a hand-curated slice of `vercel/next.js`
+- `/app/preview/causalist` — the app, mapping itself
+- `/app/preview/next-js` — a hand-curated slice of `vercel/next.js`
+- `/app/preview/flask` — `pallets/flask`
 
 ## Develop
 

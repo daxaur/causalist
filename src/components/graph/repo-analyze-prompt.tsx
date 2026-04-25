@@ -383,10 +383,10 @@ export function RepoAnalyzePrompt({
                 <ArrowRight size={12} />
               </Link>
               <Link
-                href="/library"
+                href="/app"
                 className="inline-flex h-9 items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-4 text-xs text-neutral-700 transition-colors hover:border-neutral-300"
               >
-                Library
+                Projects
               </Link>
             </div>
           ) : (

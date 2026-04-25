@@ -13,7 +13,7 @@ Clicking the button:
 
 | Variable                 | Required | What it is                                                        |
 |--------------------------|----------|-------------------------------------------------------------------|
-| `NEXT_PUBLIC_APP_URL`    | **Yes**  | Base URL of your deployment, e.g. `https://causalist.dev`         |
+| `NEXT_PUBLIC_APP_URL`    | **Yes**  | Base URL of your deployment, e.g. `https://causalist.xyz`         |
 | `GITHUB_CLIENT_ID`       | No       | GitHub OAuth — without it the app falls back to the PAT flow       |
 | `GITHUB_CLIENT_SECRET`   | No       | Paired with `GITHUB_CLIENT_ID`                                    |
 | `UPSTASH_REDIS_REST_URL` | No       | Needed for multi-instance live streaming (phase 2)                |
@@ -24,7 +24,7 @@ Clicking the button:
 1. Go to <https://github.com/settings/developers> → **OAuth Apps** → **New OAuth App**
 2. Fill in:
    - **Application name:** Causalist
-   - **Homepage URL:** your deployed URL (e.g. `https://causalist.dev`)
+   - **Homepage URL:** your deployed URL (e.g. `https://causalist.xyz`)
    - **Authorization callback URL:** `<your-url>/api/auth/github/callback`
 3. Click **Register application**
 4. Click **Generate a new client secret** — copy it immediately

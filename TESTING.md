@@ -34,8 +34,8 @@ export GITHUB_TOKEN=github_pat_...
 3. You land on `/pallets/click`. If no cached graph exists, the Analyze card shows.
 4. Click **Run the 4-agent analyze**. Octokit fetches the tree, POSTs to `/api/analyze`, stream fires 4 agents.
 5. Agent rail on the right shows Structure / Dependency / Semantic / Oracle in real time.
-6. When **Oracle** completes, graph renders inline and auto-saves to `/library`.
-7. Visit `/library` → the repo appears as a card. Click → full viewer.
+6. When **Oracle** completes, graph renders inline and auto-saves to `/app` (Projects).
+7. Visit `/app` → the repo appears in your Projects list. Click → full viewer.
 
 ## 3. CLI — install & map
 
@@ -138,7 +138,7 @@ Reload plugins, then:
 @causalist affected_tests ["graph-viewer", "node-panel"]
 ```
 
-Tool names and argument shapes match `/agents` documentation exactly.
+Tool names and argument shapes match `/docs/integrations` exactly.
 
 ## 7. API smoke tests
 

@@ -43,8 +43,8 @@ export default function ClaudeCodePage() {
         <p className="max-w-2xl text-sm leading-relaxed text-neutral-500">
           Install the Causalist CLI + Skill. Claude Code learns when to reach
           for <code className="font-mono text-[12px]">causalist blast</code>,{" "}
-          <code className="font-mono text-[12px]">affected_tests</code>,{" "}
-          <code className="font-mono text-[12px]">find_writers</code> — and
+          <code className="font-mono text-[12px]">causalist tests</code>,{" "}
+          <code className="font-mono text-[12px]">causalist writers</code> — and
           stops re-grepping your repo.
         </p>
       </header>
