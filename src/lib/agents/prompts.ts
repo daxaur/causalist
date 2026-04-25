@@ -1,12 +1,9 @@
 // Plan-mode agent: one prompt, one composable contract. The user
 // writes what they want done; the system prompt scopes the action to
 // the selected files and forces a typed JSON envelope so the panel can
-// stream findings + open a real PR from the patches.
-//
-// We removed the four "personas" (Auditor / Security / Performance /
-// Refactor) — Boris's pattern is plan-first then one-shot, not
-// pick-a-persona. Suggestion chips in the UI seed common intents but
-// they're just textarea pre-fills, not separate code paths.
+// stream findings + open a real PR from the patches. Suggestion chips
+// in the UI seed common intents but they're just textarea pre-fills,
+// not separate code paths.
 
 const SHARED_OUTPUT_CONTRACT = `
 You MUST respond with a single fenced JSON block of the shape:

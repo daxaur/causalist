@@ -184,7 +184,7 @@ The viewer ranks every node by fan-in (how many edges point at it) and bins them
 - \`core\` — the next ~15%.
 - \`leaf\` — everything else; nothing depends on these (safe to refactor).
 
-See \`src/lib/graph/importance.ts::rankImportance\`. The Agents tab uses this implicitly — selecting a hot node and assigning a Refactor agent is more interesting than picking a leaf.
+See \`src/lib/graph/importance.ts::rankImportance\`. The Agent tab uses this implicitly — pointing a plan-mode agent at a hot node will surface more downstream impact than picking a leaf.
 `,
   },
   {
@@ -338,7 +338,7 @@ Pairing is how the browser and local Claude session agree on a \`sessionId\` wit
 
 The web app exposes two endpoints for the Agents tab:
 
-- \`POST /api/agent/run\` — SSE. Body \`{ agent, repo, branch, selectedNodeIds, nodePathMap, apiKey }\`. Streams \`file_loaded\`, \`finding\`, \`patch\`, \`done\`, \`error\` events as the Auditor / Security / Performance / Refactor agent works through the selected files.
+- \`POST /api/agent/run\` — SSE. Body \`{ plan, repo, branch, selectedNodeIds, nodePathMap, apiKey }\`. Streams \`file_loaded\`, \`finding\`, \`patch\`, \`done\`, \`error\` events as the agent carries out the plan against the selected files.
 - \`POST /api/agent/push-pr\` — uses your GitHub OAuth cookie to create a branch via the Git Tree+Commit API and open a real pull request.
 
 ## Analyze API

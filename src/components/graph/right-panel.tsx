@@ -13,9 +13,9 @@ type Tab = "inspector" | "agent";
 
 /**
  * IDE-style right panel — two tabs: Inspector and Agent.
- * Inspector shows node metadata + neighborhood. Agent fuses one-click
- * preset agents (Auditor / Security / Performance / Refactor) with
- * free-form chat (the Oracle).
+ * Inspector shows node metadata + neighborhood. Agent runs plan-mode
+ * Claude on the selection (write a plan → stream patches → open PR)
+ * plus free-form chat for graph questions.
  */
 export function RightPanel({
   graph,

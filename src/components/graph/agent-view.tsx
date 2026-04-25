@@ -5,14 +5,13 @@ import { AgentAssignPanel } from "./agent-assign-panel";
 import { AskView } from "./ask-view";
 
 /**
- * Unified Agent panel — fuses preset agent runs (Auditor / Security /
- * Performance / Refactor that operate on selection) with free-form
- * chat (the Oracle, which uses graph-query tools to answer anything).
+ * Unified Agent panel — plan-mode for code review on the selection
+ * (one textarea + suggestion chips → real Claude run, AST-anchored,
+ * patches stream in, optional PR push) plus free-form chat below for
+ * graph questions that don't need a write.
  *
- * Layout: presets + run history on top, separator, free-form chat
- * with sticky composer on the bottom. Both are scrollable
- * independently so the panel always shows progress on what just
- * happened.
+ * Layout: plan composer + run history on top, separator, free-form
+ * chat with sticky composer on the bottom. Both scroll independently.
  */
 export function AgentView({
   graph,
