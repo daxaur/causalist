@@ -6,12 +6,14 @@ import { InitHelpers } from "@/components/projects/init-helpers";
 export const metadata = {
   title: "Connect Claude Code · Causalist",
   description:
-    "One install, three commands. Claude Code reads your causal graph and pushes new projects into Causalist.",
+    "Install the Causalist CLI + Skill so Claude Code can query your causal graph instead of grepping the repo.",
 };
 
 /**
- * Slim, scannable setup. Two paragraphs of context max — the rest is
- * copy-pasteable commands. Anything heavier lives in /docs.
+ * The CLI + Skill is the agent-first path Anthropic recommends
+ * (post Nov 2025): code over tool-call JSON, with a SKILL.md that
+ * teaches the model when to reach for which command. The MCP server
+ * is offered second for non-CLI clients (Cursor, Claude.ai web).
  */
 export default function ClaudeCodePage() {
   return (
@@ -34,95 +36,150 @@ export default function ClaudeCodePage() {
               Connect Claude Code
             </div>
             <h1 className="mt-1 font-display text-3xl font-medium tracking-[-0.02em] sm:text-4xl">
-              Two steps.
+              Two commands.
             </h1>
           </div>
         </div>
         <p className="max-w-2xl text-sm leading-relaxed text-neutral-500">
-          Add the Causalist MCP server. Claude Code gets 11 graph-aware tools
-          — and can push new projects straight into your list.
+          Install the Causalist CLI + Skill. Claude Code learns when to reach
+          for <code className="font-mono text-[12px]">causalist blast</code>,{" "}
+          <code className="font-mono text-[12px]">affected_tests</code>,{" "}
+          <code className="font-mono text-[12px]">find_writers</code> — and
+          stops re-grepping your repo.
         </p>
       </header>
 
-      {/* The two steps — front and center. No CLI: the MCP server is the
-          whole integration; pairing happens in the browser. */}
+      {/* The two steps */}
       <ol className="mb-8 space-y-3">
         <Step
           n={1}
-          title="Get a pair code"
-          code={null}
+          title="Install the CLI + Skill"
+          code={"npm i -g causalist-cli\ncausalist install"}
           body={
             <>
-              Visit{" "}
+              <code className="font-mono text-[12px]">causalist install</code>{" "}
+              drops a <code className="font-mono text-[12px]">SKILL.md</code>{" "}
+              into <code className="font-mono text-[12px]">~/.claude/skills/causalist/</code>{" "}
+              — Claude Code auto-discovers it. The CLI itself ships eleven
+              graph-query subcommands ready to pipe through{" "}
+              <code className="font-mono text-[12px]">jq</code>.
+            </>
+          }
+        />
+        <Step
+          n={2}
+          title="Pair this terminal"
+          code="causalist pair <code>"
+          body={
+            <>
+              Grab a 6-char code from{" "}
               <Link
                 href="/pair"
                 className="font-medium text-accent-magenta hover:underline"
               >
                 /pair
               </Link>
-              . Copy the 6-char code — you&rsquo;ll paste it into the MCP
-              config below so Claude Code knows which browser to push graphs
-              into.
+              . Once paired, Claude Code can query your graph by repo, push
+              new projects to your list, and stream tool-use events into the
+              browser.
             </>
           }
         />
-        <Step
-          n={2}
-          title="Wire the MCP server into Claude Code"
-          code="claude mcp add causalist -- npx -y causalist-mcp@latest --session YOUR_PAIR_CODE"
-          body="One command. No npm install needed — npx fetches the latest server. Claude Code now has 11 graph tools (query_node, blast_radius, affected_tests, find_writers, create_project, …)."
-        />
       </ol>
 
-      {/* Boris pattern — MCP config + CLAUDE.md instructions checked
-          into git so the whole team gets Causalist on `claude`. */}
-      <section className="mb-8">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
-            Or: check it into the repo
-          </h2>
-          <span className="font-mono text-[10px] text-neutral-400">
-            shared with your team on git pull
-          </span>
-        </div>
-        <InitHelpers sessionId="" />
-      </section>
-
       {/* What this gets you */}
-      <section className="rounded-2xl border border-neutral-200 bg-white p-6">
+      <section className="mb-8 rounded-2xl border border-neutral-200 bg-white p-6">
         <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
           <Terminal size={11} />
-          Why pair?
+          The eleven commands Claude Code learns to use
         </div>
-        <ul className="mt-3 space-y-2 text-[13px] text-neutral-700">
-          <li className="flex gap-2">
-            <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-accent-magenta" />
-            <span>
-              <strong>Faster edits.</strong> Claude Code stops re-reading the
-              whole repo — it queries the graph instead.
-            </span>
-          </li>
-          <li className="flex gap-2">
-            <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-accent-magenta" />
-            <span>
-              <strong>Knows what breaks.</strong> <code className="font-mono text-[12px]">blast_radius</code> + <code className="font-mono text-[12px]">affected_tests</code> tell it exactly which files and tests a change touches before it commits.
-            </span>
-          </li>
-          <li className="flex gap-2">
-            <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-accent-magenta" />
-            <span>
-              <strong>Pushes new projects to you.</strong> When you ask
-              Claude Code to map a repo, it appears in your{" "}
-              <Link href="/app" className="font-medium hover:underline">
-                Projects
-              </Link>{" "}
-              list automatically.
-            </span>
-          </li>
-        </ul>
+        <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
+          <CmdRow
+            cmd="causalist blast <id>"
+            desc="what depends on this node"
+          />
+          <CmdRow
+            cmd="causalist tests <ids...>"
+            desc="3 tests not 300"
+          />
+          <CmdRow
+            cmd="causalist path <a> <b>"
+            desc="shortest causal path"
+          />
+          <CmdRow
+            cmd="causalist writers <id>"
+            desc="who writes to this state"
+          />
+          <CmdRow
+            cmd="causalist verify <a> <b>"
+            desc="is this edge real?"
+          />
+          <CmdRow
+            cmd="causalist similar <id>"
+            desc="structurally similar nodes"
+          />
+          <CmdRow
+            cmd="causalist topo <ids...>"
+            desc="topological build order"
+          />
+          <CmdRow
+            cmd="causalist layer <name>"
+            desc="nodes in a layer"
+          />
+          <CmdRow
+            cmd="causalist node <id>"
+            desc="single-node metadata"
+          />
+          <CmdRow
+            cmd="causalist neighbors <id>"
+            desc="direct in/out edges"
+          />
+          <CmdRow
+            cmd="causalist info"
+            desc="capabilities manifest"
+          />
+        </div>
       </section>
 
-      <p className="mt-6 text-center text-[12px] text-neutral-400">
+      {/* MCP fallback */}
+      <section className="mb-6">
+        <details className="group rounded-2xl border border-neutral-200 bg-white">
+          <summary className="cursor-pointer list-none px-6 py-5 transition-colors hover:bg-neutral-50">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-display text-[15px] font-medium text-neutral-900">
+                  Or use the MCP server
+                </div>
+                <div className="mt-0.5 text-[12px] text-neutral-500">
+                  For non-CLI clients (Cursor, Claude.ai web). Same eleven
+                  tools, exposed over stdio.
+                </div>
+              </div>
+              <span className="font-mono text-[10px] text-neutral-400 transition-transform group-open:rotate-180">
+                ▾
+              </span>
+            </div>
+          </summary>
+          <div className="border-t border-neutral-100 p-6 pt-5">
+            <p className="mb-4 text-[12.5px] text-neutral-600">
+              Anthropic&rsquo;s{" "}
+              <a
+                href="https://www.anthropic.com/engineering/code-execution-with-mcp"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent-magenta hover:underline"
+              >
+                post-Nov 2025 guidance
+              </a>{" "}
+              prefers code/CLI over tool-call JSON for coding agents. We ship
+              both — use the CLI for Claude Code, MCP everywhere else.
+            </p>
+            <InitHelpers sessionId="" />
+          </div>
+        </details>
+      </section>
+
+      <p className="mt-8 text-center text-[12px] text-neutral-400">
         New to Claude Code?{" "}
         <a
           href="https://docs.claude.com/en/docs/claude-code/overview"
@@ -133,9 +190,9 @@ export default function ClaudeCodePage() {
           docs.claude.com/claude-code
         </a>
         <span className="mx-2 text-neutral-300">·</span>
-        Want detail?{" "}
+        Why this stack?{" "}
         <Link
-          href="/docs/foundations"
+          href="/docs/integrations"
           className="text-neutral-600 underline underline-offset-2 hover:text-neutral-900"
         >
           read the docs
@@ -168,12 +225,26 @@ function Step({
       </div>
       {code && (
         <pre className="mt-3 overflow-x-auto rounded-md border border-neutral-200 bg-neutral-900 p-3 font-mono text-[12.5px] text-white">
-          $ {code}
+          {code
+            .split("\n")
+            .map((line) => `$ ${line}`)
+            .join("\n")}
         </pre>
       )}
       <p className="mt-2.5 text-[12.5px] leading-snug text-neutral-600">
         {body}
       </p>
     </li>
+  );
+}
+
+function CmdRow({ cmd, desc }: { cmd: string; desc: string }) {
+  return (
+    <div className="flex items-baseline gap-2 border-b border-neutral-100 py-1.5 last:border-0">
+      <code className="shrink-0 font-mono text-[11.5px] text-neutral-900">
+        {cmd}
+      </code>
+      <span className="truncate text-[11px] text-neutral-500">{desc}</span>
+    </div>
   );
 }
