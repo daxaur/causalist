@@ -200,21 +200,21 @@ A graph fixes this: traversal beats grep when the answer is two or three hops aw
 
 ## How retrieval works in Causalist today
 
-We don't run Personalized PageRank or anything fancy at retrieval time. We expose **eleven typed tools** to Claude through the MCP server, and let the model decide how to traverse:
+We don't run Personalized PageRank or anything fancy at retrieval time. We expose **eleven typed tools** that Claude can reach for two ways: as CLI subcommands (preferred for Claude Code, per Anthropic's [Code Execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp) recommendation — code over tool-call JSON), and as MCP tools (for Cursor, Claude.ai web, and any non-CLI client). Either way, the same eleven primitives:
 
-- \`query_node(id)\` — get a node's metadata.
-- \`get_neighbors(id, direction)\` — fan-in / fan-out from a node.
-- \`find_path(source, target)\` — shortest path between two nodes.
-- \`blast_radius(id, depth)\` — reverse-reachable set ("what depends on this?").
-- \`affected_tests(changedIds)\` — tests reachable from a set of changed files.
-- \`find_writers(target)\` — every node that writes to a target (security audit).
-- \`similar_nodes(id)\` — nodes with the same layer, kind, and degree profile.
-- \`find_nodes_by_layer(layer)\` — list everything in a semantic layer.
-- \`topo_order(ids)\` — topological layering of a subgraph.
-- \`verify_edge(source, target, kind?)\` — confirm an edge exists.
-- \`create_project(owner, repo)\` — push a project to the paired browser's list.
+- \`causalist node <id>\` / \`query_node(id)\` — node metadata.
+- \`causalist neighbors <id>\` / \`get_neighbors(id, direction)\` — fan-in / fan-out.
+- \`causalist path <a> <b>\` / \`find_path(source, target)\` — shortest path.
+- \`causalist blast <id>\` / \`blast_radius(id, depth)\` — reverse-reachable set.
+- \`causalist tests <ids…>\` / \`affected_tests(changedIds)\` — tests reachable from changes.
+- \`causalist writers <id>\` / \`find_writers(target)\` — every node that writes.
+- \`causalist similar <id>\` / \`similar_nodes(id)\` — same layer / kind / degree.
+- \`causalist layer <name>\` / \`find_nodes_by_layer(layer)\` — list a semantic layer.
+- \`causalist topo <ids…>\` / \`topo_order(ids)\` — layered subgraph order.
+- \`causalist verify <a> <b>\` / \`verify_edge(source, target, kind?)\` — confirm an edge.
+- \`create_project(owner, repo)\` — MCP-only; pushes a new project into the paired browser.
 
-Each call returns typed JSON (not text). Claude composes them: "find the neighbors of \`auth-middleware\`, then \`find_path\` from each to a test, then read the test files." Three calls, no re-grepping.
+Each call returns the same typed JSON envelope (\`{ ok, summary, data? }\`). Claude composes them: "find the neighbors of \`auth-middleware\`, then \`tests\` from those, then read the test files." Three calls, no re-grepping.
 
 ## Why graph-first beats vector-first here
 
@@ -294,56 +294,66 @@ With [prompt caching](https://docs.anthropic.com/en/docs/build-with-claude/promp
   {
     slug: "integrations",
     title: "Integrations",
-    subtitle: "CLI, Claude Code plugin, MCP, live streaming",
+    subtitle: "CLI + Skill, MCP, live streaming",
     body: `
 ## Surfaces
 
-Causalist ships two ways to invoke it, both backed by the same core library:
+Causalist ships three ways to invoke it, all backed by the same core graph:
 
 ### Web app
 Paste a GitHub URL at [causalist.xyz](https://causalist.xyz) and Claude maps the repo. Hand-curated demos load instantly; live analyze of any public repo runs when you add your Anthropic key in Settings.
 
-### Claude Code MCP server
+### CLI + Skill (preferred for Claude Code)
+\`\`\`bash
+npm i -g causalist-cli
+causalist install        # drops SKILL.md into ~/.claude/skills/causalist/
+causalist pair <code>    # one-time browser pair
+\`\`\`
+
+The CLI ships eleven graph-query subcommands (\`causalist node\`, \`blast\`, \`tests\`, \`writers\`, \`path\`, …) — JSON-by-default when piped, plain text in TTY, exit codes 0 ok / 1 ok=false / 2 fatal-stderr. \`causalist install\` drops a [Claude Code Skill](https://code.claude.com/docs/en/skills) at \`~/.claude/skills/causalist/SKILL.md\` so the agent auto-discovers when to use which command.
+
+This is the path Anthropic recommends in [Code Execution with MCP](https://www.anthropic.com/engineering/code-execution-with-mcp): code over tool-call JSON. Tool descriptions don't pollute context; only the chunks the agent actually needs come back.
+
+### MCP server (for non-CLI clients)
 \`\`\`bash
 claude mcp add causalist -- npx -y causalist-mcp@latest --session ABC123
 \`\`\`
 
-One command. \`npx\` fetches the latest server — no global npm install needed. The \`causalist-mcp\` package exposes the eleven tools below over stdio. Pair codes come from [/pair](https://causalist.xyz/pair) in the browser; pass yours via the \`--session\` flag and Claude Code knows which browser to push graphs into.
+For Cursor, Claude.ai web, or any client that doesn't have a shell. Same eleven tools exposed over stdio. Pair codes come from [/pair](https://causalist.xyz/pair).
 
-Once wired, Claude Code's \`create_project\` tool pushes new graphs straight into your Projects list — no manual paste step.
+## The eleven tools (CLI + MCP)
+
+| CLI | MCP | What it does |
+|-----|-----|--------------|
+| \`causalist node <id>\` | \`query_node\` | Node metadata, layer, summary |
+| \`causalist neighbors <id>\` | \`get_neighbors\` | In/out edges + verified flag |
+| \`causalist path <a> <b>\` | \`find_path\` | Shortest causal path |
+| \`causalist layer <name>\` | \`find_nodes_by_layer\` | Filter by semantic layer |
+| \`causalist blast <id>\` | \`blast_radius\` | What transitively depends on a node |
+| \`causalist tests <ids…>\` | \`affected_tests\` | "3 tests not 300" — reachable tests |
+| \`causalist writers <id>\` | \`find_writers\` | Every node that writes to a target |
+| \`causalist similar <id>\` | \`similar_nodes\` | Structurally similar nodes |
+| \`causalist topo <ids…>\` | \`topo_order\` | Topological layering of a subgraph |
+| \`causalist verify <a> <b>\` | \`verify_edge\` | Confirm an edge exists |
+| — | \`create_project\` | (MCP-only) push a project to the paired browser |
+| \`causalist info\` | — | Capabilities manifest with active session |
 
 ## Live streaming
 
-When Claude Code is paired with the browser, its \`PostToolUse\` hook posts tool-use events to \`https://causalist.xyz/api/ingest/<session>\`. The browser viewer subscribes via Server-Sent Events at \`/api/stream/<session>\` and highlights nodes in real time — open the repo's graph in another tab and *watch Claude work.*
+When Claude Code is paired with the browser, its \`PostToolUse\` hook posts tool-use events to \`/api/ingest/<session>\`. The browser viewer subscribes via Server-Sent Events at \`/api/stream/<session>\` and highlights nodes in real time — open the repo's graph in another tab and *watch Claude work.*
 
 Pairing is how the browser and local Claude session agree on a \`sessionId\` without requiring a user account.
 
-## MCP tools (eleven, stable)
+## Plan-mode agent runs (web)
 
-| Tool | What it does |
-|------|-------------|
-| \`query_node(id)\` | Node metadata, layer, summary |
-| \`get_neighbors(id, direction)\` | Incoming or outgoing edges with kinds |
-| \`find_path(source, target)\` | Shortest causal path between two nodes |
-| \`find_nodes_by_layer(layer)\` | Filter nodes by semantic layer |
-| \`blast_radius(id, depth)\` | Everything that transitively depends on a node |
-| \`affected_tests(changedIds)\` | "3 tests not 300" — only the tests reachable from your changes |
-| \`find_writers(target)\` | Audit query — every node that writes to a target |
-| \`similar_nodes(id)\` | Structurally similar nodes (same layer / kind / degree) |
-| \`topo_order(ids)\` | Topological layering of a subgraph |
-| \`verify_edge(source, target, kind?)\` | Confirm an edge exists |
-| \`create_project(owner, repo)\` | Push a new project into the paired browser's list |
+The Agent tab in the right-side panel exposes two endpoints:
 
-## Live agent runs (web)
-
-The web app exposes two endpoints for the Agents tab:
-
-- \`POST /api/agent/run\` — SSE. Body \`{ plan, repo, branch, selectedNodeIds, nodePathMap, apiKey }\`. Streams \`file_loaded\`, \`finding\`, \`patch\`, \`done\`, \`error\` events as the agent carries out the plan against the selected files.
-- \`POST /api/agent/push-pr\` — uses your GitHub OAuth cookie to create a branch via the Git Tree+Commit API and open a real pull request.
+- \`POST /api/agent/run\` — SSE. Body \`{ plan, repo, branch, selectedNodeIds, nodePathMap, apiKey }\`. The user types a plan in plain English ("audit these files for security issues and fix any injection vulnerabilities"); the server streams \`file_loaded\`, \`finding\`, \`patch\`, \`done\`, \`error\` events as Claude Opus 4.7 carries it out against the selected files.
+- \`POST /api/agent/push-pr\` — uses your GitHub OAuth cookie to create a branch via the Git Tree+Commit API and open a real pull request from the patches.
 
 ## Analyze API
 
-\`POST /api/analyze\` is a public SSE endpoint. Pass \`Authorization: Bearer <your-anthropic-key>\` and a JSON body \`{owner, repo, commit, tree, files?}\`; receive \`agent\` events as each of the four pipeline agents completes, then a \`done\` event with the final graph.
+\`POST /api/analyze\` is a public SSE endpoint. Pass \`Authorization: Bearer <your-anthropic-key>\` and a JSON body \`{owner, repo, commit, tree, files?}\`; receive \`agent\` events as each of the four pipeline agents (Structure, Dependency, Semantic, Oracle) completes, then a \`done\` event with the final graph.
 `,
   },
 ];
