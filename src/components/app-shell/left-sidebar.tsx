@@ -118,11 +118,14 @@ function BrandHeader({ open }: { open: boolean }) {
     >
       <Logo size={22} />
       <motion.span
+        initial={false}
         animate={{
-          display: open ? "inline-block" : "none",
           opacity: open ? 1 : 0,
+          width: open ? "auto" : 0,
+          marginLeft: open ? 0 : -10,
         }}
-        className="font-display text-[15px] font-medium tracking-tight text-neutral-900"
+        transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+        className="overflow-hidden whitespace-nowrap font-display text-[15px] font-medium tracking-tight text-neutral-900"
       >
         causalist
       </motion.span>

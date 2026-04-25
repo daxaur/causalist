@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, Terminal } from "@phosphor-icons/react/dist/ssr";
-import { PageHeader, PageShell } from "@/components/layout/page-shell";
+import { Terminal } from "@phosphor-icons/react/dist/ssr";
+import { PageShell } from "@/components/layout/page-shell";
 
 export const metadata = {
   title: "Connect Claude Code · Causalist",
@@ -15,11 +15,33 @@ export const metadata = {
 export default function ClaudeCodePage() {
   return (
     <PageShell width="docs">
-      <PageHeader
-        eyebrow="Connect Claude Code"
-        title="Two steps."
-        description="Add the Causalist MCP server. Claude Code gets 11 graph-aware tools — and can push new projects straight into your list."
-      />
+      {/* Hero with the Claude Code logo as the visual anchor. */}
+      <header className="mb-10">
+        <div className="mb-5 flex items-center gap-4">
+          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/claude-code.png"
+              alt="Claude Code"
+              width={48}
+              height={48}
+              className="h-10 w-10 object-contain"
+            />
+          </div>
+          <div>
+            <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-neutral-400">
+              Connect Claude Code
+            </div>
+            <h1 className="mt-1 font-display text-3xl font-medium tracking-[-0.02em] sm:text-4xl">
+              Two steps.
+            </h1>
+          </div>
+        </div>
+        <p className="max-w-2xl text-sm leading-relaxed text-neutral-500">
+          Add the Causalist MCP server. Claude Code gets 11 graph-aware tools
+          — and can push new projects straight into your list.
+        </p>
+      </header>
 
       {/* The two steps — front and center. No CLI: the MCP server is the
           whole integration; pairing happens in the browser. */}

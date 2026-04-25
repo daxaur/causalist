@@ -2,27 +2,20 @@
 
 import { useState, type ReactNode } from "react";
 import { motion } from "motion/react";
-import {
-  ChatCircle,
-  Info,
-  Plugs,
-  X,
-} from "@phosphor-icons/react";
+import { Info, Sparkle, X } from "@phosphor-icons/react";
 import type { CausalGraph, CausalNode } from "@/lib/graph/types";
 import type { ImportanceSummary } from "@/lib/graph/importance";
 import { NodePanel } from "./node-panel";
-import { AskView } from "./ask-view";
-import { AgentAssignPanel } from "./agent-assign-panel";
+import { AgentView } from "./agent-view";
 import { cn } from "@/lib/utils";
 
-type Tab = "inspector" | "ask" | "agents";
+type Tab = "inspector" | "agent";
 
 /**
- * IDE-style right panel — three tabs: Inspector, Ask, Agents.
- * Replaces the standalone NodePanel on the viewer. Inspector mirrors
- * the old NodePanel (node metadata, neighborhood). Ask embeds the
- * existing AskView (tool-using Oracle). Agents lets the user
- * multi-select nodes and "assign to agent X" with live node coloring.
+ * IDE-style right panel — two tabs: Inspector and Agent.
+ * Inspector shows node metadata + neighborhood. Agent fuses one-click
+ * preset agents (Auditor / Security / Performance / Refactor) with
+ * free-form chat (the Oracle).
  */
 export function RightPanel({
   graph,
@@ -40,9 +33,7 @@ export function RightPanel({
   importance: ImportanceSummary;
   onSelect: (n: CausalNode) => void;
   onClose: () => void;
-  /** Bubble node-id highlights up to the viewer for chain coloring */
   onHighlightNodes?: (ids: string[]) => void;
-  /** Called when agent-panel wants to "mark this node as touched" */
   onAssign?: (ids: string[], status: "reviewed" | "risky" | "fixed") => void;
 }) {
   const [tab, setTab] = useState<Tab>("inspector");
@@ -65,16 +56,15 @@ export function RightPanel({
             label="Inspector"
           />
           <TabButton
-            active={tab === "ask"}
-            onClick={() => setTab("ask")}
-            icon={<ChatCircle size={12} weight="duotone" />}
-            label="Ask"
-          />
-          <TabButton
-            active={tab === "agents"}
-            onClick={() => setTab("agents")}
-            icon={<Plugs size={12} weight="duotone" />}
-            label="Agents"
+            active={tab === "agent"}
+            onClick={() => setTab("agent")}
+            icon={
+              <span className="relative inline-flex">
+                <Sparkle size={12} weight="fill" className="text-accent-magenta" />
+                <span className="absolute -right-0.5 -top-0.5 h-1 w-1 rounded-full bg-accent-magenta animate-pulse" />
+              </span>
+            }
+            label="Agent"
             badge={selectedIds.size > 0 ? String(selectedIds.size) : undefined}
           />
         </div>
@@ -110,18 +100,12 @@ export function RightPanel({
             />
           ))}
 
-        {tab === "ask" && (
-          <div className="h-full">
-            <AskView graph={graph} onHighlightNodes={onHighlightNodes} />
-          </div>
-        )}
-
-        {tab === "agents" && (
-          <AgentAssignPanel
+        {tab === "agent" && (
+          <AgentView
             graph={graph}
             selectedIds={selectedIds}
-            onAssign={onAssign}
             onHighlight={onHighlightNodes}
+            onAssign={onAssign}
           />
         )}
       </div>
@@ -147,9 +131,7 @@ function TabButton({
       onClick={onClick}
       className={cn(
         "relative flex items-center gap-1.5 px-4 py-3 text-[12px] transition-colors",
-        active
-          ? "text-neutral-900"
-          : "text-neutral-500 hover:text-neutral-900",
+        active ? "text-neutral-900" : "text-neutral-500 hover:text-neutral-900",
       )}
     >
       <span className={active ? "text-accent-magenta" : "text-neutral-400"}>

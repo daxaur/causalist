@@ -37,7 +37,6 @@ import { ImportanceStats } from "./importance-stats";
 import { FirstHotTooltip } from "./first-hot-tooltip";
 import { HelpOverlay } from "./help-overlay";
 import { CommandPalette, type PaletteAction } from "./command-palette";
-import { AnimatedBeam } from "@/components/ui/animated-beam";
 
 const ForceGraph3D = dynamic(
   () => import("react-force-graph-3d").then((m) => m.default),
@@ -149,9 +148,7 @@ export function CausalGraphViewer({
   const [focusMode, setFocusMode] = useState(false);
 
   // Refs used to draw the Claude Code → focused-node beam.
-  const beamContainerRef = useRef<HTMLDivElement>(null);
   const beamFromRef = useRef<HTMLDivElement>(null);
-  const beamToRef = useRef<HTMLDivElement>(null);
   const historyRef = useRef<{ stack: string[]; index: number }>({
     stack: [],
     index: -1,
@@ -311,40 +308,6 @@ export function CausalGraphViewer({
     selectSingle(walkOrder[nextIdx]);
   };
 
-  // Project the focused node's 3D position onto 2D screen coords
-  // every frame and park the invisible `beamToRef` there. Lets us
-  // draw an AnimatedBeam from the Claude Code avatar → the exact
-  // node the agent is looking at.
-  useEffect(() => {
-    if (!focusedId) return;
-    let rafId: number;
-    const tick = () => {
-      const g = graphRef.current;
-      const target = beamToRef.current;
-      const container = beamContainerRef.current;
-      if (g && target && container && typeof g.graph2ScreenCoords === "function") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const vn = data.nodes.find((n) => n.id === focusedId) as any;
-        if (vn && typeof vn.x === "number") {
-          const coords = g.graph2ScreenCoords(vn.x, vn.y ?? 0, vn.z ?? 0);
-          // graph2ScreenCoords returns coords relative to the inner
-          // canvas. Our beam container is relative to the viewer
-          // wrapper, which may include the file-tree sidebar. Offset
-          // by the sidebar width when open.
-          const canvas = container.querySelector("canvas");
-          const canvasRect = canvas?.getBoundingClientRect();
-          const containerRect = container.getBoundingClientRect();
-          const offsetX = canvasRect ? canvasRect.left - containerRect.left : 0;
-          const offsetY = canvasRect ? canvasRect.top - containerRect.top : 0;
-          target.style.left = `${coords.x + offsetX}px`;
-          target.style.top = `${coords.y + offsetY}px`;
-        }
-      }
-      rafId = requestAnimationFrame(tick);
-    };
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, [focusedId, data.nodes]);
 
   useGraphKeyboard({
     onOpenPalette: () => setPaletteOpen(true),
@@ -789,7 +752,6 @@ export function CausalGraphViewer({
 
   return (
     <div
-      ref={beamContainerRef}
       className="relative flex h-full w-full overflow-hidden border border-neutral-200/70 text-[color:var(--ink,#2A2420)]"
       style={{ backgroundColor: CANVAS_BG }}
     >
@@ -1188,26 +1150,6 @@ export function CausalGraphViewer({
                 Claude Code
               </span>
             </div>
-            <div
-              ref={beamToRef}
-              aria-hidden
-              className="pointer-events-none absolute h-1 w-1 -translate-x-1/2 -translate-y-1/2"
-              style={{ left: "-100px", top: "-100px" }}
-            />
-            {focusedId && (
-              <AnimatedBeam
-                containerRef={beamContainerRef}
-                fromRef={beamFromRef}
-                toRef={beamToRef}
-                pathColor="rgba(42,36,32,0.12)"
-                pathWidth={1.5}
-                pathOpacity={1}
-                gradientStartColor="#E838A4"
-                gradientStopColor="#FF9CD9"
-                duration={3}
-                curvature={60}
-              />
-            )}
           </>
         )}
 

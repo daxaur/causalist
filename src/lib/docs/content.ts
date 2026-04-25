@@ -81,41 +81,29 @@ export const SECTIONS: DocSection[] = [
   {
     slug: "foundations",
     title: "Foundations",
-    subtitle: "Why a coding agent needs causal reasoning",
+    subtitle: "Why a coding agent needs a real graph",
     body: `
 ## The claim
 
-A coding agent that only chases correlations between code patterns and outcomes will fail on the first real refactor. An agent that maintains a model of *what causes what* in a codebase can generalize to edits it has never seen.
+A coding agent that only reads files in isolation will get small things wrong over and over: edit a function, miss a call site, break a test it never opened. The fix isn't a smarter agent — it's a better view of the codebase.
 
-This isn't just intuition. [Richens & Everitt (ICLR 2024)](#cite-richens-everitt-2024) prove that **any agent whose regret stays bounded across distributional shifts must have implicitly learned an approximate causal model of its environment.** Formally, for agent policy $\\pi$ and environment distributions $P$ and $P'$ differing only in their causal structure, if
+Causalist gives that view: a typed graph of every file, every dependency, every test. Claude Code reads it through tools, not by re-grepping the repo each turn.
 
-$$
-\\sup_{P, P'} \\; \\mathbb{E}_{P'} \\big[ R(\\pi) \\big] - \\mathbb{E}_{P} \\big[ R(\\pi) \\big] \\;\\leq\\; \\epsilon
-$$
+## What we model
 
-for small $\\epsilon$, then $\\pi$ encodes a causal model approximating the true structural causal model of the environment. The upshot: **robust agents are causal agents.** If you want a coding agent to survive a refactor it hasn't seen, you have to give it a causal graph.
+For each repository:
 
-## The coding-agent setting
+- **Files and modules** — every source file, classified into a semantic layer (infra, data, logic, api, ui, test, config).
+- **Typed edges** — \`imports\`, \`calls\`, \`reads\`, \`writes\`, \`extends\`. Every edge carries a \`verified\` flag based on whether the AST actually backs it up.
+- **Importance tiers** — top 10% by fan-in are "hot" (changing them ripples), the next 15% are "core", everything else is "leaf" (safe to refactor).
 
-For a repository, every edit is an intervention, every test is a partial oracle, and every commit is a historical experiment. This maps onto [Pearl's do-calculus](#cite-pearl-causality) almost directly:
+That's it. No probability scores. No interventional / counterfactual edges. We ship the parts that produce a useful graph today and skip the parts we haven't earned yet.
 
-- **Observational** edges: what the code syntactically does. Imports, calls, inheritance.
-- **Interventional** edges: what happens when you change a file — which tests fail, which downstream modules break.
-- **Counterfactual** edges: what *would* have happened under a different commit.
+## Why it actually helps
 
-Most coding tools only capture the observational layer — a static import graph. Causalist captures all three, and makes the distinction visible: you can see at a glance which edges are trusted because they're AST-derived versus which are inferred and need verification.
+When Claude Code asks \`affected_tests\` instead of grepping for test files, it gets back exactly the tests that depend on the changed nodes — usually 3 instead of 300. When it asks \`blast_radius\`, it gets the actual reverse-reachable set. The agent stops re-discovering structure on every turn and starts reasoning about it.
 
-## What "causal" means in this product
-
-**Honest note.** At launch, most of Causalist's edges are either structural (AST-derived: \`imports\`, \`calls\`, \`extends\`) or LLM-inferred (from Claude's reasoning trace: \`caused\`, \`explains\`, \`resolves\`). Neither is *interventional* in the Pearl sense. They're scaffolding for causal reasoning, not a true structural causal model.
-
-Getting to proper causal edges is the next step:
-
-1. **Mutation testing** — programmatically mutate a function and re-run the test suite. If tests fail that weren't previously touching this node, promote the edge from \`calls\` to \`causes-to-fail\`.
-2. **Git commits as natural experiments** — a commit that touched $n$ files and broke a test $t$ suggests $P(\\text{break}(t) \\mid \\text{edit}(f)) > P(\\text{break}(t) \\mid \\neg\\text{edit}(f))$ for some $f$ in those files. Aggregate across history to estimate each file's effect on each test.
-3. **Counterfactual replay** — "what would have happened if I hadn't touched \`file.ts\`?" requires simulating an alternate history; we use Claude to hypothesize and the test suite to verify.
-
-We don't claim what we haven't earned yet — but the architecture is ready for each of these.
+That's the whole pitch. The math behind why graph-aware retrieval helps multi-hop QA is in [HippoRAG (2024)](#cite-hipporag-2024); the case for graph-guided code localization is in [LocAgent (2025)](#cite-locagent-2025) and [RepoGraph (2025)](#cite-repograph-2025). We borrow the conclusion: graphs work better than flat retrieval. We don't reproduce the proof here — read the papers if you want it.
 `,
   },
   {
@@ -202,54 +190,37 @@ See \`src/lib/graph/importance.ts::rankImportance\`. The Agents tab uses this im
   {
     slug: "retrieval",
     title: "Graph retrieval",
-    subtitle: "Personalized PageRank with HippoRAG node-specificity",
+    subtitle: "How Claude reads the graph through tools",
     body: `
 ## The problem
 
-Given a query — "where does user authentication happen?" — retrieve the smallest subgraph that is sufficient for Claude to answer. Flat vector retrieval misses multi-hop: the file that validates a JWT may not contain the word "authentication" anywhere; it's reached via \`auth-middleware.ts → jwt-verifier.ts → crypto-utils.ts\`.
+When Claude Code asks "where does user authentication happen?", flat text search misses the multi-hop trail — the file that validates a JWT may not contain the word "authentication" anywhere; it's reached through \`auth-middleware.ts → jwt-verifier.ts → crypto-utils.ts\`.
 
-[HippoRAG (NeurIPS 2024)](#cite-hipporag-2024) reports a ~20% improvement over flat retrieval on multi-hop QA by using Personalized PageRank over an entity-linked graph. Causalist borrows this.
+A graph fixes this: traversal beats grep when the answer is two or three hops away.
 
-## Personalized PageRank
+## How retrieval works in Causalist today
 
-Starting from a query, we identify *seed nodes* via entity mention and semantic matching. We then compute the stationary distribution of a random walk that restarts with probability $\\alpha$ at the seeds:
+We don't run Personalized PageRank or anything fancy at retrieval time. We expose **eleven typed tools** to Claude through the MCP server, and let the model decide how to traverse:
 
-$$
-r \\;=\\; (1 - \\alpha)\\, M r \\;+\\; \\alpha s
-$$
+- \`query_node(id)\` — get a node's metadata.
+- \`get_neighbors(id, direction)\` — fan-in / fan-out from a node.
+- \`find_path(source, target)\` — shortest path between two nodes.
+- \`blast_radius(id, depth)\` — reverse-reachable set ("what depends on this?").
+- \`affected_tests(changedIds)\` — tests reachable from a set of changed files.
+- \`find_writers(target)\` — every node that writes to a target (security audit).
+- \`similar_nodes(id)\` — nodes with the same layer, kind, and degree profile.
+- \`find_nodes_by_layer(layer)\` — list everything in a semantic layer.
+- \`topo_order(ids)\` — topological layering of a subgraph.
+- \`verify_edge(source, target, kind?)\` — confirm an edge exists.
+- \`create_project(owner, repo)\` — push a project to the paired browser's list.
 
-where
+Each call returns typed JSON (not text). Claude composes them: "find the neighbors of \`auth-middleware\`, then \`find_path\` from each to a test, then read the test files." Three calls, no re-grepping.
 
-- $r \\in \\mathbb{R}^{|V|}$ is the retrieved-relevance score for every node,
-- $M$ is the column-stochastic transition matrix of the graph (edge weights from confidence × inverse degree of the source),
-- $s$ is the seed distribution (one-hot on query-relevant nodes, or a soft distribution from semantic similarity),
-- $\\alpha \\in [0, 1]$ is the restart probability, typically $0.15$.
+## Why graph-first beats vector-first here
 
-We solve this iteratively via power iteration until $\\lVert r^{(k+1)} - r^{(k)} \\rVert_1 < 10^{-5}$. Typical convergence is 30–50 iterations.
+For factual code questions, graph traversal is grounded — the answer is in the graph by construction. Vector retrieval guesses from similarity. [LocAgent (ACL 2025)](#cite-locagent-2025) shows graph-guided retrieval significantly outperforms flat vector search on code-localization benchmarks; [HippoRAG (NeurIPS 2024)](#cite-hipporag-2024) shows the same on multi-hop QA in general.
 
-## Node specificity (the HippoRAG trick)
-
-A naive PPR over a codebase drowns the retrieval in hub nodes — \`main.ts\`, \`index.ts\`, \`types.ts\` — that connect to everything. HippoRAG applies a **node-specificity** weight to the seed distribution:
-
-$$
-s_i \\;\\propto\\; \\log\\!\\left(\\frac{N}{\\text{degree}(i)}\\right)
-$$
-
-where $N = |V|$. Hubs get small seed weight; specific, narrow nodes get large seed weight. The effect is dramatic: retrieval becomes about the *distinctive* files for a query, not the central ones.
-
-## Subgraph extraction
-
-Once $r$ is computed, we extract the top-$k$ highest-scoring nodes (typically $k = 20$) and all edges between them. The resulting subgraph is what Claude sees as context.
-
-## Topological ordering
-
-[Causal Graphs Meet Thoughts](#cite-causal-thoughts-2025) shows that putting cause nodes *before* effect nodes in the prompt, so chain-of-thought aligns with graph traversal, improves reasoning accuracy on causal queries. We sort the retrieved subgraph topologically before serialization:
-
-$$
-\\text{prompt\\_order}(n) \\;=\\; \\text{topo\\_rank}(n)
-$$
-
-with ties broken by descending PPR score. Cycles (which shouldn't exist but do during indexing) are broken by removing the lowest-confidence edge in the cycle.
+We don't reproduce their math here. We use the conclusion: typed graph tools work better than embeddings for this kind of question.
 `,
   },
   {
@@ -266,47 +237,15 @@ After the Oracle agent emits a graph, we run two real checks before handing it b
 
 That's it for the launch verifier. It's deliberately cheap — runs on every analyze, no extra LLM cost. The next two sections describe where this is going.
 
-## From structural to interventional
+## What we'd add next
 
-Today's edges are observational or LLM-inferred. The research program for Causalist v2 is to promote them to interventional where possible.
+Cheap to dream, harder to ship. The roadmap from here:
 
-### Mutation testing
+- **Mutation testing.** Mutate a function, re-run the tests. Tests that newly fail tell you which functions are *load-bearing* for which tests — a real causal signal. Today we approximate this with reachability via \`calls\` edges, which is correct in shape but not in strength.
+- **Commit history as evidence.** A commit that touches \`auth.ts\` and breaks \`auth.test.ts\` is one data point. Aggregate across thousands of commits and you can rank which files actually break which tests, without having to mutate anything.
+- **Agent self-review.** When Claude Code edits the same file four times in a row without a passing test, it's stuck. A small pass over the graph + recent tool history could surface that and inject it back into context, similar to [Reflexion](#cite-reflexion-2023).
 
-Given a function $f$, a test suite $T$, and an existing \`calls\` edge $(f, g)$:
-
-1. Apply a semantic mutation to $g$ (e.g. flip a comparison, return a constant).
-2. Re-run $T$. Let $T_{\\text{fail}}(g')$ be the set of newly-failing tests.
-3. For each $t \\in T_{\\text{fail}}(g')$, promote or create the edge $(g, t, \\texttt{causes-to-fail})$ with confidence
-
-$$
-c \\;=\\; 1 \\;-\\; P(\\text{flake}(t))
-$$
-
-estimated from test-history flake rate. This yields genuinely causal edges in Pearl's sense: we intervened, we observed, the counterfactual is the unmutated world.
-
-### Git commits as natural experiments
-
-Every commit $c$ touches a set of files $F_c$ and either leaves the build green or turns a test $t$ red. Across many commits we have samples that let us estimate
-
-$$
-P\\big(\\text{fail}(t) \\,\\big|\\, f \\in F_c\\big) \\quad\\text{vs.}\\quad P\\big(\\text{fail}(t) \\,\\big|\\, f \\notin F_c\\big)
-$$
-
-Files with a large positive gap are load-bearing for that test. This isn't a true intervention (commits correlate with each other), but it's a principled way to rank candidate causal edges for mutation testing without having to mutate everything.
-
-### Counterfactual replay
-
-Given a regression introduced by commit $c$, the counterfactual is *"what would have happened if $c$ had reverted file $f$ to its state at $c-1$?"* We use Claude + the test suite to hypothesize, then run the test to verify. Edges surviving this are labeled \`counterfactually-required\`.
-
-## The introspection loop
-
-Every few agent iterations, a dedicated pass reads the graph and reports:
-
-- **Repeated actions** — if the agent has called \`Edit\` on the same file 4+ times without an intervening successful test, it's stuck. Surface it.
-- **Contradictions** — any new violations of DAG or pairwise checks.
-- **Low-confidence territory** — clusters of nodes where average edge confidence < 0.3 deserve human review.
-
-This snapshot gets injected back into the next turn's context, so the agent can course-correct on its own memory. It echoes [Reflexion (NeurIPS 2023)](#cite-reflexion-2023) — agents that read their own trajectory outperform agents that don't.
+We don't ship any of this today. The launch verifier is the AST check above. Everything else is honest-future-work, not honest-present.
 `,
   },
   {
