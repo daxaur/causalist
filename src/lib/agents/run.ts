@@ -8,9 +8,8 @@ import {
   type SDKMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import {
-  AGENT_PROMPTS,
+  GENERAL_PROMPT,
   buildUserPrompt,
-  type AgentKind,
   type AgentRunInput,
   type AgentRunOutput,
 } from "./prompts";
@@ -18,7 +17,7 @@ import {
 const MODEL = "claude-opus-4-7";
 
 export type AgentEvent =
-  | { type: "started"; agent: AgentKind; nodeCount: number }
+  | { type: "started"; nodeCount: number; plan: string }
   | { type: "file_loaded"; path: string; bytes: number }
   | { type: "thinking" }
   | { type: "finding"; nodeId: string; kind: "reviewed" | "risky" | "fixed"; note: string; path: string }
@@ -29,7 +28,8 @@ export type AgentEvent =
 
 export interface RunOptions {
   apiKey: string;
-  agent: AgentKind;
+  /** Free-form plain-English instruction the user typed. */
+  plan: string;
   repo: string; // "owner/name"
   branch: string;
   selectedNodeIds: string[];
@@ -43,8 +43,8 @@ export interface RunOptions {
 export async function* runAgent(
   opts: RunOptions,
 ): AsyncGenerator<AgentEvent, AgentRunOutput | null, void> {
-  const { agent, selectedNodeIds, nodePathMap, repo, branch, githubToken } = opts;
-  yield { type: "started", agent, nodeCount: selectedNodeIds.length };
+  const { plan, selectedNodeIds, nodePathMap, repo, branch, githubToken } = opts;
+  yield { type: "started", nodeCount: selectedNodeIds.length, plan };
 
   // Resolve node ids -> file paths, then fetch the file contents from GitHub.
   const paths = Array.from(
@@ -85,7 +85,7 @@ export async function* runAgent(
   yield { type: "thinking" };
 
   const input: AgentRunInput = {
-    agent,
+    plan,
     repo,
     branch,
     files,
@@ -93,7 +93,7 @@ export async function* runAgent(
   };
 
   const userPrompt = buildUserPrompt(input);
-  const sysPrompt = AGENT_PROMPTS[agent];
+  const sysPrompt = GENERAL_PROMPT;
 
   const sdkOpts: Options = {
     env: {

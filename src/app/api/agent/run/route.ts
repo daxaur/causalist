@@ -9,13 +9,12 @@
 import { cookies } from "next/headers";
 import { TOKEN_COOKIE } from "@/lib/auth/github";
 import { runAgent, type AgentEvent } from "@/lib/agents/run";
-import type { AgentKind } from "@/lib/agents/prompts";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
 interface RunBody {
-  agent: AgentKind;
+  plan: string;
   repo: string;
   branch?: string;
   selectedNodeIds: string[];
@@ -32,7 +31,8 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   if (
-    !body.agent ||
+    !body.plan ||
+    !body.plan.trim() ||
     !body.repo ||
     !body.apiKey ||
     !Array.isArray(body.selectedNodeIds) ||
@@ -69,7 +69,7 @@ export async function POST(req: Request): Promise<Response> {
       try {
         for await (const ev of runAgent({
           apiKey: body.apiKey,
-          agent: body.agent,
+          plan: body.plan,
           repo: body.repo,
           branch: body.branch ?? "main",
           selectedNodeIds: body.selectedNodeIds,

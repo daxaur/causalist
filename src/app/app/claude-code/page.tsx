@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Terminal } from "@phosphor-icons/react/dist/ssr";
 import { PageShell } from "@/components/layout/page-shell";
+import { InitHelpers } from "@/components/projects/init-helpers";
 
 export const metadata = {
   title: "Connect Claude Code · Causalist",
@@ -72,6 +73,20 @@ export default function ClaudeCodePage() {
           body="One command. No npm install needed — npx fetches the latest server. Claude Code now has 11 graph tools (query_node, blast_radius, affected_tests, find_writers, create_project, …)."
         />
       </ol>
+
+      {/* Boris pattern — MCP config + CLAUDE.md instructions checked
+          into git so the whole team gets Causalist on `claude`. */}
+      <section className="mb-8">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
+            Or: check it into the repo
+          </h2>
+          <span className="font-mono text-[10px] text-neutral-400">
+            shared with your team on git pull
+          </span>
+        </div>
+        <InitHelpers sessionId="" />
+      </section>
 
       {/* What this gets you */}
       <section className="rounded-2xl border border-neutral-200 bg-white p-6">

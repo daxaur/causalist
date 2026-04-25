@@ -7,7 +7,7 @@ import {
   ArrowUpRight,
   CheckCircle,
   GithubLogo,
-  Plus,
+  PaperPlaneRight,
   Sparkle,
   Stop,
   Warning,
@@ -18,7 +18,6 @@ import { RotatingVerb } from "@/components/ui/thinking";
 import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
-import type { AgentKind } from "@/lib/agents/prompts";
 
 type AssignStatus = "running" | "done" | "error";
 
@@ -29,11 +28,9 @@ interface Patch {
   newContent?: string;
 }
 
-interface Assignment {
+interface Run {
   id: string;
-  agent: AgentKind;
-  agentName: string;
-  agentRole: string;
+  plan: string;
   nodeIds: string[];
   status: AssignStatus;
   findings: {
@@ -51,11 +48,14 @@ interface Assignment {
   startedAt: number;
 }
 
-const AGENT_ROSTER: { kind: AgentKind; name: string; role: string }[] = [
-  { kind: "auditor", name: "Auditor", role: "Bugs, dead branches, missing error handling" },
-  { kind: "security", name: "Security", role: "Injection, auth gaps, tainted data flows" },
-  { kind: "performance", name: "Performance", role: "Hot paths, N+1s, redundant work" },
-  { kind: "refactor", name: "Refactor", role: "Safe structural improvements only" },
+// Suggestion chips — pre-fill the textarea, not separate code paths.
+// They're seeds; the user can type anything. This is plan-mode.
+const SUGGESTIONS = [
+  "Audit for bugs and propose fixes",
+  "Find security issues and patch them",
+  "Look for perf hot paths to optimize",
+  "Suggest safe refactors",
+  "Explain what these files do",
 ];
 
 export function AgentAssignPanel({
@@ -69,12 +69,12 @@ export function AgentAssignPanel({
   onAssign?: (ids: string[], status: "reviewed" | "risky" | "fixed") => void;
   onHighlight?: (ids: string[]) => void;
 }) {
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [runs, setRuns] = useState<Run[]>([]);
+  const [plan, setPlan] = useState("");
   const auth = useGithubAuth();
   const settings = useSettings();
   const cancelRef = useRef<Map<string, AbortController>>(new Map());
 
-  // Cancel any in-flight runs on unmount.
   useEffect(() => {
     const ctls = cancelRef.current;
     return () => {
@@ -86,10 +86,15 @@ export function AgentAssignPanel({
   const isRealRepo = /^[\w.-]+\/[\w.-]+$/.test(graph.repo);
   const nodesById = new Map(graph.nodes.map((n) => [n.id, n]));
 
-  const update = (id: string, fn: (a: Assignment) => Assignment) =>
-    setAssignments((prev) => prev.map((a) => (a.id === id ? fn(a) : a)));
+  const update = (id: string, fn: (r: Run) => Run) =>
+    setRuns((prev) => prev.map((r) => (r.id === id ? fn(r) : r)));
 
-  const assign = async (entry: (typeof AGENT_ROSTER)[number]) => {
+  const submit = async () => {
+    const trimmed = plan.trim();
+    if (!trimmed) {
+      toast.info("Type what you want the agent to do");
+      return;
+    }
     const nodeIds = Array.from(selectedIds);
     if (nodeIds.length === 0) {
       toast.info("Select nodes first", {
@@ -97,26 +102,23 @@ export function AgentAssignPanel({
       });
       return;
     }
-
     if (!settings.anthropicKey) {
       toast.error("Add your Anthropic key in Settings first", {
-        description: "Agents call real Claude — that needs a key.",
+        description: "Agents call Claude Opus 4.7 directly.",
       });
       return;
     }
 
-    const id = `a_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const id = `r_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const nodePathMap: Record<string, string> = {};
     for (const nid of nodeIds) {
       const n = nodesById.get(nid);
       if (n?.path) nodePathMap[nid] = n.path;
     }
 
-    const assignment: Assignment = {
+    const run: Run = {
       id,
-      agent: entry.kind,
-      agentName: entry.name,
-      agentRole: entry.role,
+      plan: trimmed,
       nodeIds,
       status: "running",
       findings: [],
@@ -124,10 +126,11 @@ export function AgentAssignPanel({
       filesLoaded: 0,
       startedAt: Date.now(),
     };
-    setAssignments((a) => [assignment, ...a]);
+    setRuns((rs) => [run, ...rs]);
+    setPlan("");
 
-    toast.success(`${entry.name} · started`, {
-      description: `Reviewing ${nodeIds.length} node${nodeIds.length === 1 ? "" : "s"}`,
+    toast.success("Agent started", {
+      description: `Plan: ${trimmed.slice(0, 80)}${trimmed.length > 80 ? "…" : ""}`,
     });
 
     const ac = new AbortController();
@@ -138,7 +141,7 @@ export function AgentAssignPanel({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          agent: entry.kind,
+          plan: trimmed,
           repo: graph.repo,
           branch: "main",
           selectedNodeIds: nodeIds,
@@ -151,15 +154,12 @@ export function AgentAssignPanel({
         throw new Error(`agent run failed (${res.status})`);
       }
 
-      // Parse SSE stream as it arrives.
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = "";
 
-      // Collected patches need full content for the PR push, so the
-      // route emits a final `done` event with the full output.
       type FinalOutput = {
-        findings: Assignment["findings"];
+        findings: Run["findings"];
         patches: { path: string; newContent: string; summary: string }[];
         summary: string;
       };
@@ -169,10 +169,8 @@ export function AgentAssignPanel({
         const { value, done } = await reader.read();
         if (done) break;
         buf += decoder.decode(value, { stream: true });
-
         const events = buf.split("\n\n");
         buf = events.pop() ?? "";
-
         for (const block of events) {
           const line = block.split("\n").find((l) => l.startsWith("data:"));
           if (!line) continue;
@@ -185,16 +183,13 @@ export function AgentAssignPanel({
             continue;
           }
           handleEvent(id, parsed);
-          if (parsed.type === "done") {
-            finalOutput = parsed.output as FinalOutput;
-          }
+          if (parsed.type === "done") finalOutput = parsed.output as FinalOutput;
         }
       }
 
-      // Stash full patch contents for the PR push.
       if (finalOutput) {
-        update(id, (a) => ({
-          ...a,
+        update(id, (r) => ({
+          ...r,
           status: "done",
           summary: finalOutput!.summary,
           patches: finalOutput!.patches.map((p) => ({
@@ -204,55 +199,49 @@ export function AgentAssignPanel({
             newContent: p.newContent,
           })),
         }));
-        toast.success(`${entry.name} · done`, {
+        toast.success("Agent done", {
           description: `${finalOutput.findings.length} finding${finalOutput.findings.length === 1 ? "" : "s"} · ${finalOutput.patches.length} patch${finalOutput.patches.length === 1 ? "" : "es"}`,
         });
       } else {
-        // Stream ended without 'done' — flag as error.
-        update(id, (a) =>
-          a.status === "running" ? { ...a, status: "error" } : a,
-        );
+        update(id, (r) => (r.status === "running" ? { ...r, status: "error" } : r));
       }
     } catch (e) {
       const message = e instanceof Error ? e.message : "agent failed";
-      update(id, (a) => ({ ...a, status: "error", errorMsg: message }));
-      toast.error(`${entry.name} · error`, { description: message });
+      update(id, (r) => ({ ...r, status: "error", errorMsg: message }));
+      toast.error("Agent error", { description: message });
     } finally {
       cancelRef.current.delete(id);
     }
   };
 
-  const handleEvent = (
-    id: string,
-    ev: { type: string; [k: string]: unknown },
-  ) => {
+  const handleEvent = (id: string, ev: { type: string; [k: string]: unknown }) => {
     switch (ev.type) {
       case "file_loaded":
-        update(id, (a) => ({ ...a, filesLoaded: a.filesLoaded + 1 }));
+        update(id, (r) => ({ ...r, filesLoaded: r.filesLoaded + 1 }));
         break;
       case "finding": {
-        const f = ev as unknown as Assignment["findings"][number];
-        update(id, (a) => ({ ...a, findings: [...a.findings, f] }));
+        const f = ev as unknown as Run["findings"][number];
+        update(id, (r) => ({ ...r, findings: [...r.findings, f] }));
         onAssign?.([f.nodeId], f.kind);
         onHighlight?.([f.nodeId]);
         break;
       }
       case "patch": {
         const p = ev as unknown as Patch;
-        update(id, (a) => ({
-          ...a,
-          patches: [...a.patches, { path: p.path, summary: p.summary, bytes: p.bytes }],
+        update(id, (r) => ({
+          ...r,
+          patches: [...r.patches, { path: p.path, summary: p.summary, bytes: p.bytes }],
         }));
         break;
       }
       case "summary": {
         const text = String((ev as { text?: string }).text ?? "");
-        update(id, (a) => ({ ...a, summary: text }));
+        update(id, (r) => ({ ...r, summary: text }));
         break;
       }
       case "error":
-        update(id, (a) => ({
-          ...a,
+        update(id, (r) => ({
+          ...r,
           status: "error",
           errorMsg: String((ev as { message?: string }).message ?? "error"),
         }));
@@ -261,12 +250,11 @@ export function AgentAssignPanel({
   };
 
   const cancel = (id: string) => {
-    const ac = cancelRef.current.get(id);
-    ac?.abort();
-    update(id, (a) => ({ ...a, status: "error", errorMsg: "cancelled" }));
+    cancelRef.current.get(id)?.abort();
+    update(id, (r) => ({ ...r, status: "error", errorMsg: "cancelled" }));
   };
 
-  const openPr = async (a: Assignment) => {
+  const openPr = async (r: Run) => {
     if (!auth.authenticated) {
       toast.error("Sign in to GitHub", {
         description: "We push the PR through your GitHub OAuth token.",
@@ -279,13 +267,13 @@ export function AgentAssignPanel({
       });
       return;
     }
-    if (a.patches.length === 0) {
+    if (r.patches.length === 0) {
       toast.info("No patches to push", {
         description: "This run only produced findings, no code changes.",
       });
       return;
     }
-    update(a.id, (x) => ({ ...x, pushing: true }));
+    update(r.id, (x) => ({ ...x, pushing: true }));
     try {
       const res = await fetch("/api/agent/push-pr", {
         method: "POST",
@@ -293,9 +281,9 @@ export function AgentAssignPanel({
         body: JSON.stringify({
           repo: graph.repo,
           baseBranch: "main",
-          prTitle: `Causalist ${a.agentName}: ${a.summary?.slice(0, 60) ?? "review"}`,
-          prBody: buildPrBody(a),
-          files: a.patches
+          prTitle: `Causalist: ${r.plan.slice(0, 60)}${r.plan.length > 60 ? "…" : ""}`,
+          prBody: buildPrBody(r),
+          files: r.patches
             .filter((p): p is Patch & { newContent: string } =>
               typeof p.newContent === "string",
             )
@@ -304,18 +292,15 @@ export function AgentAssignPanel({
       });
       const body = (await res.json()) as { prUrl?: string; error?: string };
       if (!res.ok) throw new Error(body.error ?? "push failed");
-      update(a.id, (x) => ({ ...x, pushing: false, prUrl: body.prUrl }));
+      update(r.id, (x) => ({ ...x, pushing: false, prUrl: body.prUrl }));
       toast.success("PR opened", {
         description: body.prUrl,
         action: body.prUrl
-          ? {
-              label: "Open",
-              onClick: () => window.open(body.prUrl, "_blank"),
-            }
+          ? { label: "Open", onClick: () => window.open(body.prUrl, "_blank") }
           : undefined,
       });
     } catch (e) {
-      update(a.id, (x) => ({ ...x, pushing: false }));
+      update(r.id, (x) => ({ ...x, pushing: false }));
       toast.error("PR push failed", {
         description: e instanceof Error ? e.message : "unknown error",
       });
@@ -326,58 +311,82 @@ export function AgentAssignPanel({
     <div className="flex h-full flex-col">
       {/* Demo banner — preview/reference graphs aren't real repos */}
       {!isRealRepo && (
-        <div className="border-b border-amber-200 bg-amber-50/60 px-4 py-2.5 text-[11px] text-amber-800">
+        <div className="border-b border-amber-200 bg-amber-50/60 px-4 py-2 text-[11px] text-amber-800">
           <span className="font-medium">Demo mode.</span> Sample graphs aren&rsquo;t
-          tied to a real GitHub repo, so agents won&rsquo;t fetch files or open
-          PRs. Try this on your own analyzed project.
+          tied to a real repo, so agents can&rsquo;t fetch files or open PRs.
+          Try this on your own analyzed project.
         </div>
       )}
 
-      {/* Assign section */}
+      {/* Plan composer */}
       <div className="border-b border-neutral-100 p-4">
-        <div className="mb-2 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
-          <Sparkle size={10} weight="duotone" className="text-accent-magenta" />
-          Assign agent
+        <div className="mb-2 flex items-center justify-between">
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
+            <Sparkle size={10} weight="fill" className="text-accent-magenta" />
+            Run an agent
+          </div>
+          <div className="font-mono text-[10px] text-neutral-400">
+            {selectedIds.size > 0 ? (
+              <>
+                <span className="font-medium text-neutral-700">
+                  {selectedIds.size}
+                </span>{" "}
+                node{selectedIds.size === 1 ? "" : "s"} selected
+              </>
+            ) : (
+              <span className="text-amber-600">no selection</span>
+            )}
+          </div>
         </div>
-        <div className="mb-3 text-[11px] text-neutral-500">
-          {selectedIds.size > 0 ? (
-            <>
-              <span className="font-medium text-neutral-900">
-                {selectedIds.size}
-              </span>{" "}
-              node{selectedIds.size === 1 ? "" : "s"} selected — pick an agent
-              to review them.
-            </>
-          ) : (
-            <>Multi-select nodes in the graph (shift-click), then pick an agent.</>
-          )}
-        </div>
-        <div className="grid grid-cols-1 gap-1.5">
-          {AGENT_ROSTER.map((a) => (
+        <textarea
+          value={plan}
+          onChange={(e) => setPlan(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          rows={3}
+          placeholder="What should the agent do? e.g., audit these files for bugs and propose fixes."
+          className="w-full resize-none rounded-md border border-neutral-200 bg-white px-3 py-2 text-[12.5px] leading-snug text-neutral-900 placeholder:text-neutral-400 focus:border-accent-magenta/60 focus:outline-none focus:ring-2 focus:ring-accent-magenta/15"
+        />
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {SUGGESTIONS.map((s) => (
             <button
-              key={a.kind}
-              onClick={() => assign(a)}
-              disabled={selectedIds.size === 0 || !isRealRepo}
-              className="group flex items-center justify-between gap-3 rounded-md border border-neutral-200 bg-white px-3 py-2 text-left transition-all hover:border-accent-magenta/50 hover:bg-accent-magenta/[0.03] disabled:cursor-not-allowed disabled:opacity-40"
+              key={s}
+              type="button"
+              onClick={() => setPlan(s)}
+              className="rounded-full border border-neutral-200 bg-white px-2.5 py-1 text-[10.5px] text-neutral-600 transition-all hover:border-accent-magenta/50 hover:text-neutral-900"
             >
-              <div className="min-w-0">
-                <div className="text-[12px] font-medium text-neutral-900">
-                  {a.name}
-                </div>
-                <div className="truncate text-[11px] text-neutral-500">
-                  {a.role}
-                </div>
-              </div>
-              <Plus
-                size={11}
-                className="shrink-0 text-neutral-400 transition-colors group-hover:text-accent-magenta"
-              />
+              {s}
             </button>
           ))}
         </div>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <div className="font-mono text-[10px] text-neutral-400">
+            <kbd className="rounded border border-neutral-200 bg-white px-1 py-px">
+              ⌘
+            </kbd>
+            <span className="mx-0.5">+</span>
+            <kbd className="rounded border border-neutral-200 bg-white px-1 py-px">
+              ↵
+            </kbd>{" "}
+            to run
+          </div>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!plan.trim() || selectedIds.size === 0 || !isRealRepo}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-neutral-900 px-3 text-[12px] font-medium text-white transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            <PaperPlaneRight size={11} weight="fill" />
+            Run agent
+          </button>
+        </div>
         {!settings.anthropicKey && (
           <div className="mt-3 rounded-md border border-neutral-200 bg-neutral-50 p-2.5 text-[11px] text-neutral-500">
-            Agents call Claude Opus 4.7 directly.{" "}
+            Agents call Claude Opus 4.7.{" "}
             <a
               href="/app/settings"
               className="font-medium text-accent-magenta hover:underline"
@@ -389,34 +398,31 @@ export function AgentAssignPanel({
         )}
       </div>
 
-      {/* Active + past assignments */}
+      {/* Run feed */}
       <div className="flex-1 overflow-y-auto p-4">
-        <div className="mb-2 flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
-          <span>Runs</span>
-          {assignments.length > 0 && (
-            <span className="text-neutral-400">{assignments.length}</span>
-          )}
+        <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
+          Activity {runs.length > 0 ? `· ${runs.length}` : ""}
         </div>
-        {assignments.length === 0 ? (
+        {runs.length === 0 ? (
           <div className="rounded-md border border-dashed border-neutral-200 px-4 py-6 text-center text-[11px] text-neutral-400">
             No runs yet.
           </div>
         ) : (
           <ul className="space-y-3">
             <AnimatePresence initial={false}>
-              {assignments.map((a) => (
+              {runs.map((r) => (
                 <motion.li
-                  key={a.id}
+                  key={r.id}
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
                   className="rounded-md border border-neutral-200 bg-white p-3"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {a.status === "running" ? (
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      {r.status === "running" ? (
                         <CausalistSpinner size={11} />
-                      ) : a.status === "error" ? (
+                      ) : r.status === "error" ? (
                         <Warning size={11} weight="fill" className="text-red-500" />
                       ) : (
                         <CheckCircle
@@ -425,56 +431,54 @@ export function AgentAssignPanel({
                           className="text-emerald-500"
                         />
                       )}
-                      <span className="font-mono text-[11px] font-medium text-neutral-900">
-                        {a.agentName}
-                      </span>
-                      <span className="text-[10px] text-neutral-400">
-                        · {a.nodeIds.length} node{a.nodeIds.length === 1 ? "" : "s"}
+                      <span className="truncate font-mono text-[11px] text-neutral-700">
+                        {r.plan}
                       </span>
                     </div>
-                    {a.status === "running" && (
+                    {r.status === "running" && (
                       <button
-                        onClick={() => cancel(a.id)}
+                        onClick={() => cancel(r.id)}
                         aria-label="Cancel"
-                        className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+                        className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
                       >
                         <Stop size={10} weight="fill" />
                       </button>
                     )}
                   </div>
 
-                  {a.status === "running" && (
+                  <div className="mt-1 font-mono text-[10px] text-neutral-400">
+                    {r.nodeIds.length} node{r.nodeIds.length === 1 ? "" : "s"} ·{" "}
+                    {r.filesLoaded}/{r.nodeIds.length} loaded
+                  </div>
+
+                  {r.status === "running" && (
                     <div className="mt-2 flex items-center gap-1.5 font-mono text-[11px] text-accent-magenta">
                       <RotatingVerb
                         verbs={[
-                          a.filesLoaded < a.nodeIds.length ? "Reading" : "Reasoning",
+                          r.filesLoaded < r.nodeIds.length ? "Reading" : "Reasoning",
                           "Tracing",
                           "Cross-checking",
                           "Synthesising",
                         ]}
                       />
-                      <span className="text-neutral-400">
-                        · {a.filesLoaded}/{a.nodeIds.length} loaded
-                      </span>
                     </div>
                   )}
 
-                  {a.errorMsg && (
+                  {r.errorMsg && (
                     <p className="mt-2 font-mono text-[10px] text-red-500">
-                      {a.errorMsg}
+                      {r.errorMsg}
                     </p>
                   )}
 
-                  {a.summary && a.status === "done" && (
+                  {r.summary && r.status === "done" && (
                     <p className="mt-2 text-[11px] leading-snug text-neutral-700">
-                      {a.summary}
+                      {r.summary}
                     </p>
                   )}
 
-                  {/* Findings */}
-                  {a.findings.length > 0 && (
+                  {r.findings.length > 0 && (
                     <ul className="mt-2 space-y-1">
-                      {a.findings.slice(-6).map((f, i) => (
+                      {r.findings.slice(-6).map((f, i) => (
                         <li
                           key={i}
                           className="flex items-start gap-1.5 text-[11px]"
@@ -507,23 +511,22 @@ export function AgentAssignPanel({
                           </span>
                         </li>
                       ))}
-                      {a.findings.length > 6 && (
+                      {r.findings.length > 6 && (
                         <li className="font-mono text-[10px] text-neutral-400">
-                          +{a.findings.length - 6} more
+                          +{r.findings.length - 6} more
                         </li>
                       )}
                     </ul>
                   )}
 
-                  {/* Patches → Open PR */}
-                  {a.status === "done" && a.patches.length > 0 && (
+                  {r.status === "done" && r.patches.length > 0 && (
                     <div className="mt-3 rounded-md border border-neutral-100 bg-[#FAFAF8] p-2.5">
                       <div className="font-mono text-[10px] uppercase tracking-wider text-neutral-400">
-                        {a.patches.length} patch
-                        {a.patches.length === 1 ? "" : "es"}
+                        {r.patches.length} patch
+                        {r.patches.length === 1 ? "" : "es"}
                       </div>
                       <ul className="mt-1.5 space-y-0.5">
-                        {a.patches.slice(0, 4).map((p, i) => (
+                        {r.patches.slice(0, 4).map((p, i) => (
                           <li
                             key={i}
                             className="flex items-center gap-1.5 truncate font-mono text-[10px] text-neutral-600"
@@ -533,9 +536,9 @@ export function AgentAssignPanel({
                           </li>
                         ))}
                       </ul>
-                      {a.prUrl ? (
+                      {r.prUrl ? (
                         <a
-                          href={a.prUrl}
+                          href={r.prUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="mt-2 inline-flex h-7 items-center gap-1 rounded-md bg-emerald-600 px-2.5 text-[11px] font-medium text-white transition-colors hover:bg-emerald-700"
@@ -547,22 +550,14 @@ export function AgentAssignPanel({
                       ) : (
                         <button
                           type="button"
-                          onClick={() => openPr(a)}
-                          disabled={a.pushing || !auth.authenticated || !isRealRepo}
+                          onClick={() => openPr(r)}
+                          disabled={r.pushing || !auth.authenticated || !isRealRepo}
                           className="mt-2 inline-flex h-7 items-center gap-1 rounded-md bg-neutral-900 px-2.5 text-[11px] font-medium text-white transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <GithubLogo size={11} weight="fill" />
-                          {a.pushing ? "Pushing…" : "Open PR"}
+                          {r.pushing ? "Pushing…" : "Open PR"}
                           <ArrowUpRight size={11} />
                         </button>
-                      )}
-                      {!auth.authenticated && (
-                        <a
-                          href="/api/auth/github/login"
-                          className="ml-2 text-[10px] text-neutral-400 underline underline-offset-2 hover:text-neutral-700"
-                        >
-                          Sign in to GitHub
-                        </a>
                       )}
                     </div>
                   )}
@@ -576,21 +571,23 @@ export function AgentAssignPanel({
   );
 }
 
-function buildPrBody(a: Assignment): string {
+function buildPrBody(r: Run): string {
   const lines: string[] = [
-    `_Opened by Causalist **${a.agentName}** agent on behalf of the user._`,
+    `_Opened by a Causalist agent on behalf of the user._`,
     "",
-    a.summary ?? "(no summary)",
+    `**Plan:** ${r.plan}`,
+    "",
+    r.summary ?? "(no summary)",
     "",
     "## Changes",
     "",
   ];
-  for (const p of a.patches) {
+  for (const p of r.patches) {
     lines.push(`- \`${p.path}\` — ${p.summary}`);
   }
-  if (a.findings.length > 0) {
+  if (r.findings.length > 0) {
     lines.push("", "## Findings", "");
-    for (const f of a.findings) {
+    for (const f of r.findings) {
       lines.push(`- **${f.kind}** \`${f.path}\` — ${f.note}`);
     }
   }
