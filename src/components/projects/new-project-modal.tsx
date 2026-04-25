@@ -3,13 +3,11 @@
 import { useEffect, useMemo, useState, type ReactElement } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import {
   ArrowRight,
   CheckCircle,
   CircleNotch,
-  GithubLogo,
-  Terminal,
   Warning,
 } from "@phosphor-icons/react";
 import {
@@ -34,14 +32,15 @@ type UrlState =
   | { kind: "private"; owner: string; repo: string };
 
 /**
- * New-project modal — URL tab now feels alive: type a URL, see the
- * format checked instantly, then a real GitHub HEAD lookup confirms
- * the repo exists and surfaces the language + star count. Failure
- * states (404, private/auth) get their own friendly micro-copy.
+ * New-project modal — single focused form: an optional friendly name
+ * up top, then the GitHub URL with live validation (format check on
+ * every keystroke, debounced GitHub HEAD lookup confirms the repo
+ * exists, surfaces stars + primary language). Pairing lives elsewhere
+ * (the dedicated PairWizard on the Projects page) — this modal is
+ * single-purpose: spin up a new graph.
  */
 export function NewProjectModal({ children }: { children: ReactElement }) {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<"url" | "pair">("url");
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -154,149 +153,103 @@ export function NewProjectModal({ children }: { children: ReactElement }) {
             </DialogDescription>
           </header>
 
-          {/* Tabs */}
-          <div className="flex border-b border-neutral-100 px-2">
-            <TabBtn
-              active={tab === "url"}
-              onClick={() => setTab("url")}
-              icon={<GithubLogo size={12} weight="fill" />}
-              label="From GitHub URL"
-            />
-            <TabBtn
-              active={tab === "pair"}
-              onClick={() => setTab("pair")}
-              icon={<Terminal size={12} weight="duotone" />}
-              label="Pair your terminal"
-            />
-          </div>
+          <div className="space-y-4 bg-[#FAFAF8] px-5 py-5">
+            {/* Optional name — visible upfront so the user can think of
+                it as "their" project before the URL is even validated. */}
+            <div>
+              <label
+                htmlFor="proj-name"
+                className="font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400"
+              >
+                Project name <span className="text-neutral-300">· optional</span>
+              </label>
+              <Input
+                id="proj-name"
+                type="text"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={
+                  urlState.kind === "valid" || urlState.kind === "private"
+                    ? `${urlState.owner}/${urlState.repo}`
+                    : "e.g. payments-service"
+                }
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && canAnalyze && handleAnalyze()
+                }
+                className="mt-1.5 h-10 border-neutral-200 bg-white text-sm"
+              />
+            </div>
 
-          <div className="bg-[#FAFAF8] px-5 py-5">
-            {tab === "url" ? (
-              <div className="space-y-4">
-                {/* URL field with live status */}
-                <div>
-                  <label
-                    htmlFor="repo-url"
-                    className="font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400"
-                  >
-                    Repo URL
-                  </label>
-                  <div className="relative mt-1.5">
-                    <Input
-                      id="repo-url"
-                      type="url"
-                      inputMode="url"
-                      autoComplete="off"
-                      spellCheck={false}
-                      autoFocus
-                      placeholder="https://github.com/owner/repo"
-                      value={repoUrl}
-                      onChange={(e) => setRepoUrl(e.target.value)}
-                      onKeyDown={(e) =>
-                        e.key === "Enter" && canAnalyze && handleAnalyze()
-                      }
-                      className={cn(
-                        "h-11 border-neutral-200 bg-white pr-10 font-mono text-sm transition-colors",
-                        urlState.kind === "valid" && "border-emerald-300",
-                        (urlState.kind === "invalid" ||
-                          urlState.kind === "missing") &&
-                          "border-red-300",
-                      )}
-                      aria-invalid={
-                        urlState.kind === "invalid" || urlState.kind === "missing"
-                          ? "true"
-                          : "false"
-                      }
-                    />
-                    <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
-                      <UrlStatusGlyph state={urlState.kind} />
-                    </div>
-                  </div>
-                  <UrlStatusLine state={urlState} />
-                </div>
-
-                {/* Optional nickname — only show once we have a valid URL */}
-                <AnimatePresence>
-                  {(urlState.kind === "valid" ||
-                    urlState.kind === "private") && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-                    >
-                      <label
-                        htmlFor="proj-name"
-                        className="font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400"
-                      >
-                        Name (optional)
-                      </label>
-                      <Input
-                        id="proj-name"
-                        type="text"
-                        autoComplete="off"
-                        spellCheck={false}
-                        placeholder={`${urlState.owner}/${urlState.repo}`}
-                        value={nickname}
-                        onChange={(e) => setNickname(e.target.value)}
-                        onKeyDown={(e) =>
-                          e.key === "Enter" && canAnalyze && handleAnalyze()
-                        }
-                        className="mt-1.5 h-10 border-neutral-200 bg-white text-sm"
-                      />
-                      <p className="mt-1 text-[10.5px] text-neutral-400">
-                        Shown in your Projects list. Defaults to{" "}
-                        <code className="font-mono">owner/repo</code>.
-                      </p>
-                    </motion.div>
+            {/* GitHub URL with live status */}
+            <div>
+              <label
+                htmlFor="repo-url"
+                className="font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400"
+              >
+                GitHub URL
+              </label>
+              <div className="relative mt-1.5">
+                <Input
+                  id="repo-url"
+                  type="url"
+                  inputMode="url"
+                  autoComplete="off"
+                  spellCheck={false}
+                  autoFocus
+                  placeholder="https://github.com/owner/repo"
+                  value={repoUrl}
+                  onChange={(e) => setRepoUrl(e.target.value)}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && canAnalyze && handleAnalyze()
+                  }
+                  className={cn(
+                    "h-11 border-neutral-200 bg-white pr-10 font-mono text-sm transition-colors",
+                    urlState.kind === "valid" && "border-emerald-300",
+                    (urlState.kind === "invalid" ||
+                      urlState.kind === "missing") &&
+                      "border-red-300",
                   )}
-                </AnimatePresence>
-
-                {/* Action row */}
-                <div className="flex items-center justify-between pt-1">
-                  <p className="text-[10.5px] text-neutral-400">
-                    Need a key?{" "}
-                    <Link
-                      href="/app/settings"
-                      className="underline underline-offset-2 hover:text-neutral-700"
-                    >
-                      Add Anthropic in settings
-                    </Link>
-                    .
-                  </p>
-                  <Button
-                    onClick={handleAnalyze}
-                    disabled={submitting || !canAnalyze}
-                    className={cn(
-                      "h-10 px-4 text-white transition-all",
-                      canAnalyze
-                        ? "bg-accent-magenta hover:bg-accent-magenta/90 hover:shadow-[0_0_0_4px_rgba(232,56,164,0.15)]"
-                        : "bg-neutral-900 hover:bg-neutral-800",
-                    )}
-                  >
-                    Map it
-                    <ArrowRight size={14} className="ml-1.5" />
-                  </Button>
+                  aria-invalid={
+                    urlState.kind === "invalid" || urlState.kind === "missing"
+                      ? "true"
+                      : "false"
+                  }
+                />
+                <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+                  <UrlStatusGlyph state={urlState.kind} />
                 </div>
               </div>
-            ) : (
-              <div>
-                <p className="text-[12px] text-neutral-600">
-                  Run Causalist alongside your editor — Claude Code can push
-                  new projects straight into this list via the MCP server.
-                </p>
-                <pre className="mt-3 overflow-x-auto rounded-md border border-neutral-200 bg-white p-3 font-mono text-[11px] text-neutral-700">
-                  {`# 1. grab a pair code at /pair\n\n# 2. wire the MCP server into Claude Code\n#    (no npm install — npx fetches it)\nclaude mcp add causalist -- \\\n  npx -y causalist-mcp@latest --session YOUR_CODE`}
-                </pre>
+              <UrlStatusLine state={urlState} />
+            </div>
+
+            {/* Action row */}
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-[10.5px] text-neutral-400">
+                Need a key?{" "}
                 <Link
-                  href="/app/claude-code"
-                  className="mt-3 inline-flex items-center gap-1 text-[12px] text-accent-magenta hover:underline"
+                  href="/app/settings"
+                  className="underline underline-offset-2 hover:text-neutral-700"
                 >
-                  Full setup walkthrough
-                  <ArrowRight size={11} />
+                  Add Anthropic in settings
                 </Link>
-              </div>
-            )}
+                .
+              </p>
+              <Button
+                onClick={handleAnalyze}
+                disabled={submitting || !canAnalyze}
+                className={cn(
+                  "h-10 px-4 text-white transition-all",
+                  canAnalyze
+                    ? "bg-accent-magenta hover:bg-accent-magenta/90 hover:shadow-[0_0_0_4px_rgba(232,56,164,0.15)]"
+                    : "bg-neutral-900 hover:bg-neutral-800",
+                )}
+              >
+                Map it
+                <ArrowRight size={14} className="ml-1.5" />
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
@@ -399,33 +352,3 @@ function UrlStatusLine({ state }: { state: UrlState }) {
   );
 }
 
-function TabBtn({
-  active,
-  onClick,
-  icon,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: ReactElement;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "relative flex items-center gap-1.5 px-4 py-3 text-[12px] transition-colors",
-        active ? "text-neutral-900" : "text-neutral-500 hover:text-neutral-900",
-      )}
-    >
-      <span className={active ? "text-accent-magenta" : "text-neutral-400"}>
-        {icon}
-      </span>
-      {label}
-      {active && (
-        <span className="absolute inset-x-2 -bottom-px h-0.5 bg-accent-magenta" />
-      )}
-    </button>
-  );
-}
