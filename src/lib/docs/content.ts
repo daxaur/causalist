@@ -359,33 +359,25 @@ With [prompt caching](https://docs.anthropic.com/en/docs/build-with-claude/promp
     body: `
 ## Surfaces
 
-Causalist ships three ways to invoke it, all backed by the same core library:
+Causalist ships two ways to invoke it, both backed by the same core library:
 
 ### Web app
 Paste a GitHub URL at [causalist.xyz](https://causalist.xyz) and Claude maps the repo. Hand-curated demos load instantly; live analyze of any public repo runs when you add your Anthropic key in Settings.
 
-### CLI
-\`\`\`bash
-npm install -g causalist-cli
-causalist pair <code>          # pair this terminal with the browser
-causalist map vercel/next.js   # analyze a repo
-causalist serve --graph ./graph.json  # serve a local graph for the MCP server
-\`\`\`
-
-Run \`causalist install\` to print the MCP config snippet for Claude Code.
-
 ### Claude Code MCP server
 \`\`\`bash
-claude mcp add causalist -- npx -y causalist-mcp@latest
+claude mcp add causalist -- npx -y causalist-mcp@latest --session ABC123
 \`\`\`
 
-The \`causalist-mcp\` package exposes the eleven tools below over stdio. Once paired, Claude Code's \`create_project\` tool pushes new graphs straight into your browser's Projects list.
+One command. \`npx\` fetches the latest server — no global npm install needed. The \`causalist-mcp\` package exposes the eleven tools below over stdio. Pair codes come from [/pair](https://causalist.xyz/pair) in the browser; pass yours via the \`--session\` flag and Claude Code knows which browser to push graphs into.
+
+Once wired, Claude Code's \`create_project\` tool pushes new graphs straight into your Projects list — no manual paste step.
 
 ## Live streaming
 
 When Claude Code is paired with the browser, its \`PostToolUse\` hook posts tool-use events to \`https://causalist.xyz/api/ingest/<session>\`. The browser viewer subscribes via Server-Sent Events at \`/api/stream/<session>\` and highlights nodes in real time — open the repo's graph in another tab and *watch Claude work.*
 
-The pairing flow (browser shows a code, CLI calls \`causalist pair ABC123\`) is how the browser and local session agree on a \`sessionId\` without requiring a user account.
+Pairing is how the browser and local Claude session agree on a \`sessionId\` without requiring a user account.
 
 ## MCP tools (eleven, stable)
 

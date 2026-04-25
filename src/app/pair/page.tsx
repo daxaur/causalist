@@ -66,7 +66,9 @@ export default function PairPage() {
 
   const copyCli = async () => {
     if (!code) return;
-    await navigator.clipboard.writeText(`causalist pair ${code}`);
+    await navigator.clipboard.writeText(
+      `claude mcp add causalist -- npx -y causalist-mcp@latest --session ${code}`,
+    );
     setCopied("cli");
     setTimeout(() => setCopied(null), 1500);
   };
@@ -137,31 +139,31 @@ export default function PairPage() {
 
               <details className="w-full text-left text-xs text-neutral-500">
                 <summary className="cursor-pointer hover:text-neutral-700">
-                  Or use the Causalist CLI
+                  Or wire it into Claude Code directly
                 </summary>
                 <button
                   onClick={copyCli}
-                  className="mt-3 flex w-full items-center justify-between rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 font-mono text-[12px] text-neutral-700 hover:border-neutral-300"
+                  className="mt-3 flex w-full items-center justify-between rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-left font-mono text-[12px] text-neutral-700 hover:border-neutral-300"
                 >
-                  <span>
+                  <span className="min-w-0 truncate">
                     <TerminalIcon
                       size={11}
                       className="mr-1.5 inline-block align-[-1px] text-accent-magenta"
                     />
-                    causalist pair {code}
+                    claude mcp add causalist -- npx -y causalist-mcp@latest --session {code}
                   </span>
                   {copied === "cli" ? (
                     <CheckCircle
                       size={12}
                       weight="fill"
-                      className="text-emerald-500"
+                      className="ml-2 shrink-0 text-emerald-500"
                     />
                   ) : (
-                    <Copy size={11} className="text-neutral-400" />
+                    <Copy size={11} className="ml-2 shrink-0 text-neutral-400" />
                   )}
                 </button>
                 <p className="mt-2 text-[11px] text-neutral-400">
-                  Requires <code className="font-mono">npm install -g causalist-cli</code>.
+                  Adds the Causalist MCP server to Claude Code with this pair code baked in. No global npm install needed — npx fetches the latest server.
                 </p>
               </details>
             </motion.div>

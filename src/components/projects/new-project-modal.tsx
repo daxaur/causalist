@@ -163,7 +163,7 @@ export function NewProjectModal({ children }: { children: ReactElement }) {
                   new projects straight into this list via the MCP server.
                 </p>
                 <pre className="mt-3 overflow-x-auto rounded-md border border-neutral-200 bg-white p-3 font-mono text-[11px] text-neutral-700">
-                  {`# 1. install the CLI + MCP server\nnpm i -g causalist-cli causalist-mcp\n\n# 2. pair this browser (visit /pair for the code)\ncausalist pair <code>\n\n# 3. wire into Claude Code\nclaude mcp add causalist -- npx -y causalist-mcp@latest`}
+                  {`# 1. grab a pair code at /pair\n\n# 2. wire the MCP server into Claude Code\n#    (no npm install — npx fetches it)\nclaude mcp add causalist -- \\\n  npx -y causalist-mcp@latest --session YOUR_CODE`}
                 </pre>
                 <Link
                   href="/app/claude-code"

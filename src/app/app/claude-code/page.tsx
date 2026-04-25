@@ -17,41 +17,37 @@ export default function ClaudeCodePage() {
     <PageShell width="docs">
       <PageHeader
         eyebrow="Connect Claude Code"
-        title="Three commands."
-        description="Pair Claude Code with Causalist so the agent can read your graph (10 tools) and push new projects into your list."
+        title="Two steps."
+        description="Add the Causalist MCP server. Claude Code gets 11 graph-aware tools — and can push new projects straight into your list."
       />
 
-      {/* The three commands — front and center */}
+      {/* The two steps — front and center. No CLI: the MCP server is the
+          whole integration; pairing happens in the browser. */}
       <ol className="mb-8 space-y-3">
         <Step
           n={1}
-          title="Install"
-          code="npm i -g causalist-cli causalist-mcp"
-          body="One package gives you the CLI; the other is the MCP server Claude Code talks to."
-        />
-        <Step
-          n={2}
-          title="Pair this browser"
-          code="causalist init"
+          title="Get a pair code"
+          code={null}
           body={
             <>
-              Opens a one-time pair link. Once paired, the MCP server knows
-              which browser session to push to. Or visit{" "}
+              Visit{" "}
               <Link
                 href="/pair"
                 className="font-medium text-accent-magenta hover:underline"
               >
                 /pair
-              </Link>{" "}
-              for a manual code.
+              </Link>
+              . Copy the 6-char code — you&rsquo;ll paste it into the MCP
+              config below so Claude Code knows which browser to push graphs
+              into.
             </>
           }
         />
         <Step
-          n={3}
-          title="Wire the server into Claude Code"
-          code="claude mcp add causalist -- npx -y causalist-mcp@latest"
-          body="Claude Code now has 10 graph-aware tools — query_node, blast_radius, affected_tests, find_writers, and more — plus create_project to add repos to your list."
+          n={2}
+          title="Wire the MCP server into Claude Code"
+          code="claude mcp add causalist -- npx -y causalist-mcp@latest --session YOUR_PAIR_CODE"
+          body="One command. No npm install needed — npx fetches the latest server. Claude Code now has 11 graph tools (query_node, blast_radius, affected_tests, find_writers, create_project, …)."
         />
       </ol>
 
@@ -120,7 +116,7 @@ function Step({
 }: {
   n: number;
   title: string;
-  code: string;
+  code: string | null;
   body: React.ReactNode;
 }) {
   return (
@@ -133,9 +129,11 @@ function Step({
           {title}
         </div>
       </div>
-      <pre className="mt-3 overflow-x-auto rounded-md border border-neutral-200 bg-neutral-900 p-3 font-mono text-[12.5px] text-white">
-        $ {code}
-      </pre>
+      {code && (
+        <pre className="mt-3 overflow-x-auto rounded-md border border-neutral-200 bg-neutral-900 p-3 font-mono text-[12.5px] text-white">
+          $ {code}
+        </pre>
+      )}
       <p className="mt-2.5 text-[12.5px] leading-snug text-neutral-600">
         {body}
       </p>
