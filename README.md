@@ -85,9 +85,9 @@ npm run dev -- --port 4141
 - `@octokit/rest` for GitHub ingestion
 - Devicon CDN for language/framework node icons
 
-## Hackathon
+## License
 
-Built for **Built with Opus 4.7** — Anthropic × Cerebral Valley (Apr 21–27 2026).
+MIT — see [`LICENSE`](LICENSE).
 
 Claude and Anthropic are trademarks of Anthropic PBC. This project is
 independent and unaffiliated.

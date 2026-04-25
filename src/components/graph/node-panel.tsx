@@ -55,16 +55,16 @@ export function NodePanel({
   const [promptOpen, setPromptOpen] = useState(false);
 
   const { incoming, outgoing } = useMemo(() => {
-    const incoming: { node: CausalNode; kind: string }[] = [];
-    const outgoing: { node: CausalNode; kind: string }[] = [];
+    const incoming: { node: CausalNode; kind: string; verified?: boolean }[] = [];
+    const outgoing: { node: CausalNode; kind: string; verified?: boolean }[] = [];
     for (const e of allEdges) {
       if (e.target === node.id) {
         const src = allNodes.find((n) => n.id === e.source);
-        if (src) incoming.push({ node: src, kind: e.kind });
+        if (src) incoming.push({ node: src, kind: e.kind, verified: e.verified });
       }
       if (e.source === node.id) {
         const tgt = allNodes.find((n) => n.id === e.target);
-        if (tgt) outgoing.push({ node: tgt, kind: e.kind });
+        if (tgt) outgoing.push({ node: tgt, kind: e.kind, verified: e.verified });
       }
     }
     return { incoming, outgoing };
@@ -282,7 +282,7 @@ function EdgeList({
 }: {
   title: string;
   description: string;
-  edges: { node: CausalNode; kind: string }[];
+  edges: { node: CausalNode; kind: string; verified?: boolean }[];
   onSelect: (n: CausalNode) => void;
   direction: "in" | "out";
 }) {
@@ -298,22 +298,44 @@ function EdgeList({
         <div className="text-[11px] italic text-neutral-400">—</div>
       ) : (
         <ul className="space-y-1">
-          {edges.slice(0, 12).map(({ node, kind }, i) => (
+          {edges.slice(0, 12).map(({ node, kind, verified }, i) => (
             <li key={`${node.id}-${i}`}>
               <button
                 onClick={() => onSelect(node)}
                 className={cn(
                   "group flex w-full items-start gap-1.5 rounded px-1.5 py-1 text-left transition-colors hover:bg-neutral-50",
                 )}
-                title={node.summary ?? node.label}
+                title={
+                  verified === true
+                    ? `${node.summary ?? node.label} · AST-verified`
+                    : verified === false
+                      ? `${node.summary ?? node.label} · agent-claimed only (not in AST)`
+                      : node.summary ?? node.label
+                }
               >
                 <span
                   className="mt-1 h-1 w-1 shrink-0 rounded-full"
                   style={{ backgroundColor: LAYER_COLORS[node.layer] }}
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-[11px] text-neutral-700 group-hover:text-neutral-900">
-                    {node.label}
+                  <div className="flex items-center gap-1.5 truncate text-[11px] text-neutral-700 group-hover:text-neutral-900">
+                    <span className="truncate">{node.label}</span>
+                    {verified === true && (
+                      <span
+                        aria-label="AST-verified"
+                        className="shrink-0 font-mono text-[9px] text-emerald-600"
+                      >
+                        ✓
+                      </span>
+                    )}
+                    {verified === false && (
+                      <span
+                        aria-label="agent-claimed only — not in AST"
+                        className="shrink-0 font-mono text-[9px] text-amber-500"
+                      >
+                        ~
+                      </span>
+                    )}
                   </div>
                   <div className="truncate text-[9px] text-neutral-400">
                     {direction === "out" ? "" : "← "}

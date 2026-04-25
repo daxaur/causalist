@@ -128,7 +128,7 @@ function Footer() {
 
       <div className="mx-auto mt-12 flex max-w-6xl flex-col items-start justify-between gap-3 border-t border-neutral-200 pt-6 text-[11px] text-neutral-400 sm:flex-row sm:items-center">
         <span className="flex items-center gap-2">
-          causalist · built for the Opus 4.7 hackathon
+          causalist · open source · MIT
         </span>
         <span className="font-mono">
           Claude and Anthropic are trademarks of Anthropic PBC
