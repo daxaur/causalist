@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowUpRight,
   Cursor,
-  Fire,
   GithubLogo,
   X,
 } from "@phosphor-icons/react";
@@ -65,28 +64,6 @@ export function EmbeddedMiniViewer({ previews }: { previews: PreviewMeta[] }) {
     () => new Map(active.graph.nodes.map((n) => [n.id, n])),
     [active],
   );
-
-  // Only show legend rows for layers that actually appear in this graph
-  // — keeps the demo focused, no empty UI.
-  const presentLayers = useMemo(() => {
-    const set = new Set<SemanticLayer>();
-    for (const n of active.graph.nodes) set.add(n.layer);
-    return Array.from(set);
-  }, [active]);
-
-  // Hot/core/leaf counts for the importance hint at top-right.
-  const tiers = useMemo(() => {
-    let hot = 0,
-      core = 0,
-      leaf = 0;
-    for (const n of active.graph.nodes) {
-      const t = importance.byId.get(n.id)?.tier;
-      if (t === "hot") hot++;
-      else if (t === "core") core++;
-      else leaf++;
-    }
-    return { hot, core, leaf };
-  }, [active, importance]);
 
   const data = useMemo(
     () => ({
@@ -231,24 +208,12 @@ export function EmbeddedMiniViewer({ previews }: { previews: PreviewMeta[] }) {
             />
           )}
 
-          {/* Importance hint — top-right */}
-          <div className="pointer-events-none absolute right-3 top-3 flex items-center gap-2 rounded-md border border-neutral-200 bg-white/85 px-2 py-1 font-mono text-[10px] text-neutral-500 backdrop-blur">
-            <span className="flex items-center gap-1 text-accent-magenta">
-              <Fire size={9} weight="fill" />
-              {tiers.hot} hot
-            </span>
-            <span className="text-neutral-300">·</span>
-            <span className="text-amber-600">{tiers.core} core</span>
-            <span className="text-neutral-300">·</span>
-            <span>{tiers.leaf} leaf</span>
-          </div>
-
-          {/* "Click a node" prompt — bottom-right, only when nothing
-              selected. Lets viewers know the canvas is interactive. */}
+          {/* Single quiet hint when nothing's selected. Disappears on
+              first click — the info card replaces it. */}
           {!selected && (
-            <div className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white/85 px-2.5 py-1 font-mono text-[10px] text-neutral-500 backdrop-blur">
+            <div className="pointer-events-none absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-neutral-200 bg-white/85 px-2.5 py-1 font-mono text-[10px] text-neutral-500 backdrop-blur">
               <Cursor size={9} weight="duotone" />
-              click any node to inspect
+              click any node
             </div>
           )}
 
@@ -314,33 +279,7 @@ export function EmbeddedMiniViewer({ previews }: { previews: PreviewMeta[] }) {
           </AnimatePresence>
         </div>
 
-        {/* Legend strip — color → layer. Only layers that exist in this
-            graph; the strip auto-shrinks for lighter previews. */}
-        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 border-t border-neutral-100 bg-white/80 px-3 py-2 font-mono text-[10px] text-neutral-500 backdrop-blur">
-          <span className="text-neutral-400">layer:</span>
-          {presentLayers.map((l) => (
-            <span key={l} className="inline-flex items-center gap-1.5">
-              <span
-                className="inline-block h-1.5 w-1.5 rounded-full"
-                style={{ backgroundColor: LAYER_COLORS[l] }}
-              />
-              {LAYER_LABELS[l]}
-            </span>
-          ))}
-          <span className="ml-2 text-neutral-300">·</span>
-          <span className="inline-flex items-center gap-1.5 text-accent-magenta">
-            <span
-              className="inline-block h-1.5 w-1.5 rounded-full"
-              style={{ backgroundColor: ACCENT }}
-            />
-            hot (top 10% by fan-in)
-          </span>
-        </div>
       </motion.div>
-
-      <p className="mt-3 text-center font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
-        drag · orbit · click — it&rsquo;s the real 3D graph
-      </p>
     </div>
   );
 }
