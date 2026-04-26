@@ -410,12 +410,12 @@ function EmptyCanvas({
             </div>
             <div>
               <div className="font-display text-[20px] font-medium text-neutral-900">
-                {isError ? "Build failed" : "Ready to build"}
+                {isError ? "Build failed" : "Ready when you are"}
               </div>
               <p className="mt-1.5 max-w-md text-[13.5px] leading-relaxed text-neutral-500">
                 {isError
-                  ? "Pick models above and try again — your last selection is preserved."
-                  : "Pick a model for each of the 4 agents above (or keep the Opus 4.7 defaults), then run."}
+                  ? "Open the build dialog from Projects to retry."
+                  : "Configure agents in the dialog, then run. Nodes appear here as Structure emits them."}
               </p>
             </div>
             {onRun && (

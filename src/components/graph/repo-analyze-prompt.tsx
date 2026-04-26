@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ArrowRight, Key } from "@phosphor-icons/react";
 import { listIndex, getEntry, saveEntry, touch } from "@/lib/library/store";
@@ -12,6 +13,7 @@ import {
   LiveBuildView,
   type AgentLiveState,
 } from "./live-build-view";
+import { BuildConfigModal } from "./build-config-modal";
 import { BUILDER_AGENTS, type BuilderAgentId } from "@/lib/analyze/prompts";
 import type {
   CausalEdge,
@@ -39,6 +41,10 @@ function initialModels(): Record<BuilderAgentId, string> {
   };
 }
 
+function initialEnabled(): Record<BuilderAgentId, boolean> {
+  return { structure: true, dependency: true, semantic: true, oracle: true };
+}
+
 export function RepoAnalyzePrompt({
   owner,
   repo,
@@ -56,9 +62,16 @@ export function RepoAnalyzePrompt({
   const [models, setModels] = useState<Record<BuilderAgentId, string>>(
     () => readModelsFromStorage() ?? initialModels(),
   );
+  const [enabled, setEnabled] = useState<Record<BuilderAgentId, boolean>>(
+    initialEnabled,
+  );
   const [stage, setStage] = useState<
     "idle" | "fetching" | "running" | "done" | "error"
   >("idle");
+  const router = useRouter();
+  // Modal owns the build configuration step. Opens automatically when
+  // we're on /app/owner/repo with no saved graph and stage === idle.
+  const [configOpen, setConfigOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [graph, setGraph] = useState<CausalGraph | null>(null);
   // Live-build state. Nodes/edges accumulate as agents emit; pulse
@@ -170,6 +183,36 @@ export function RepoAnalyzePrompt({
     });
   }, []);
 
+  const setAgentEnabled = useCallback(
+    (id: BuilderAgentId, value: boolean) => {
+      setEnabled((prev) => ({ ...prev, [id]: value }));
+    },
+    [],
+  );
+
+  // Open the build-config modal automatically once we know the user
+  // has a key, the library check is done, and there's no existing
+  // graph to render.
+  useEffect(() => {
+    if (
+      canAnalyze &&
+      !hydrating &&
+      stage === "idle" &&
+      !graph &&
+      !configOpen
+    ) {
+      setConfigOpen(true);
+    }
+  }, [canAnalyze, hydrating, stage, graph, configOpen]);
+
+  const enabledAgentsForApi = useMemo(
+    () => ({
+      dependency: enabled.dependency,
+      semantic: enabled.semantic,
+    }),
+    [enabled.dependency, enabled.semantic],
+  );
+
   // No auto-start — the user lands on the LiveBuildView empty state
   // ("Ready to build") with the per-agent ModelPills visible in the
   // top strip. They pick the model for each agent (Opus 4.7 / Sonnet
@@ -177,12 +220,20 @@ export function RepoAnalyzePrompt({
 
   const startAnalysis = async () => {
     if (!canAnalyze) return;
+    setConfigOpen(false);
     setError(null);
     setGraph(null);
     setLiveNodes([]);
     setLiveEdges([]);
     setStage("fetching");
-    setAgents(initialAgents());
+    // Initialize agent strip: enabled ones are pending, disabled ones
+    // are marked "done" up-front so they read as "skipped" in the UI
+    // instead of perpetually pending.
+    const init = initialAgents();
+    for (const a of BUILDER_AGENTS) {
+      if (!enabled[a.id]) init[a.id] = { id: a.id, status: "done", count: 0 };
+    }
+    setAgents(init);
     const controller = new AbortController();
     abortRef.current = controller;
 
@@ -280,6 +331,7 @@ export function RepoAnalyzePrompt({
           tree: entries.slice(0, 1500),
           files,
           models,
+          enabledAgents: enabledAgentsForApi,
         }),
       });
       if (!res.body) throw new Error("Analyze endpoint returned no body");
@@ -492,10 +544,12 @@ export function RepoAnalyzePrompt({
   }
 
   // Idle / fetching / running / error — full-bleed live build view.
-  // The Run CTA is embedded inside LiveBuildView's empty state so the
-  // user picks models above and clicks Run inline with the canvas.
+  // Run CTA lives in the BuildConfigModal, not in the canvas. While
+  // the modal is open the underlying view is the empty/streaming
+  // canvas. Closing the modal without running drops the user back to
+  // the projects page.
   return (
-    <div className="h-full w-full">
+    <div className="relative h-full w-full">
       <LiveBuildView
         agents={agents}
         models={models}
@@ -505,10 +559,34 @@ export function RepoAnalyzePrompt({
         modelsLocked={isBuildLive}
         running={isBuildLive}
         stage={stage}
-        onRun={startAnalysis}
+        // No onRun — the modal is the only entry point for starting a
+        // build, so the empty-canvas hint stays a passive "warming up"
+        // state.
         footerNote={
-          error ?? (isBuildLive ? undefined : "Pick models, then run.")
+          error ??
+          (isBuildLive
+            ? undefined
+            : configOpen
+              ? "Configure agents in the dialog…"
+              : "Build cancelled. Reopen via Projects.")
         }
+      />
+      <BuildConfigModal
+        open={configOpen}
+        owner={owner}
+        repo={repo}
+        models={models}
+        onModelChange={setModel}
+        enabled={enabled}
+        onEnabledChange={setAgentEnabled}
+        onRun={() => void startAnalysis()}
+        onClose={() => {
+          setConfigOpen(false);
+          // If the user dismisses without running and no graph exists,
+          // send them back to the project list so they don't sit on a
+          // dead empty viewer.
+          if (stage === "idle") router.push("/app");
+        }}
       />
     </div>
   );

@@ -37,6 +37,16 @@ export interface TreeEntry {
 
 export type ModelMap = Partial<Record<BuilderAgentId, string>>;
 
+export interface EnabledAgents {
+  /** Edge extraction. Default true. */
+  dependency?: boolean;
+  /** Per-node summaries. Default true. */
+  semantic?: boolean;
+  // Structure + Oracle are always on — Structure produces the node
+  // list every other stage depends on, Oracle synthesizes the final
+  // graph. Disabling either is a degenerate run.
+}
+
 export interface AnalyzeInput {
   owner: string;
   repo: string;
@@ -48,6 +58,8 @@ export interface AnalyzeInput {
   apiKey: string;
   /** Per-agent model overrides; defaults to Opus 4.7 for missing entries. */
   models?: ModelMap;
+  /** Optional opt-out toggles for Dependency / Semantic. */
+  enabledAgents?: EnabledAgents;
 }
 
 export type AgentStage =
@@ -151,42 +163,56 @@ export async function* runAnalyze(
     });
 
     // Now Dependency + Semantic — both informed by the real node list.
-    enqueue({ stage: "dependency", status: "started" });
-    enqueue({ stage: "semantic", status: "started" });
+    // Either can be disabled via input.enabledAgents; in that case we
+    // still emit a "completed" event so the UI strip moves on.
+    const depEnabled = input.enabledAgents?.dependency !== false;
+    const semEnabled = input.enabledAgents?.semantic !== false;
+
+    if (depEnabled) enqueue({ stage: "dependency", status: "started" });
+    if (semEnabled) enqueue({ stage: "semantic", status: "started" });
+
     const [dependencyRes, semanticRes] = await Promise.allSettled([
-      streamDependency(client, input, collectedNodes, enqueue, (e) =>
-        collectedEdges.push(e),
-      ),
-      streamSemantic(client, input, collectedNodes, enqueue, (s) =>
-        collectedSummaries.push(s),
-      ),
+      depEnabled
+        ? streamDependency(client, input, collectedNodes, enqueue, (e) =>
+            collectedEdges.push(e),
+          )
+        : Promise.resolve(),
+      semEnabled
+        ? streamSemantic(client, input, collectedNodes, enqueue, (s) =>
+            collectedSummaries.push(s),
+          )
+        : Promise.resolve(),
     ]);
 
-    if (dependencyRes.status === "rejected") {
+    if (depEnabled) {
+      if (dependencyRes.status === "rejected") {
+        enqueue({
+          stage: "dependency",
+          status: "error",
+          message: errString(dependencyRes.reason),
+        });
+      }
       enqueue({
         stage: "dependency",
-        status: "error",
-        message: errString(dependencyRes.reason),
+        status: "completed",
+        payload: collectedEdges,
       });
     }
-    enqueue({
-      stage: "dependency",
-      status: "completed",
-      payload: collectedEdges,
-    });
 
-    if (semanticRes.status === "rejected") {
+    if (semEnabled) {
+      if (semanticRes.status === "rejected") {
+        enqueue({
+          stage: "semantic",
+          status: "error",
+          message: errString(semanticRes.reason),
+        });
+      }
       enqueue({
         stage: "semantic",
-        status: "error",
-        message: errString(semanticRes.reason),
+        status: "completed",
+        payload: collectedSummaries,
       });
     }
-    enqueue({
-      stage: "semantic",
-      status: "completed",
-      payload: collectedSummaries,
-    });
 
     // Resolve edge endpoints to canonical node IDs (handles cases
     // where the model emits the path or a relative variant), then drop
