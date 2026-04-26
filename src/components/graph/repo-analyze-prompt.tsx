@@ -9,7 +9,7 @@ import {
   Warning,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
-import { saveEntry } from "@/lib/library/store";
+import { listIndex, getEntry, saveEntry, touch } from "@/lib/library/store";
 import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useSettings } from "@/lib/settings";
 import { Logo } from "@/components/brand/logo";
@@ -74,8 +74,56 @@ export function RepoAnalyzePrompt({
   const abortRef = useRef<AbortController | null>(null);
 
   const canAnalyze = Boolean(settings.anthropicKey);
+  // While we check the library on mount, don't show the analyze
+  // prompt — otherwise the user sees a flicker of "Run the build"
+  // before we've confirmed there's already a saved graph.
+  const [hydrating, setHydrating] = useState(true);
 
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  // On mount: check the library for a previously-built graph for this
+  // owner/repo. If there is one (terminal upload, prior browser run,
+  // anything), render it immediately and skip the analyze prompt.
+  // Re-runs whenever the library fires its changed event so a fresh
+  // upload while the page is open also takes effect.
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const idx = await listIndex();
+        const match = idx.find(
+          (e) =>
+            e.owner.toLowerCase() === owner.toLowerCase() &&
+            e.repo.toLowerCase() === repo.toLowerCase(),
+        );
+        if (cancelled) return;
+        if (match) {
+          const full = await getEntry(match.id);
+          if (cancelled) return;
+          if (full?.graph) {
+            setGraph(full.graph);
+            setStage("done");
+            void touch(match.id);
+          }
+        }
+      } catch {
+        // ignore — fall through to the analyze prompt
+      } finally {
+        if (!cancelled) setHydrating(false);
+      }
+    };
+    void load();
+    const onChanged = () => void load();
+    if (typeof window !== "undefined") {
+      window.addEventListener("causalist:library-changed", onChanged);
+    }
+    return () => {
+      cancelled = true;
+      if (typeof window !== "undefined") {
+        window.removeEventListener("causalist:library-changed", onChanged);
+      }
+    };
+  }, [owner, repo]);
 
   const updateAgent = useCallback(
     (id: BuilderAgentId, patch: Partial<AgentLiveState>) => {
@@ -380,6 +428,10 @@ export function RepoAnalyzePrompt({
                 Projects
               </Link>
             </>
+          ) : hydrating ? (
+            <span className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs text-neutral-500">
+              Checking your library…
+            </span>
           ) : !canAnalyze ? null : (stage === "idle" || stage === "error") ? (
             <Button
               onClick={startAnalysis}
