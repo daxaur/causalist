@@ -60,7 +60,7 @@ export function BuildConfigModal({
     >
       <DialogContent
         showCloseButton={false}
-        className="max-w-[520px] gap-0 overflow-hidden bg-white p-0 sm:max-w-[520px]"
+        className="max-w-[580px] gap-0 overflow-hidden bg-white p-0 sm:max-w-[580px]"
       >
         {/* Header */}
         <div className="border-b border-neutral-200 px-6 pb-4 pt-5">
@@ -148,6 +148,7 @@ export function BuildConfigModal({
                   value={models[a.id]}
                   onChange={(m) => onModelChange(a.id, m)}
                   disabled={!isOn}
+                  className="w-[122px] shrink-0"
                 />
               </div>
             );

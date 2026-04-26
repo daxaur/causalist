@@ -626,13 +626,37 @@ export function CausalGraphViewer({
     onNodeHover: (n: VisNode | null) => setHover(n?.id ?? null),
     onBackgroundClick: () => clearSelection(),
     backgroundColor: CANVAS_BG,
-    // Cool fast and stop. With many isolated nodes (e.g. low-edge
-    // graphs) the default decay leaves them drifting forever — that
-    // reads as "the page is glitching." Settle in ~3s and freeze.
-    cooldownTicks: 80,
-    cooldownTime: 3000,
-    d3AlphaDecay: 0.05,
-    d3VelocityDecay: 0.55,
+    // Aggressive cooldown so the graph SITS STILL after settling.
+    // Small graphs without enough links would drift forever on the
+    // defaults. cooldownTicks ~ first cool, alpha decay drops alpha
+    // quickly, velocity decay = friction. onEngineStop calls
+    // pauseAnimation() so the WebGL renderer stops scheduling rAFs
+    // entirely once equilibrium is reached. User interactions still
+    // work (clicking a node fires onNodeClick because hit-testing
+    // doesn't need an active loop).
+    cooldownTicks: 60,
+    cooldownTime: 2500,
+    d3AlphaDecay: 0.06,
+    d3VelocityDecay: 0.7,
+    onEngineStop: () => {
+      // Zero out residual velocities so any stray re-render won't see
+      // leftover momentum and start drifting nodes again. Don't call
+      // pauseAnimation() — that halts the render loop entirely and
+      // hover/select visual feedback would freeze with it.
+      try {
+        for (const n of (data.nodes as unknown) as Array<{
+          vx?: number;
+          vy?: number;
+          vz?: number;
+        }>) {
+          n.vx = 0;
+          n.vy = 0;
+          n.vz = 0;
+        }
+      } catch {
+        // best-effort only
+      }
+    },
   };
 
   const paletteActions: PaletteAction[] = useMemo(() => {

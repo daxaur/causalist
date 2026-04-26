@@ -78,7 +78,7 @@ export function ModelPill({
         aria-expanded={open}
         disabled={disabled}
         className={cn(
-          "inline-flex w-full items-center justify-between gap-1.5 rounded-md border bg-white font-mono text-neutral-700 transition-colors",
+          "inline-flex w-full items-center justify-between gap-1.5 whitespace-nowrap rounded-md border bg-white font-mono text-neutral-700 transition-colors",
           sm ? "h-7 px-2 text-[11px]" : "h-8 px-2.5 text-[12px]",
           disabled
             ? "cursor-not-allowed border-neutral-200 opacity-60"
@@ -92,15 +92,15 @@ export function ModelPill({
           src="/claude-mark.svg"
           alt=""
           aria-hidden
-          className={cn(sm ? "h-3 w-3" : "h-3.5 w-3.5")}
+          className={cn("shrink-0", sm ? "h-3 w-3" : "h-3.5 w-3.5")}
           style={{
             // Tint the mark in brand magenta so it reads as part of the pill.
             filter:
               "invert(34%) sepia(93%) saturate(2200%) hue-rotate(298deg) brightness(96%) contrast(94%)",
           }}
         />
-        <span>{current.label}</span>
-        <CaretDown size={sm ? 9 : 10} className="opacity-50" />
+        <span className="shrink-0">{current.label}</span>
+        <CaretDown size={sm ? 9 : 10} className="shrink-0 opacity-50" />
       </button>
 
       {open && (

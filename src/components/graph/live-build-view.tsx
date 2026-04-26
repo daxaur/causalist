@@ -51,7 +51,10 @@ interface VisEdge extends CausalEdge {
   _pulse?: number;
 }
 
-const PULSE_MS = 700;
+// Softened pulse: ring is shorter-lived, smaller, and dimmer than the
+// original demo polish — the previous values read as "popping" when
+// many nodes land in the same frame. Subtle is calmer.
+const PULSE_MS = 450;
 const ACCENT = "#D24798";
 const INK = "#141413";
 const CANVAS_BG = "#faf9f5";
@@ -159,9 +162,16 @@ export function LiveBuildView({
               width={size.w}
               height={size.h}
               backgroundColor={CANVAS_BG}
+              // Keep the simulation warm enough that newly-emitted
+              // nodes can find their seat, but with much higher
+              // friction so existing nodes don't keep ricocheting
+              // around the canvas every time a new arrival shifts the
+              // equilibrium. The old (0.01 / 0.35) values made the
+              // graph "pop" — small graphs especially.
               cooldownTicks={Infinity}
-              d3AlphaDecay={0.01}
-              d3VelocityDecay={0.35}
+              d3AlphaDecay={0.035}
+              d3VelocityDecay={0.7}
+              warmupTicks={20}
               nodeRelSize={5}
               linkColor={(l) => {
                 const link = l as VisEdge;
@@ -195,8 +205,8 @@ export function LiveBuildView({
                 if (pulseAge < PULSE_MS) {
                   const t = 1 - pulseAge / PULSE_MS;
                   ctx.beginPath();
-                  ctx.arc(node.x, node.y, r + 8 * (1 - t), 0, Math.PI * 2);
-                  ctx.fillStyle = `rgba(210,71,152,${0.35 * t})`;
+                  ctx.arc(node.x, node.y, r + 5 * (1 - t), 0, Math.PI * 2);
+                  ctx.fillStyle = `rgba(210,71,152,${0.22 * t})`;
                   ctx.fill();
                 }
                 ctx.beginPath();
