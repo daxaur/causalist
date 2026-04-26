@@ -104,7 +104,6 @@ export function CausalGraphViewer({
   diff,
   visibleIds,
   onAskAboutSelection,
-  showAgentBeam = true,
   compact = false,
 }: {
   graph: CausalGraph;
@@ -113,14 +112,8 @@ export function CausalGraphViewer({
   /** If set, nodes NOT in the set are dimmed (not hidden). From filter panel. */
   visibleIds?: Set<string>;
   onAskAboutSelection?: (ids: string[]) => void;
-  /** Show the "Claude Code" avatar + beam-to-focused-node overlay.
-   * Off by default inside the landing-page PreviewDialog since a cold
-   * visitor has no MCP wired up and the badge just reads as clutter. */
-  showAgentBeam?: boolean;
   /** Compact mode (landing-page PreviewDialog) — hide file-tree sidebar,
-   * top bar extras, importance stats, keyboard hint strip, legend.
-   * Keep just the 3D/2D toggle + the graph itself. Implies
-   * showAgentBeam=false, sidebarOpen=false. */
+   * top bar extras, importance stats, keyboard hint strip, legend. */
   compact?: boolean;
 }) {
   const [mode, setMode] = useState<"3d" | "2d">("3d");
@@ -173,8 +166,6 @@ export function CausalGraphViewer({
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
 
-  // Refs used to draw the Claude Code → focused-node beam.
-  const beamFromRef = useRef<HTMLDivElement>(null);
   const historyRef = useRef<{ stack: string[]; index: number }>({
     stack: [],
     index: -1,
@@ -956,89 +947,82 @@ export function CausalGraphViewer({
           )}
         </div>
 
-        {/* Top overlay */}
+        {/* Top overlay — left stack carries chrome (file tree, repo,
+            mode, stats); right stack carries the panel toggles. */}
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between p-4">
-          {!compact && (
-            <div className="pointer-events-auto flex items-center gap-2">
-              <button
-                onClick={() => setSidebarOpen((v) => !v)}
-                aria-label="Toggle file tree"
-                aria-pressed={sidebarOpen}
-                className={cn(
-                  "flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 bg-white/80 backdrop-blur transition-colors",
-                  sidebarOpen ? "text-neutral-900" : "text-neutral-500 hover:text-neutral-900",
-                )}
-              >
-                <SidebarSimple size={14} />
-              </button>
-              <div className="rounded-md border border-neutral-200 bg-white/80 px-3 py-1.5 font-mono text-xs text-neutral-700 backdrop-blur">
-                {graph.repo}
-                {graph.commit ? (
-                  <span className="text-neutral-400">@{graph.commit.slice(0, 7)}</span>
-                ) : null}
+          {!compact ? (
+            <div className="pointer-events-auto flex flex-col items-start gap-2">
+              {/* Row 1 — file-tree toggle + repo pill */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSidebarOpen((v) => !v)}
+                  aria-label="Toggle file tree"
+                  aria-pressed={sidebarOpen}
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-md border border-neutral-200 bg-white/80 backdrop-blur transition-colors",
+                    sidebarOpen ? "text-neutral-900" : "text-neutral-500 hover:text-neutral-900",
+                  )}
+                >
+                  <SidebarSimple size={14} />
+                </button>
+                <div className="rounded-md border border-neutral-200 bg-white/80 px-3 py-1.5 font-mono text-xs text-neutral-700 backdrop-blur">
+                  {graph.repo}
+                  {graph.commit ? (
+                    <span className="text-neutral-400">@{graph.commit.slice(0, 7)}</span>
+                  ) : null}
+                </div>
               </div>
-            </div>
-          )}
 
-          {/* Mode toggle — always visible (compact keeps just this) */}
-          <div
-            className={cn(
-              "pointer-events-auto flex items-center gap-1 rounded-md border border-neutral-200 bg-white/80 p-1 backdrop-blur",
-              compact && "ml-auto",
-            )}
-          >
-            <ModeButton
-              active={mode === "3d"}
-              onClick={() => setMode("3d")}
-              label="3D"
-              icon={<Cube size={13} weight={mode === "3d" ? "fill" : "regular"} />}
-            />
-            <ModeButton
-              active={mode === "2d"}
-              onClick={() => setMode("2d")}
-              label="2D"
-              icon={<SquaresFour size={13} weight={mode === "2d" ? "fill" : "regular"} />}
-            />
-            {!compact && (
-              <>
+              {/* Row 2 — 3D / 2D + node·edge count */}
+              <div className="flex items-center gap-1 rounded-md border border-neutral-200 bg-white/80 p-1 backdrop-blur">
+                <ModeButton
+                  active={mode === "3d"}
+                  onClick={() => setMode("3d")}
+                  label="3D"
+                  icon={<Cube size={13} weight={mode === "3d" ? "fill" : "regular"} />}
+                />
+                <ModeButton
+                  active={mode === "2d"}
+                  onClick={() => setMode("2d")}
+                  label="2D"
+                  icon={<SquaresFour size={13} weight={mode === "2d" ? "fill" : "regular"} />}
+                />
                 <div className="mx-1 h-4 w-px bg-neutral-200" />
                 <div className="flex items-center gap-1.5 px-2 font-mono text-[10px] text-neutral-500">
                   <List size={11} />
                   {graph.nodes.length} · {graph.edges.length}
                 </div>
-                <div className="mx-1 h-4 w-px bg-neutral-200" />
-                <button
-                  onClick={() => setHelpOpen(true)}
-                  aria-label="Keyboard shortcuts"
-                  className="flex items-center gap-1 rounded px-2 py-1 font-mono text-[10px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
-                >
-                  <Keyboard size={11} />
-                  <kbd className="rounded border border-neutral-300 px-1 text-[9px]">
-                    ?
-                  </kbd>
-                </button>
-              </>
-            )}
-          </div>
-
-          {!compact && (
-            <>
-              <div
-                className="pointer-events-auto absolute top-14 transition-[right] duration-200"
-                style={{ right: `${rightOverlayOffsetPx}px` }}
-              >
-                <ImportanceStats
-                  summary={importance}
-                  totalNodes={graph.nodes.length}
-                />
               </div>
 
-              <FirstHotTooltip
-                enabled={importance.hotIds.size > 0}
-                hotCount={importance.hotIds.size}
-                rightOffset={rightOverlayOffsetPx}
+              {/* Row 3 — Hot / Core / Leaf importance stats */}
+              <ImportanceStats
+                summary={importance}
+                totalNodes={graph.nodes.length}
               />
-            </>
+            </div>
+          ) : (
+            // Compact mode (preview dialogs etc.) — just the mode toggle, top-right
+            <div className="pointer-events-auto ml-auto flex items-center gap-1 rounded-md border border-neutral-200 bg-white/80 p-1 backdrop-blur">
+              <ModeButton
+                active={mode === "3d"}
+                onClick={() => setMode("3d")}
+                label="3D"
+                icon={<Cube size={13} weight={mode === "3d" ? "fill" : "regular"} />}
+              />
+              <ModeButton
+                active={mode === "2d"}
+                onClick={() => setMode("2d")}
+                label="2D"
+                icon={<SquaresFour size={13} weight={mode === "2d" ? "fill" : "regular"} />}
+              />
+            </div>
+          )}
+
+          {!compact && (
+            <FirstHotTooltip
+              enabled={importance.hotIds.size > 0}
+              hotCount={importance.hotIds.size}
+            />
           )}
 
           {/* Persistent panel toggle — proper button at the top-right
@@ -1089,31 +1073,20 @@ export function CausalGraphViewer({
           </div>
         )}
 
-        {compact && (
-          <div className="pointer-events-none absolute bottom-4 left-1/2 z-10 hidden -translate-x-1/2 items-center gap-2 rounded-full border border-neutral-200 bg-white/85 px-3 py-1 font-mono text-[10px] text-neutral-400 backdrop-blur md:flex">
-            <span>tip</span>
-            <span className="text-neutral-300">·</span>
-            <Hint keys={["j", "k"]} label="walk" />
-            <span className="text-neutral-300">·</span>
-            <Hint keys={["."]} label="focus" />
-            <span className="text-neutral-300">·</span>
-            <Hint keys={["⌘", "K"]} label="cmd" />
-          </div>
-        )}
-
+        {/* Bottom-right "?" pill — opens HelpOverlay. Single discoverable
+            affordance instead of the cramped hint strip. Shifts left when
+            the right panel is open so it doesn't slide under it. */}
         {!compact && (
-          <div
-            className="pointer-events-none absolute bottom-4 z-10 hidden items-center gap-3 rounded-full border border-neutral-200 bg-white/85 px-3 py-1.5 font-mono text-[10px] text-neutral-500 backdrop-blur transition-[right] duration-200 lg:flex"
+          <button
+            type="button"
+            onClick={() => setHelpOpen(true)}
+            aria-label="Keyboard shortcuts"
+            title="Keyboard shortcuts (?)"
+            className="pointer-events-auto absolute bottom-4 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-neutral-200 bg-white/90 text-neutral-500 shadow-sm backdrop-blur transition-[right,colors] duration-200 hover:border-accent-magenta/40 hover:text-accent-magenta"
             style={{ right: `${rightOverlayOffsetPx}px` }}
           >
-            <Hint keys={["j", "k"]} label="walk" />
-            <span className="text-neutral-300">·</span>
-            <Hint keys={["."]} label="focus" />
-            <span className="text-neutral-300">·</span>
-            <Hint keys={["⌘", "K"]} label="cmd" />
-            <span className="text-neutral-300">·</span>
-            <Hint keys={["?"]} label="help" />
-          </div>
+            <Keyboard size={14} />
+          </button>
         )}
 
         {/* Selection toolbar — sits well above the mode switcher (which
@@ -1170,33 +1143,6 @@ export function CausalGraphViewer({
           <div className="pointer-events-none absolute left-1/2 top-4 z-20 -translate-x-1/2 rounded-full border border-accent-magenta/40 bg-black/50 px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-accent-magenta backdrop-blur">
             Focus mode · press . to exit
           </div>
-        )}
-
-        {/* Claude Code avatar + beam to the currently-focused node.
-            Hidden on preview dialogs (showAgentBeam=false) where a
-            cold visitor has no MCP wired and the badge reads as
-            clutter. Visible on real repo/reference routes. */}
-        {showAgentBeam && !compact && (
-          <>
-            <div
-              ref={beamFromRef}
-              className="absolute left-4 top-16 z-20 flex h-10 items-center gap-2 rounded-full border border-neutral-200 bg-white/90 pl-1 pr-3 shadow-sm backdrop-blur"
-            >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-neutral-200 bg-white">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src="/claude-code.png"
-                  alt="Claude Code"
-                  width={22}
-                  height={22}
-                  className="h-5 w-5 object-contain"
-                />
-              </span>
-              <span className="font-mono text-[11px] text-neutral-700">
-                Claude Code
-              </span>
-            </div>
-          </>
         )}
 
         {/* Help overlay (?) */}

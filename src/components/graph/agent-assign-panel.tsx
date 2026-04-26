@@ -18,6 +18,15 @@ import { RotatingVerb } from "@/components/ui/thinking";
 import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
+import { CAUSAL_AGENTS } from "@/lib/agents/prompts";
+
+type AgentMeta = { agentId: string; agentName: string; agentColor: string };
+type AgentRunState = AgentMeta & {
+  status: "running" | "done" | "error";
+  paths: string[];
+  findingCount: number;
+  patchCount: number;
+};
 
 type AssignStatus = "running" | "done" | "error";
 
@@ -33,19 +42,21 @@ interface Run {
   plan: string;
   nodeIds: string[];
   status: AssignStatus;
-  findings: {
+  findings: ({
     nodeId: string;
     kind: "reviewed" | "risky" | "fixed";
     note: string;
     path: string;
-  }[];
-  patches: Patch[];
+  } & Partial<AgentMeta>)[];
+  patches: (Patch & Partial<AgentMeta>)[];
   filesLoaded: number;
   errorMsg?: string;
   summary?: string;
   prUrl?: string;
   pushing?: boolean;
   startedAt: number;
+  agentCount: number;
+  agents: AgentRunState[];
 }
 
 // Suggestion chips — pre-fill the textarea. Phrased as causal
@@ -79,6 +90,7 @@ export function AgentAssignPanel({
   const [runs, setRuns] = useState<Run[]>([]);
   const [plan, setPlan] = useState("");
   const [model, setModel] = useState<string>(MODELS[0].id);
+  const [agentCount, setAgentCount] = useState<number>(1);
   const auth = useGithubAuth();
   const settings = useSettings();
   const cancelRef = useRef<Map<string, AbortController>>(new Map());
@@ -133,6 +145,8 @@ export function AgentAssignPanel({
       patches: [],
       filesLoaded: 0,
       startedAt: Date.now(),
+      agentCount,
+      agents: [],
     };
     setRuns((rs) => [run, ...rs]);
     setPlan("");
@@ -151,6 +165,7 @@ export function AgentAssignPanel({
         body: JSON.stringify({
           plan: trimmed,
           model,
+          agents: agentCount,
           repo: graph.repo,
           branch: "main",
           selectedNodeIds: nodeIds,
@@ -228,18 +243,95 @@ export function AgentAssignPanel({
       case "file_loaded":
         update(id, (r) => ({ ...r, filesLoaded: r.filesLoaded + 1 }));
         break;
+      case "agent_started": {
+        const meta = ev as unknown as AgentMeta & { paths: string[] };
+        update(id, (r) => ({
+          ...r,
+          agents: [
+            ...r.agents.filter((a) => a.agentId !== meta.agentId),
+            {
+              ...meta,
+              status: "running",
+              paths: meta.paths ?? [],
+              findingCount: 0,
+              patchCount: 0,
+            },
+          ],
+        }));
+        // Highlight all nodes any active agent is currently looking at,
+        // so the graph shows real-time per-agent activity. We push the
+        // union after setRuns settles.
+        queueMicrotask(() => {
+          setRuns((prev) => {
+            const r = prev.find((x) => x.id === id);
+            if (r) onHighlight?.(activeNodeIds(r, nodesById));
+            return prev;
+          });
+        });
+        break;
+      }
+      case "agent_finished": {
+        const meta = ev as unknown as AgentMeta;
+        update(id, (r) => ({
+          ...r,
+          agents: r.agents.map((a) =>
+            a.agentId === meta.agentId ? { ...a, status: "done" } : a,
+          ),
+        }));
+        queueMicrotask(() => {
+          setRuns((prev) => {
+            const r = prev.find((x) => x.id === id);
+            if (r) onHighlight?.(activeNodeIds(r, nodesById));
+            return prev;
+          });
+        });
+        break;
+      }
+      case "agent_error": {
+        const meta = ev as unknown as AgentMeta & { message?: string };
+        update(id, (r) => ({
+          ...r,
+          agents: r.agents.map((a) =>
+            a.agentId === meta.agentId ? { ...a, status: "error" } : a,
+          ),
+        }));
+        break;
+      }
       case "finding": {
         const f = ev as unknown as Run["findings"][number];
-        update(id, (r) => ({ ...r, findings: [...r.findings, f] }));
+        update(id, (r) => ({
+          ...r,
+          findings: [...r.findings, f],
+          agents: r.agents.map((a) =>
+            a.agentId === f.agentId
+              ? { ...a, findingCount: a.findingCount + 1 }
+              : a,
+          ),
+        }));
         onAssign?.([f.nodeId], f.kind);
         onHighlight?.([f.nodeId]);
         break;
       }
       case "patch": {
-        const p = ev as unknown as Patch;
+        const p = ev as unknown as Patch & Partial<AgentMeta>;
         update(id, (r) => ({
           ...r,
-          patches: [...r.patches, { path: p.path, summary: p.summary, bytes: p.bytes }],
+          patches: [
+            ...r.patches,
+            {
+              path: p.path,
+              summary: p.summary,
+              bytes: p.bytes,
+              agentId: p.agentId,
+              agentName: p.agentName,
+              agentColor: p.agentColor,
+            },
+          ],
+          agents: r.agents.map((a) =>
+            a.agentId === p.agentId
+              ? { ...a, patchCount: a.patchCount + 1 }
+              : a,
+          ),
         }));
         break;
       }
@@ -368,12 +460,36 @@ export function AgentAssignPanel({
           isRealRepo={isRealRepo}
           model={model}
           setModel={setModel}
+          agentCount={agentCount}
+          setAgentCount={setAgentCount}
         />
       ) : (
         <KeyGate />
       )}
     </div>
   );
+}
+
+/** Map an agent's owned file paths back to graph node ids so the
+ *  viewer's externalHighlight can pulse them. Files outside the graph
+ *  (e.g. the agent invented a path) are dropped silently. */
+function activeNodeIds(
+  r: Run,
+  nodesById: Map<string, { path?: string }>,
+): string[] {
+  const out = new Set<string>();
+  const pathToId = new Map<string, string>();
+  for (const [id, n] of nodesById.entries()) {
+    if (n.path) pathToId.set(n.path, id);
+  }
+  for (const a of r.agents) {
+    if (a.status !== "running") continue;
+    for (const p of a.paths) {
+      const nid = pathToId.get(p);
+      if (nid) out.add(nid);
+    }
+  }
+  return Array.from(out);
 }
 
 /** Bottom-of-panel chat composer. Cursor / Claude-Desktop pattern. */
@@ -385,6 +501,8 @@ function Composer({
   isRealRepo,
   model,
   setModel,
+  agentCount,
+  setAgentCount,
 }: {
   plan: string;
   setPlan: (v: string) => void;
@@ -393,6 +511,8 @@ function Composer({
   isRealRepo: boolean;
   model: string;
   setModel: (v: string) => void;
+  agentCount: number;
+  setAgentCount: (n: number) => void;
 }) {
   const canSend = plan.trim().length > 0 && selectedCount > 0 && isRealRepo;
   return (
@@ -400,29 +520,22 @@ function Composer({
       {/* Magenta accent strip on top — quiet brand presence */}
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent-magenta/40 to-transparent" />
 
-      {/* Scope chip — what the agent will read. Phrased as files-to-read,
-          not "nodes attached" so it doesn't sound like N agents will run. */}
-      <div className="mb-2 flex items-center justify-between text-[12px]">
+      {/* Scope chip + parallel-agent picker. Picker shows the causal
+          names so users see which lenses are about to fire. */}
+      <div className="mb-2 flex items-center justify-between gap-2 text-[12px]">
         {selectedCount > 0 ? (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-magenta/30 bg-accent-magenta/[0.06] px-2.5 py-0.5 font-mono text-accent-magenta">
             <CausalThinkingIcon size={11} />
-            agent will read {selectedCount} file{selectedCount === 1 ? "" : "s"}
+            {agentCount === 1
+              ? `${selectedCount} file${selectedCount === 1 ? "" : "s"} · 1 agent`
+              : `${selectedCount} file${selectedCount === 1 ? "" : "s"} · ${agentCount} agents`}
           </span>
         ) : (
           <span className="font-mono text-neutral-400">
             select files in the graph to scope the agent
           </span>
         )}
-        <span className="font-mono text-neutral-400">
-          <kbd className="rounded border border-neutral-200 bg-white px-1 py-px text-[9px]">
-            ⌘
-          </kbd>
-          <span className="mx-0.5">+</span>
-          <kbd className="rounded border border-neutral-200 bg-white px-1 py-px text-[9px]">
-            ↵
-          </kbd>{" "}
-          to send
-        </span>
+        <AgentCountPicker value={agentCount} onChange={setAgentCount} />
       </div>
 
       <div
@@ -493,6 +606,56 @@ function Composer({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Numeric picker (1..N) for parallel-agent count. Each step
+ *  enlists one more causal lens — hovering the chips shows whose
+ *  perspective is about to fire. */
+function AgentCountPicker({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+}) {
+  const max = CAUSAL_AGENTS.length;
+  return (
+    <div
+      className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white px-1 py-0.5"
+      role="radiogroup"
+      aria-label="Parallel agents"
+    >
+      {Array.from({ length: max }, (_, i) => {
+        const n = i + 1;
+        const active = n <= value;
+        const agent = CAUSAL_AGENTS[i];
+        return (
+          <button
+            key={n}
+            type="button"
+            role="radio"
+            aria-checked={value === n}
+            onClick={() => onChange(n)}
+            title={`Run ${n} agent${n === 1 ? "" : "s"} — ${CAUSAL_AGENTS.slice(0, n)
+              .map((a) => a.name)
+              .join(" · ")}`}
+            className={cn(
+              "h-4 w-4 rounded-full border transition-all",
+              active
+                ? "border-transparent shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]"
+                : "border-neutral-200 bg-white hover:border-neutral-400",
+            )}
+            style={active ? { backgroundColor: agent.color } : undefined}
+          >
+            <span className="sr-only">{n}</span>
+          </button>
+        );
+      })}
+      <span className="ml-1 pr-1 font-mono text-[10px] tabular-nums text-neutral-500">
+        ×{value}
+      </span>
     </div>
   );
 }
@@ -687,6 +850,13 @@ function RunThread({
         {meta}
       </div>
 
+      {/* Per-agent swarm strip — only when >1 agent. Shows live status
+          per causal lens; the strip is the user's window into "who's
+          working on what" while the streams are concurrent. */}
+      {r.agentCount > 1 && r.agents.length > 0 && (
+        <AgentSwarmStrip agents={r.agents} />
+      )}
+
       {/* Agent thread */}
       <div className="space-y-1.5">
         {/* file_loaded steps as a single collapsed line so the feed
@@ -718,8 +888,17 @@ function RunThread({
           <StepCard
             key={`f-${i}`}
             status={f.kind === "risky" ? "warn" : f.kind === "fixed" ? "fixed" : "done"}
+            agentColor={f.agentColor}
             label={
               <span>
+                {f.agentName && (
+                  <span
+                    className="mr-1.5 inline-block rounded px-1 font-mono text-[9px] uppercase tracking-wider text-white"
+                    style={{ backgroundColor: f.agentColor ?? "#999" }}
+                  >
+                    {f.agentName}
+                  </span>
+                )}
                 <span
                   className={cn(
                     "font-medium",
@@ -827,13 +1006,23 @@ function StepCard({
   status,
   label,
   sub,
+  agentColor,
 }: {
   status: StepStatus;
   label: React.ReactNode;
   sub?: React.ReactNode;
+  /** Optional left border color — used to tag rows by agent. */
+  agentColor?: string;
 }) {
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-neutral-200 bg-white px-2.5 py-2 text-[12px]">
+    <div
+      className="flex items-start gap-2 overflow-hidden rounded-lg border border-neutral-200 bg-white px-2.5 py-2 text-[12px]"
+      style={
+        agentColor
+          ? { boxShadow: `inset 3px 0 0 ${agentColor}` }
+          : undefined
+      }
+    >
       <StatusGlyph status={status} />
       <div className="min-w-0 flex-1">
         <div className="leading-snug">{label}</div>
@@ -843,6 +1032,61 @@ function StepCard({
       </div>
     </div>
   );
+}
+
+/** Live per-agent status row — one chip per causal lens, color-coded,
+ *  pulsing while running. The "real-time" face of a parallel run. */
+function AgentSwarmStrip({ agents }: { agents: AgentRunState[] }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-neutral-200 bg-neutral-50/70 p-1.5">
+      {agents.map((a) => {
+        const isRunning = a.status === "running";
+        const isError = a.status === "error";
+        return (
+          <div
+            key={a.agentId}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md border bg-white px-1.5 py-0.5 text-[10.5px] font-medium transition-opacity",
+              isError && "opacity-60",
+            )}
+            style={{
+              borderColor: isRunning ? a.agentColor : "#e5e5e5",
+              color: isError ? "#a3a3a3" : "#171717",
+            }}
+            title={`${a.agentName} — ${a.status}${a.paths.length ? ` · owns ${a.paths.length} file${a.paths.length === 1 ? "" : "s"}` : ""}`}
+          >
+            <span
+              className={cn(
+                "h-2 w-2 shrink-0 rounded-full",
+                isRunning && "animate-pulse",
+              )}
+              style={{
+                backgroundColor: a.agentColor,
+                boxShadow: isRunning
+                  ? `0 0 0 3px ${hexToRgba(a.agentColor, 0.18)}`
+                  : undefined,
+              }}
+            />
+            <span>{a.agentName}</span>
+            {a.findingCount + a.patchCount > 0 && (
+              <span className="ml-0.5 font-mono text-[9px] tabular-nums text-neutral-500">
+                {a.findingCount + a.patchCount}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const m = hex.replace("#", "");
+  if (m.length !== 6) return hex;
+  const r = parseInt(m.slice(0, 2), 16);
+  const g = parseInt(m.slice(2, 4), 16);
+  const b = parseInt(m.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 function StatusGlyph({ status }: { status: StepStatus }) {

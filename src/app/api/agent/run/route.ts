@@ -22,6 +22,8 @@ interface RunBody {
   apiKey: string;
   /** Optional model override; defaults to claude-opus-4-7. */
   model?: string;
+  /** Number of parallel causal-lens agents (1..5). Defaults to 1. */
+  agents?: number;
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -73,6 +75,7 @@ export async function POST(req: Request): Promise<Response> {
           apiKey: body.apiKey,
           plan: body.plan,
           model: body.model,
+          agents: body.agents,
           repo: body.repo,
           branch: body.branch ?? "main",
           selectedNodeIds: body.selectedNodeIds,

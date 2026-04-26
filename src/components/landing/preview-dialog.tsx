@@ -77,11 +77,7 @@ export function PreviewDialog({
             </div>
           </header>
           <div className="relative flex-1">
-            <CausalGraphViewer
-              graph={preview.graph}
-              showAgentBeam={false}
-              compact
-            />
+            <CausalGraphViewer graph={preview.graph} compact />
           </div>
         </div>
       </DialogContent>

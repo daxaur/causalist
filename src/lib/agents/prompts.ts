@@ -38,6 +38,64 @@ Your behavior:
 
 ${SHARED_OUTPUT_CONTRACT}`;
 
+/**
+ * Causal-lens agent roster for parallel runs. Each agent works the
+ * same plan from a different vantage point so the swarm covers ground
+ * a single agent would miss. Names are taken straight from the causal
+ * inference toolkit (Pearl) so the swarm itself is on-brand.
+ *
+ * Colors are picked to read distinctly against the cream graph canvas
+ * and to be friendly under the magenta brand accent — the magenta
+ * stays reserved for "Cause" so the lead agent feels like Causalist's
+ * own voice.
+ */
+export const CAUSAL_AGENTS = [
+  {
+    id: "cause",
+    name: "Cause",
+    color: "#D24798",
+    lens: "Trace upstream causes. What inputs, callers, or conditions trigger the behavior under review? Look backward through the dependency graph and call edges.",
+  },
+  {
+    id: "effect",
+    name: "Effect",
+    color: "#F6A623",
+    lens: "Trace downstream effects. Who depends on the selected files? What breaks (or silently misbehaves) if these change? Think blast radius.",
+  },
+  {
+    id: "mechanism",
+    name: "Mechanism",
+    color: "#3B82F6",
+    lens: "Explain the internal mechanism. How does the code actually accomplish what it claims? Surface the moving parts, the invariants, and any leaky abstractions.",
+  },
+  {
+    id: "intervention",
+    name: "Intervention",
+    color: "#10B981",
+    lens: "Propose interventions. Given the plan, what is the smallest, safest change that satisfies it? Prefer concrete patches over commentary.",
+  },
+  {
+    id: "counterfactual",
+    name: "Counterfactual",
+    color: "#A855F7",
+    lens: "Run counterfactuals. What edge cases, failure modes, or 'what if X were different' scenarios deserve attention? Flag risks the other agents would miss.",
+  },
+] as const;
+
+export type CausalAgent = (typeof CAUSAL_AGENTS)[number];
+
+/** Per-agent system prompt — adds a causal-lens preamble so each
+ *  parallel run focuses on a different facet of the same plan. */
+export function buildAgentSystemPrompt(agent: CausalAgent): string {
+  return `You are the **${agent.name}** agent in a swarm of Causalist agents working the same plan from different vantage points.
+
+Your causal lens: ${agent.lens}
+
+Stay inside your lens. Other agents handle the other facets — don't duplicate their work. Findings from your lens are most valuable when they're things only your vantage point would surface. If your lens has nothing to add for a given file, emit a brief "reviewed" finding rather than padding patches.
+
+${GENERAL_PROMPT}`;
+}
+
 export interface AgentRunInput {
   plan: string;
   repo: string; // "owner/name"
