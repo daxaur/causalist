@@ -49,7 +49,7 @@ export default async function RepoGraphPage({
           <span className="text-neutral-900">{repo}</span>
         </div>
       </div>
-      <div className="flex-1 overflow-hidden">
+      <div className="relative flex-1 overflow-hidden">
         {cachedPreview ? (
           <CausalGraphViewer graph={cachedPreview.graph} />
         ) : (

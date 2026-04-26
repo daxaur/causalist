@@ -13,7 +13,8 @@
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CausalistSpinner } from "@/components/ui/causalist-loader";
-import { CheckCircle, Warning } from "@phosphor-icons/react";
+import { ArrowRight, CheckCircle, Sparkle, Warning } from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
 import { ModelPill } from "@/components/agents/model-pill";
 import { BUILDER_AGENTS, type BuilderAgentId } from "@/lib/analyze/prompts";
 import {
@@ -66,6 +67,14 @@ interface Props {
   /** When true, model dropdowns are disabled (run is in flight and we
    *  don't yet support mid-run restart). */
   modelsLocked: boolean;
+  /** True while the pipeline is actually streaming. Drives the empty-
+   *  state copy ("warming up" vs "ready to build"). */
+  running?: boolean;
+  /** Coarse stage from the parent — used to choose the Run button copy
+   *  ("Run the 4-agent build" vs "Retry build" on error). */
+  stage?: "idle" | "fetching" | "running" | "done" | "error";
+  /** Click handler for the embedded Run CTA in the empty state. */
+  onRun?: () => void;
   /** Optional final message under the bottom strip — shown on error/done. */
   footerNote?: string;
 }
@@ -77,6 +86,9 @@ export function LiveBuildView({
   nodes,
   edges,
   modelsLocked,
+  running,
+  stage,
+  onRun,
   footerNote,
 }: Props) {
   // Force a small repaint cadence so pulse rings fade on time even
@@ -109,8 +121,12 @@ export function LiveBuildView({
     [nodes, edges],
   );
 
+  const anyRunning =
+    running ?? Object.values(agents).some((a) => a.status === "running");
+  const isError = stage === "error";
+
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+    <div className="flex h-full w-full flex-col overflow-hidden bg-white">
       {/* Top strip — 4 agent chips */}
       <div className="flex shrink-0 items-stretch gap-2 border-b border-neutral-200 bg-neutral-50/60 p-2">
         {BUILDER_AGENTS.map((a) => {
@@ -132,7 +148,9 @@ export function LiveBuildView({
       <div ref={wrapRef} className="relative flex-1 overflow-hidden">
         {nodes.length === 0 && edges.length === 0 ? (
           <EmptyCanvas
-            running={Object.values(agents).some((a) => a.status === "running")}
+            running={anyRunning}
+            isError={isError}
+            onRun={onRun}
           />
         ) : (
           size.w > 0 && (
@@ -349,11 +367,15 @@ function StatusGlyph({
   );
 }
 
-function EmptyCanvas({ running }: { running: boolean }) {
-  // Two states. Pre-build (running=false) is intentional dead space —
-  // we want it to look like "the canvas is waiting," not "loading
-  // failed." Running state shows the spinner + a calm what-to-expect
-  // message so the user doesn't think the page is frozen.
+function EmptyCanvas({
+  running,
+  isError,
+  onRun,
+}: {
+  running: boolean;
+  isError?: boolean;
+  onRun?: () => void;
+}) {
   return (
     <div className="relative flex h-full w-full items-center justify-center">
       {/* Quiet dotted-grid backdrop so the canvas doesn't read as a
@@ -367,7 +389,7 @@ function EmptyCanvas({ running }: { running: boolean }) {
           backgroundSize: "22px 22px",
         }}
       />
-      <div className="relative flex flex-col items-center gap-4 text-center">
+      <div className="relative flex flex-col items-center gap-5 text-center">
         {running ? (
           <>
             <CausalistSpinner size={36} />
@@ -387,18 +409,25 @@ function EmptyCanvas({ running }: { running: boolean }) {
               <span className="font-mono text-2xl">·</span>
             </div>
             <div>
-              <div className="font-display text-[18px] font-medium text-neutral-900">
-                Ready to build
+              <div className="font-display text-[20px] font-medium text-neutral-900">
+                {isError ? "Build failed" : "Ready to build"}
               </div>
-              <p className="mt-1 max-w-sm text-[14px] leading-relaxed text-neutral-500">
-                Pick a model for each agent above (or keep the Opus 4.7
-                defaults), then click{" "}
-                <span className="font-medium text-neutral-700">
-                  Run the 4-agent build
-                </span>
-                .
+              <p className="mt-1.5 max-w-md text-[13.5px] leading-relaxed text-neutral-500">
+                {isError
+                  ? "Pick models above and try again — your last selection is preserved."
+                  : "Pick a model for each of the 4 agents above (or keep the Opus 4.7 defaults), then run."}
               </p>
             </div>
+            {onRun && (
+              <Button
+                onClick={onRun}
+                className="h-11 bg-[#E838A4] px-6 text-[13px] font-medium text-white hover:bg-[#C92E8E]"
+              >
+                <Sparkle size={15} weight="duotone" className="mr-1.5" />
+                {isError ? "Retry build" : "Run the 4-agent build"}
+                <ArrowRight size={14} className="ml-1.5" />
+              </Button>
+            )}
           </>
         )}
       </div>

@@ -2,17 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ArrowRight,
-  Key,
-  Sparkle,
-  Warning,
-} from "@phosphor-icons/react";
-import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { ArrowRight, Key } from "@phosphor-icons/react";
 import { listIndex, getEntry, saveEntry, touch } from "@/lib/library/store";
 import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useSettings } from "@/lib/settings";
-import { Logo } from "@/components/brand/logo";
 import { CausalGraphViewer } from "./causal-graph-viewer";
 import {
   LiveBuildView,
@@ -455,103 +449,67 @@ export function RepoAnalyzePrompt({
 
   const isBuildLive = stage === "fetching" || stage === "running";
 
+  // Toast once when the build finishes — replaces the old wrapper
+  // header that said "Saved to library." The user is now dropped
+  // straight into the full viewer; the toast is the only confirmation.
+  const didToastDoneRef = useRef(false);
+  useEffect(() => {
+    if (stage === "done" && graph && !didToastDoneRef.current) {
+      didToastDoneRef.current = true;
+      toast.success(`Saved ${owner}/${repo} to your library`);
+    }
+  }, [stage, graph, owner, repo]);
+
+  if (!canAnalyze) {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-[#FAFAF8]">
+        <MissingKeyCard />
+      </div>
+    );
+  }
+
+  // Hydrating — short window where we don't yet know if a saved graph
+  // exists. Showing the empty "Ready to build" state would cause a
+  // flicker if the lookup resolves to a hit. Render a calm placeholder.
+  if (hydrating && stage === "idle") {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-[#FAFAF8]">
+        <div className="font-mono text-[11px] uppercase tracking-wider text-neutral-400">
+          checking your library…
+        </div>
+      </div>
+    );
+  }
+
+  // Done — full-bleed viewer, no wrapper header, no buttons. The route
+  // page already shows the breadcrumb (owner/repo) above us.
+  if (graph && stage === "done") {
+    return (
+      <div className="h-full w-full">
+        <CausalGraphViewer graph={graph} />
+      </div>
+    );
+  }
+
+  // Idle / fetching / running / error — full-bleed live build view.
+  // The Run CTA is embedded inside LiveBuildView's empty state so the
+  // user picks models above and clicks Run inline with the canvas.
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="font-mono text-[10px] uppercase tracking-wider text-neutral-400">
-            {stage === "done" ? "Mapped" : "Mapping"}
-          </div>
-          <h1 className="font-display text-2xl font-medium tracking-[-0.02em] sm:text-3xl">
-            {stage === "done" ? "Saved to library" : "Map"}{" "}
-            <span className="font-mono text-[0.72em] text-neutral-500">
-              {owner}/{repo}
-            </span>
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {stage === "done" ? (
-            <>
-              <Link
-                href={`/app/${owner}/${repo}`}
-                className="inline-flex h-9 items-center gap-1.5 rounded-md bg-neutral-900 px-4 text-xs text-white transition-colors hover:bg-neutral-800"
-              >
-                Open full viewer
-                <ArrowRight size={12} />
-              </Link>
-              <Link
-                href="/app"
-                className="inline-flex h-9 items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-4 text-xs text-neutral-700 transition-colors hover:border-neutral-300"
-              >
-                Projects
-              </Link>
-            </>
-          ) : hydrating ? (
-            <span className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1 text-xs text-neutral-500">
-              Checking your library…
-            </span>
-          ) : !canAnalyze ? null : (stage === "idle" || stage === "error") ? (
-            <Button
-              onClick={startAnalysis}
-              className="h-10 bg-[#E838A4] px-5 text-sm text-white hover:bg-[#C92E8E]"
-            >
-              <Sparkle size={15} weight="duotone" className="mr-1.5" />
-              {stage === "error" ? "Retry analyze" : "Run the 4-agent build"}
-              <ArrowRight size={14} className="ml-1.5" />
-            </Button>
-          ) : (
-            <span className="inline-flex items-center gap-2 rounded-full border border-[#E838A4]/30 bg-[#E838A4]/10 px-3 py-1 text-xs text-[#C92E8E]">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#E838A4]" />
-              {stage === "fetching" ? "fetching repo tree" : "4 agents streaming"}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {!canAnalyze ? (
-        <div className="flex justify-center">
-          <MissingKeyCard />
-        </div>
-      ) : (
-        <div className="h-[calc(100vh-220px)] min-h-[560px] w-full">
-          {isBuildLive ? (
-            <LiveBuildView
-              agents={agents}
-              models={models}
-              onModelChange={setModel}
-              nodes={liveNodes}
-              edges={liveEdges}
-              modelsLocked={true}
-              footerNote={error ?? undefined}
-            />
-          ) : graph && stage === "done" ? (
-            <CausalGraphViewer graph={graph} />
-          ) : (
-            // idle / error — placeholder showing the current model config
-            <LiveBuildView
-              agents={agents}
-              models={models}
-              onModelChange={setModel}
-              nodes={[]}
-              edges={[]}
-              modelsLocked={false}
-              footerNote={error ?? "Click Run to start the build"}
-            />
-          )}
-        </div>
-      )}
-
-      {/* Logo + bg accent */}
-      <div className="pointer-events-none fixed bottom-6 right-6 opacity-30">
-        <Logo size={20} className="text-neutral-900" />
-      </div>
-
-      {error && stage === "error" && (
-        <p className="flex items-start gap-2 text-xs text-red-500">
-          <Warning size={13} className="mt-0.5 shrink-0" />
-          {error}
-        </p>
-      )}
+    <div className="h-full w-full">
+      <LiveBuildView
+        agents={agents}
+        models={models}
+        onModelChange={setModel}
+        nodes={liveNodes}
+        edges={liveEdges}
+        modelsLocked={isBuildLive}
+        running={isBuildLive}
+        stage={stage}
+        onRun={startAnalysis}
+        footerNote={
+          error ?? (isBuildLive ? undefined : "Pick models, then run.")
+        }
+      />
     </div>
   );
 }
