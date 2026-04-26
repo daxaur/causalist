@@ -412,6 +412,11 @@ function FreshKeyPanel({
         </div>
       </details>
 
+      {/* Now what? — concrete prompts the user can paste into Claude
+          Code immediately. Without this the snippet gets copied and
+          the user is left wondering what to actually type. */}
+      <NextSteps />
+
       <button
         type="button"
         onClick={onDismiss}
@@ -419,6 +424,59 @@ function FreshKeyPanel({
       >
         I&rsquo;ve saved it — dismiss
       </button>
+    </div>
+  );
+}
+
+function NextSteps() {
+  const prompts = [
+    "Map vercel/swr as a Causalist project for me.",
+    "What breaks if I change src/lib/auth.ts in this repo?",
+    "Which tests cover the changes in my last 3 commits?",
+  ];
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-neutral-50/60 p-5">
+      <div className="mb-3 flex items-center gap-2">
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+          <Check size={14} weight="bold" />
+        </span>
+        <h3 className="font-display text-[16px] font-medium tracking-tight text-neutral-900">
+          Now open Claude Code and try this
+        </h3>
+      </div>
+      <p className="mb-4 text-[14.5px] leading-relaxed text-neutral-600">
+        After you paste the snippet above, run{" "}
+        <code className="rounded bg-neutral-200/60 px-1.5 py-0.5 font-mono text-[13px] text-neutral-900">
+          claude
+        </code>{" "}
+        in any terminal — Claude Code is now wired to your account. Try one of
+        these prompts. New projects appear in your projects list automatically.
+      </p>
+      <ul className="space-y-2">
+        {prompts.map((p) => (
+          <li
+            key={p}
+            className="flex items-start gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2.5 text-[14px] leading-snug text-neutral-700"
+          >
+            <span className="mt-0.5 font-mono text-[13px] text-accent-magenta">
+              ›
+            </span>
+            <span className="italic">{p}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-[13px] text-neutral-500">
+        Don&rsquo;t have Claude Code yet?{" "}
+        <a
+          href="https://docs.claude.com/en/docs/claude-code/overview"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-neutral-700 underline underline-offset-2 hover:text-neutral-900"
+        >
+          Install it from docs.claude.com
+        </a>
+        .
+      </p>
     </div>
   );
 }
