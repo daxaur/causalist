@@ -176,24 +176,10 @@ export function RepoAnalyzePrompt({
     });
   }, []);
 
-  // Auto-start the build the moment hydration confirms there's no
-  // existing graph. Pasting a URL → Map it → / app/owner/repo
-  // should drop the user straight into the live build view, not
-  // show a "Run the 4-agent build" button they have to click.
-  // Guarded by a ref so we only fire once per page mount.
-  const autoStarted = useRef(false);
-  useEffect(() => {
-    if (autoStarted.current) return;
-    if (hydrating) return;
-    if (graph) return; // already loaded from library or server
-    if (stage !== "idle") return;
-    if (!canAnalyze) return; // gate handles the missing-key UX
-    autoStarted.current = true;
-    void startAnalysis();
-    // intentionally no startAnalysis in deps — its identity changes
-    // every render and we only want the auto-fire trigger
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hydrating, graph, stage, canAnalyze]);
+  // No auto-start — the user lands on the LiveBuildView empty state
+  // ("Ready to build") with the per-agent ModelPills visible in the
+  // top strip. They pick the model for each agent (Opus 4.7 / Sonnet
+  // 4.6 / Haiku 4.5) then click "Run the 4-agent build" themselves.
 
   const startAnalysis = async () => {
     if (!canAnalyze) return;

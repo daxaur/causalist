@@ -27,13 +27,47 @@ import { ConnectClaudeCard } from "@/components/projects/connect-claude-card";
  * row of featured demo graphs. Repository discovery happens INSIDE the
  * modal, not as a sidebar duplicate.
  */
+interface ServerProject {
+  owner: string;
+  repo: string;
+  nodeCount: number;
+  edgeCount: number;
+  commit?: string;
+  updatedAt: number;
+}
+
 export default function ProjectsPage() {
   const settings = useSettings();
   const auth = useGithubAuth();
   const { entries: libraryEntries, loading: loadingLib } = useLibrary();
   const [query, setQuery] = useState("");
   const [bus, setBus] = useState<{ events: number }>({ events: 0 });
+  const [serverProjects, setServerProjects] = useState<ServerProject[]>([]);
   const isConnected = auth.authenticated || Boolean(settings.githubToken);
+
+  // Pull the user's server-side project list once on mount + whenever
+  // a fresh upload arrives. So a user who built on another device or
+  // wiped their browser cache still sees their projects.
+  useEffect(() => {
+    if (!auth.authenticated) return;
+    let cancelled = false;
+    const fetchServer = async () => {
+      try {
+        const res = await fetch("/api/projects/list", {
+          credentials: "same-origin",
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as { projects?: ServerProject[] };
+        if (!cancelled && data.projects) setServerProjects(data.projects);
+      } catch {
+        // ignore — local library still shows
+      }
+    };
+    void fetchServer();
+    return () => {
+      cancelled = true;
+    };
+  }, [auth.authenticated, bus.events]);
 
   // Live SSE listener — when the MCP server pushes a new project to
   // this paired browser, the library refreshes and the new entry
@@ -126,15 +160,47 @@ export default function ProjectsPage() {
     };
   }, [auth.userId, router]);
 
+  // Merge: local library is the canonical "I've got the graph cached
+  // here" set; serverProjects fills in anything the user built on
+  // another device or that hasn't been touched yet on this browser.
+  // Keyed by owner/repo so duplicates (same project in both places)
+  // collapse and prefer the local entry (it has nickname/pinned/etc).
+  const merged = useMemo(() => {
+    const byKey = new Map<string, LibraryIndexEntry>();
+    for (const e of libraryEntries) byKey.set(`${e.owner}/${e.repo}`, e);
+    for (const p of serverProjects) {
+      const key = `${p.owner}/${p.repo}`;
+      if (byKey.has(key)) continue;
+      // Synthesize a library-shaped row for the projects list. id is
+      // the owner/repo string so React keys are stable; clicking
+      // navigates to /app/owner/repo where RepoAnalyzePrompt will
+      // hydrate the graph from the server fetch.
+      byKey.set(key, {
+        id: `server:${key}`,
+        owner: p.owner,
+        repo: p.repo,
+        generatedAt: p.updatedAt,
+        lastOpenedAt: p.updatedAt,
+        pinned: false,
+        tags: [],
+        nodeCount: p.nodeCount,
+        edgeCount: p.edgeCount,
+      } as LibraryIndexEntry);
+    }
+    return Array.from(byKey.values()).sort(
+      (a, b) => b.lastOpenedAt - a.lastOpenedAt,
+    );
+  }, [libraryEntries, serverProjects]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return libraryEntries;
-    return libraryEntries.filter(
+    if (!q) return merged;
+    return merged.filter(
       (e) =>
         `${e.owner}/${e.repo}`.toLowerCase().includes(q) ||
         (e.nickname ?? "").toLowerCase().includes(q),
     );
-  }, [libraryEntries, query]);
+  }, [merged, query]);
 
   return (
     <div className="h-full overflow-y-auto bg-[#FAFAF8]">
