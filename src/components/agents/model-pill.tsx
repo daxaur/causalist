@@ -78,7 +78,7 @@ export function ModelPill({
         aria-expanded={open}
         disabled={disabled}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-md border bg-white font-mono text-neutral-700 transition-colors",
+          "inline-flex w-full items-center justify-between gap-1.5 rounded-md border bg-white font-mono text-neutral-700 transition-colors",
           sm ? "h-7 px-2 text-[11px]" : "h-8 px-2.5 text-[12px]",
           disabled
             ? "cursor-not-allowed border-neutral-200 opacity-60"

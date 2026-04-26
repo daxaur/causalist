@@ -131,7 +131,9 @@ export function LiveBuildView({
       {/* Body — live force graph */}
       <div ref={wrapRef} className="relative flex-1 overflow-hidden">
         {nodes.length === 0 && edges.length === 0 ? (
-          <EmptyCanvas />
+          <EmptyCanvas
+            running={Object.values(agents).some((a) => a.status === "running")}
+          />
         ) : (
           size.w > 0 && (
             <ForceGraph2D
@@ -195,9 +197,10 @@ export function LiveBuildView({
         )}
       </div>
 
-      {/* Bottom — concise count line */}
-      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-neutral-200 bg-neutral-50/60 px-3 py-1.5 font-mono text-[10.5px] text-neutral-500">
-        <div className="flex items-center gap-3">
+      {/* Bottom — running totals + optional note. Larger type than
+          before so users can read it from across the room. */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-5 gap-y-1 border-t border-neutral-200 bg-neutral-50/60 px-4 py-2.5 text-[12.5px] text-neutral-500">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           {BUILDER_AGENTS.map((a) => {
             const live = agents[a.id];
             const labelByCount: Record<BuilderAgentId, string> = {
@@ -206,26 +209,37 @@ export function LiveBuildView({
               semantic: "summaries",
               oracle: "synth",
             };
+            const value =
+              live.status === "pending"
+                ? "·"
+                : a.id === "oracle"
+                  ? live.status === "done"
+                    ? "✓"
+                    : live.status === "running"
+                      ? "…"
+                      : "·"
+                  : live.count;
             return (
-              <span key={a.id} className="inline-flex items-center gap-1">
-                <span style={{ color: a.color }}>{a.name}</span>
-                <span className="tabular-nums">
-                  {live.status === "pending"
-                    ? "·"
-                    : a.id === "oracle"
-                      ? live.status === "done"
-                        ? "✓"
-                        : live.status === "running"
-                          ? "…"
-                          : "·"
-                      : live.count}
+              <span key={a.id} className="inline-flex items-center gap-1.5">
+                <span
+                  className="font-medium"
+                  style={{ color: a.color }}
+                >
+                  {a.name}
                 </span>
-                <span className="text-neutral-300">{labelByCount[a.id]}</span>
+                <span className="font-mono tabular-nums text-neutral-700">
+                  {value}
+                </span>
+                <span className="text-neutral-400">{labelByCount[a.id]}</span>
               </span>
             );
           })}
         </div>
-        {footerNote && <span className="truncate">{footerNote}</span>}
+        {footerNote && (
+          <span className="truncate font-mono text-[12px] text-neutral-500">
+            {footerNote}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -250,7 +264,7 @@ function AgentChip({
   return (
     <div
       className={cn(
-        "flex flex-1 items-center gap-2 rounded-lg border bg-white px-2.5 py-1.5 transition-colors",
+        "flex flex-1 flex-col gap-2 rounded-lg border bg-white p-3 transition-colors",
         isError && "border-red-200 bg-red-50/40",
         isRunning && "border-neutral-300",
         isDone && "border-emerald-200 bg-emerald-50/30",
@@ -261,22 +275,25 @@ function AgentChip({
       }
       title={spec.description}
     >
-      <StatusGlyph status={live.status} color={spec.color} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-2 leading-tight">
-          <span className="font-display text-[13px] font-medium text-neutral-900">
-            {spec.name}
+      {/* Top row — status glyph, name, count */}
+      <div className="flex items-center gap-2">
+        <StatusGlyph status={live.status} color={spec.color} />
+        <span className="flex-1 truncate font-display text-[14px] font-medium text-neutral-900">
+          {spec.name}
+        </span>
+        {live.count > 0 && (
+          <span className="font-mono text-[11px] tabular-nums text-neutral-400">
+            {live.count}
           </span>
-          <span className="font-mono text-[9px] uppercase tracking-wider text-neutral-400">
-            {spec.role}
-          </span>
-        </div>
+        )}
       </div>
+      {/* Bottom row — full-width ModelPill */}
       <ModelPill
         size="sm"
         value={model}
         onChange={onModel}
         disabled={modelsLocked && live.status !== "pending"}
+        className="w-full"
       />
     </div>
   );
@@ -332,14 +349,58 @@ function StatusGlyph({
   );
 }
 
-function EmptyCanvas() {
+function EmptyCanvas({ running }: { running: boolean }) {
+  // Two states. Pre-build (running=false) is intentional dead space —
+  // we want it to look like "the canvas is waiting," not "loading
+  // failed." Running state shows the spinner + a calm what-to-expect
+  // message so the user doesn't think the page is frozen.
   return (
-    <div className="flex h-full w-full items-center justify-center text-center">
-      <div>
-        <CausalistSpinner size={28} />
-        <p className="mt-3 max-w-xs font-mono text-[11px] uppercase tracking-wider text-neutral-400">
-          Agents warming up · graph appears as nodes are emitted
-        </p>
+    <div className="relative flex h-full w-full items-center justify-center">
+      {/* Quiet dotted-grid backdrop so the canvas doesn't read as a
+          big white nothing. Pure CSS — no SVG payload. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 opacity-[0.35]"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle, rgba(120,120,120,0.18) 1px, transparent 1px)",
+          backgroundSize: "22px 22px",
+        }}
+      />
+      <div className="relative flex flex-col items-center gap-4 text-center">
+        {running ? (
+          <>
+            <CausalistSpinner size={36} />
+            <div>
+              <div className="font-display text-[18px] font-medium text-neutral-900">
+                Agents warming up
+              </div>
+              <p className="mt-1 max-w-sm text-[14px] leading-relaxed text-neutral-500">
+                Nodes appear here as the Structure agent emits them. Edges
+                trace as Dependency connects them. Should take 20–60 seconds.
+              </p>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-neutral-200 bg-white text-accent-magenta">
+              <span className="font-mono text-2xl">·</span>
+            </div>
+            <div>
+              <div className="font-display text-[18px] font-medium text-neutral-900">
+                Ready to build
+              </div>
+              <p className="mt-1 max-w-sm text-[14px] leading-relaxed text-neutral-500">
+                Pick a model for each agent above (or keep the Opus 4.7
+                defaults), then click{" "}
+                <span className="font-medium text-neutral-700">
+                  Run the 4-agent build
+                </span>
+                .
+              </p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

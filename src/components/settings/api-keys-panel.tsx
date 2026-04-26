@@ -7,18 +7,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import {
-  Check,
-  Copy,
-  Key,
-  Plus,
-  Trash,
-  Warning,
-} from "@phosphor-icons/react";
+import { Key, Plus, Trash } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { API_KEYS_CHANGED_EVENT } from "@/hooks/use-api-key-status";
-import { cn } from "@/lib/utils";
+import { FreshKeyReveal } from "@/components/agents/fresh-key-reveal";
 
 function notifyChanged() {
   if (typeof window !== "undefined") {
@@ -40,7 +33,6 @@ export function ApiKeysPanel({ authenticated }: { authenticated: boolean }) {
   const [name, setName] = useState("");
   const [minting, setMinting] = useState(false);
   const [revealedToken, setRevealedToken] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!authenticated) return;
@@ -109,17 +101,6 @@ export function ApiKeysPanel({ authenticated }: { authenticated: boolean }) {
     }
   };
 
-  const onCopy = async () => {
-    if (!revealedToken) return;
-    try {
-      await navigator.clipboard.writeText(revealedToken);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    } catch {
-      toast.error("Couldn't copy — select and ⌘C");
-    }
-  };
-
   return (
     <section className="mt-10 rounded-2xl border border-neutral-200 bg-white p-7">
       <header className="mb-5 flex items-start justify-between gap-4">
@@ -145,49 +126,15 @@ export function ApiKeysPanel({ authenticated }: { authenticated: boolean }) {
         </div>
       ) : (
         <>
-          {/* One-time reveal panel — shown after a successful mint */}
+          {/* Fresh-key reveal — shared component used by both this
+              panel and the ConnectClaudeCard so the user always sees
+              the same install snippet + example prompts after minting. */}
           {revealedToken && (
-            <div className="mb-5 rounded-xl border border-accent-magenta/30 bg-accent-magenta/[0.04] p-5">
-              <div className="flex items-start gap-3 text-[15px] text-neutral-900">
-                <Warning
-                  size={18}
-                  weight="fill"
-                  className="mt-0.5 shrink-0 text-accent-magenta"
-                />
-                <div>
-                  <div className="font-semibold">
-                    Copy this key now — it won&rsquo;t be shown again.
-                  </div>
-                  <p className="mt-1 text-[14px] leading-relaxed text-neutral-600">
-                    We only store its hash. If you lose it, mint a new one.
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 flex items-center gap-2 rounded-lg border border-neutral-200 bg-white p-3">
-                <code className="flex-1 select-all overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[14px] text-neutral-900">
-                  {revealedToken}
-                </code>
-                <button
-                  type="button"
-                  onClick={onCopy}
-                  className={cn(
-                    "inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-colors",
-                    copied
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-neutral-900 text-white hover:bg-neutral-800",
-                  )}
-                >
-                  {copied ? <Check size={13} weight="bold" /> : <Copy size={13} />}
-                  {copied ? "Copied" : "Copy"}
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => setRevealedToken(null)}
-                className="mt-3 text-[13px] text-neutral-500 underline-offset-2 hover:text-neutral-900 hover:underline"
-              >
-                I&rsquo;ve saved it — dismiss
-              </button>
+            <div className="mb-6">
+              <FreshKeyReveal
+                token={revealedToken}
+                onDismiss={() => setRevealedToken(null)}
+              />
             </div>
           )}
 
