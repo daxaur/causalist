@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "motion/react";
 import {
+  ArrowUp,
   ArrowUpRight,
   CheckCircle,
   GithubLogo,
-  PaperPlaneRight,
   Sparkle,
   Stop,
   Warning,
@@ -19,6 +19,7 @@ import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useSettings } from "@/lib/settings";
 import { cn } from "@/lib/utils";
 import { CAUSAL_AGENTS } from "@/lib/agents/prompts";
+import { ModelPill } from "@/components/agents/model-pill";
 
 type AgentMeta = { agentId: string; agentName: string; agentColor: string };
 type AgentRunState = AgentMeta & {
@@ -59,21 +60,16 @@ interface Run {
   agents: AgentRunState[];
 }
 
-// Suggestion chips — pre-fill the textarea. Phrased as causal
-// questions ("why might this fail?", "what does this break?") so the
-// agent leans on the graph instead of doing a generic linter pass.
+// Suggestion chips — pre-fill the textarea. Each one explicitly
+// invokes the GRAPH (blast radius, upstream, riskiest edges, depends
+// on, subgraph cut) so the agent leans on the topology as evidence
+// rather than running a generic linter pass.
 const SUGGESTIONS = [
-  "What breaks if these files change?",
-  "Why might this fail under load?",
-  "What does this depend on, and what depends on it?",
-  "Find the root cause of any latent bugs",
-  "Which tests cover this — and which should I add?",
-];
-
-const MODELS = [
-  { id: "claude-opus-4-7", label: "Opus 4.7" },
-  { id: "claude-sonnet-4-6", label: "Sonnet 4.6" },
-  { id: "claude-haiku-4-5", label: "Haiku 4.5" },
+  "Trace the blast radius of these nodes",
+  "What's upstream of this in the graph?",
+  "Show me the riskiest edges in the selection",
+  "Which other nodes are most depended on by these?",
+  "Find the simplest cut that isolates this subgraph",
 ];
 
 export function AgentAssignPanel({
@@ -89,7 +85,7 @@ export function AgentAssignPanel({
 }) {
   const [runs, setRuns] = useState<Run[]>([]);
   const [plan, setPlan] = useState("");
-  const [model, setModel] = useState<string>(MODELS[0].id);
+  const [model, setModel] = useState<string>("claude-opus-4-7");
   const [agentCount, setAgentCount] = useState<number>(1);
   const auth = useGithubAuth();
   const settings = useSettings();
@@ -562,47 +558,25 @@ function Composer({
           className="w-full resize-none rounded-xl bg-transparent px-3 py-2.5 text-[13px] leading-snug text-neutral-900 placeholder:text-neutral-400 focus:outline-none"
         />
 
-        {/* Model picker + suggestion chips + send button row */}
-        <div className="flex items-end justify-between gap-2 border-t border-neutral-100 px-2 py-1.5">
-          <div className="flex min-w-0 flex-1 items-center gap-1.5">
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              aria-label="Model"
-              className="h-6 max-w-[110px] cursor-pointer rounded-md border border-neutral-200 bg-white px-1.5 font-mono text-[11px] text-neutral-600 hover:border-neutral-300 focus:border-accent-magenta focus:outline-none focus:ring-2 focus:ring-accent-magenta/15"
-            >
-              {MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-            <div className="flex min-w-0 flex-wrap gap-1">
-              {SUGGESTIONS.slice(0, 2).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => setPlan(s)}
-                  className="rounded-md px-1.5 py-0.5 text-[12px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
-                >
-                  {s.split(" ").slice(0, 3).join(" ")}…
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Footer — single quiet line: ModelPill on the left, send on
+            the right. Suggestion chips were dropped here; they live in
+            the empty-state hero only, which keeps the active-thread
+            composer uncluttered. */}
+        <div className="flex items-center justify-between gap-2 border-t border-neutral-100 px-2 py-1.5">
+          <ModelPill size="sm" value={model} onChange={setModel} />
           <button
             type="button"
             onClick={submit}
             disabled={!canSend}
             aria-label="Send"
             className={cn(
-              "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white transition-all",
+              "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white transition-all focus:outline-none focus:ring-2 focus:ring-accent-magenta/30 focus:ring-offset-1",
               canSend
-                ? "bg-accent-magenta hover:bg-accent-magenta/90"
-                : "bg-neutral-200 text-neutral-400",
+                ? "bg-accent-magenta shadow-sm hover:bg-accent-magenta/90 hover:shadow-md hover:ring-2 hover:ring-accent-magenta/15"
+                : "bg-neutral-100 text-neutral-300",
             )}
           >
-            <PaperPlaneRight size={12} weight="fill" />
+            <ArrowUp size={14} weight="bold" />
           </button>
         </div>
       </div>
@@ -610,9 +584,10 @@ function Composer({
   );
 }
 
-/** Numeric picker (1..N) for parallel-agent count. Each step
- *  enlists one more causal lens — hovering the chips shows whose
- *  perspective is about to fire. */
+/** Graph-style swarm picker. Each agent renders as a tiny node-with-edges
+ *  glyph in its color with the causal name beneath; raising the count
+ *  lights up the next agent and adds an edge linking it into the chain
+ *  — so the picker visually IS a small causal graph being assembled. */
 function AgentCountPicker({
   value,
   onChange,
@@ -620,43 +595,102 @@ function AgentCountPicker({
   value: number;
   onChange: (n: number) => void;
 }) {
-  const max = CAUSAL_AGENTS.length;
   return (
     <div
-      className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white px-1 py-0.5"
+      className="inline-flex items-end gap-0 rounded-md border border-neutral-200 bg-white px-1.5 py-1.5"
       role="radiogroup"
       aria-label="Parallel agents"
     >
-      {Array.from({ length: max }, (_, i) => {
+      {CAUSAL_AGENTS.map((agent, i) => {
         const n = i + 1;
         const active = n <= value;
-        const agent = CAUSAL_AGENTS[i];
+        const nextActive = n + 1 <= value;
         return (
-          <button
-            key={n}
-            type="button"
-            role="radio"
-            aria-checked={value === n}
-            onClick={() => onChange(n)}
-            title={`Run ${n} agent${n === 1 ? "" : "s"} — ${CAUSAL_AGENTS.slice(0, n)
-              .map((a) => a.name)
-              .join(" · ")}`}
-            className={cn(
-              "h-4 w-4 rounded-full border transition-all",
-              active
-                ? "border-transparent shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]"
-                : "border-neutral-200 bg-white hover:border-neutral-400",
+          <div key={agent.id} className="flex items-end">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={value === n}
+              onClick={() => onChange(n)}
+              title={`Run ${n} agent${n === 1 ? "" : "s"} — ${agent.name}: ${agent.lens}`}
+              className="group relative flex flex-col items-center gap-0.5 px-1"
+            >
+              <AgentNodeGlyph color={agent.color} active={active} />
+              <span
+                className={cn(
+                  "font-mono text-[8.5px] uppercase tracking-wider transition-colors",
+                  active ? "text-neutral-700" : "text-neutral-300",
+                )}
+              >
+                {agent.name}
+              </span>
+            </button>
+            {/* Connector edge to the next active avatar — drawn between
+                two avatar buttons so raising the dial visibly extends
+                the chain. */}
+            {i < CAUSAL_AGENTS.length - 1 && (
+              <span
+                aria-hidden
+                className="mb-[16px] h-px w-2 transition-colors"
+                style={{
+                  background: nextActive
+                    ? `linear-gradient(to right, ${agent.color}, ${CAUSAL_AGENTS[i + 1].color})`
+                    : "rgba(120,120,120,0.18)",
+                }}
+              />
             )}
-            style={active ? { backgroundColor: agent.color } : undefined}
-          >
-            <span className="sr-only">{n}</span>
-          </button>
+          </div>
         );
       })}
-      <span className="ml-1 pr-1 font-mono text-[10px] tabular-nums text-neutral-500">
-        ×{value}
-      </span>
     </div>
+  );
+}
+
+/** Tiny node-with-edges glyph (~22px). Center disc in the agent's color
+ *  with two short outbound lines fanning down-right and up-right. The
+ *  visual cue is "this is a graph node," not just an abstract circle. */
+function AgentNodeGlyph({
+  color,
+  active,
+}: {
+  color: string;
+  active: boolean;
+}) {
+  const stroke = active ? color : "#cbd5e1";
+  const fill = active ? color : "transparent";
+  return (
+    <svg width={22} height={22} viewBox="0 0 22 22" fill="none">
+      <line
+        x1={11}
+        y1={11}
+        x2={4}
+        y2={4}
+        stroke={stroke}
+        strokeWidth={1}
+        strokeLinecap="round"
+        opacity={active ? 0.7 : 0.4}
+      />
+      <line
+        x1={11}
+        y1={11}
+        x2={18}
+        y2={18}
+        stroke={stroke}
+        strokeWidth={1}
+        strokeLinecap="round"
+        opacity={active ? 0.7 : 0.4}
+      />
+      <circle cx={4} cy={4} r={1.6} fill={stroke} opacity={active ? 0.6 : 0.3} />
+      <circle cx={18} cy={18} r={1.6} fill={stroke} opacity={active ? 0.6 : 0.3} />
+      <circle
+        cx={11}
+        cy={11}
+        r={4.5}
+        fill={fill}
+        stroke={active ? color : "#cbd5e1"}
+        strokeWidth={1.5}
+      />
+    </svg>
   );
 }
 

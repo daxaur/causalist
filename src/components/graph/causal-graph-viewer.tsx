@@ -180,6 +180,12 @@ export function CausalGraphViewer({
     : null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<any>(null);
+  // Cheap per-frame label collision buckets — Set is cleared whenever
+  // we detect a >50ms gap between nodeCanvasObject calls (new frame).
+  const labelBucketsRef = useRef<{ ts: number; set: Set<string> }>({
+    ts: 0,
+    set: new Set(),
+  });
 
   const importance = useMemo(() => rankImportance(graph), [graph]);
 
@@ -563,8 +569,10 @@ export function CausalGraphViewer({
   const sharedProps: any = {
     graphData: data,
     nodeId: "id",
-    nodeLabel: (n: VisNode) =>
-      n.summary ? `${n.label}\n\n${n.summary}` : n.label,
+    // Hover label = filename only. Summary lives in the Inspector tab —
+      // keeping the tooltip short stops mouse-over from blowing up into
+      // a multi-line wall of text.
+    nodeLabel: (n: VisNode) => n.label,
     nodeVal: (n: VisNode) => (n.size ?? 4) + (n.kind === "external" ? 2 : 0),
     nodeOpacity: 0.95,
     nodeResolution: 20,
@@ -872,28 +880,39 @@ export function CausalGraphViewer({
                 ctx.strokeStyle = sel || foc ? ACCENT : strokeColor;
                 ctx.stroke();
 
-                // Label logic — tight rules so zooming in doesn't
-                // explode into text soup, and hovering always wins:
-                // - always for hovered + focused
-                // - selected always
-                // - hot at scale >= 0.9, core at >= 1.4
-                // - anything else only at scale >= 2.2
-                const showLabel =
-                  hov ||
-                  foc ||
-                  sel ||
-                  (imp?.tier === "hot" && scale >= 0.9) ||
-                  (imp?.tier === "core" && scale >= 1.4) ||
-                  scale >= 2.2;
-                if (!showLabel) return;
-                // Font size inverts with zoom so labels stay
-                // visually small even when zoomed in — kills the
-                // text-soup-at-close-range bug.
-                const fontSize = Math.max(9, Math.min(13, 13 / Math.max(1, scale)));
+                // Label visibility — tight tier rules + an explicit
+                // "no labels at low zoom" floor. Hovered/focused/selected
+                // always win; everything else gates on tier + scale.
+                const tierVisible =
+                  (tier === "hot" && scale >= 1.0) ||
+                  (tier === "core" && scale >= 1.6) ||
+                  scale >= 2.6;
+                const forceShow = hov || foc || sel || ext;
+                if (!tierVisible && !forceShow) return;
+                // Cheap per-frame collision avoidance for leaf-tier
+                // labels: bucket by 40px grid; first label in a bucket
+                // wins. Hot/core/forced labels skip the check.
+                const now = Date.now();
+                if (now - labelBucketsRef.current.ts > 50) {
+                  labelBucketsRef.current = { ts: now, set: new Set() };
+                } else {
+                  labelBucketsRef.current.ts = now;
+                }
+                if (!forceShow && tier !== "hot" && tier !== "core") {
+                  const bucketKey = `${Math.round(node.x / 40)}_${Math.round(node.y / 40)}`;
+                  if (labelBucketsRef.current.set.has(bucketKey)) return;
+                  labelBucketsRef.current.set.add(bucketKey);
+                }
+                // Font: stable 9–11px, no wild scale-inverse math.
+                const fontSize = scale > 1.5 ? 9 : 11;
                 ctx.font = `500 ${fontSize}px ui-sans-serif, system-ui`;
                 ctx.textAlign = "center";
                 ctx.textBaseline = "top";
-                const label = node.label as string;
+                // Truncate to 18 chars + ellipsis so long basenames
+                // don't bleed past their pill.
+                const rawLabel = (node.label as string) ?? "";
+                const label =
+                  rawLabel.length > 18 ? rawLabel.slice(0, 17) + "…" : rawLabel;
                 const padX = 5;
                 const padY = 2.5;
                 const w = ctx.measureText(label).width + padX * 2;

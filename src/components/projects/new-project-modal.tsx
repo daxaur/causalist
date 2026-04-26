@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
 import {
   ArrowRight,
+  CaretDown,
   CheckCircle,
   CircleNotch,
   Warning,
@@ -20,6 +21,48 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ModelPill } from "@/components/agents/model-pill";
+import { BUILDER_AGENTS, type BuilderAgentId } from "@/lib/analyze/prompts";
+
+const DEFAULT_MODEL = "claude-opus-4-7";
+const MODELS_LS_KEY = "causalist:builder-models:v1";
+
+type ModelMap = Record<BuilderAgentId, string>;
+
+function defaultModels(): ModelMap {
+  return {
+    structure: DEFAULT_MODEL,
+    dependency: DEFAULT_MODEL,
+    semantic: DEFAULT_MODEL,
+    oracle: DEFAULT_MODEL,
+  };
+}
+
+function readModels(): ModelMap {
+  if (typeof window === "undefined") return defaultModels();
+  try {
+    const raw = window.localStorage.getItem(MODELS_LS_KEY);
+    if (!raw) return defaultModels();
+    const p = JSON.parse(raw) as Partial<ModelMap>;
+    return {
+      structure: p.structure ?? DEFAULT_MODEL,
+      dependency: p.dependency ?? DEFAULT_MODEL,
+      semantic: p.semantic ?? DEFAULT_MODEL,
+      oracle: p.oracle ?? DEFAULT_MODEL,
+    };
+  } catch {
+    return defaultModels();
+  }
+}
+
+function writeModels(m: ModelMap): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(MODELS_LS_KEY, JSON.stringify(m));
+  } catch {
+    // ignore quota errors
+  }
+}
 
 const GITHUB_URL = /github\.com\/([^/\s]+)\/([^/\s?#]+)/;
 
@@ -57,6 +100,31 @@ export function NewProjectModal({ children }: { children: ReactElement }) {
   const [nickname, setNickname] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [urlState, setUrlState] = useState<UrlState>({ kind: "empty" });
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [models, setModels] = useState<ModelMap>(() => defaultModels());
+
+  // Hydrate models from localStorage on mount (avoids SSR/CSR mismatch).
+  useEffect(() => {
+    setModels(readModels());
+  }, []);
+
+  const setModel = (id: BuilderAgentId, model: string) => {
+    setModels((prev) => {
+      const next = { ...prev, [id]: model };
+      writeModels(next);
+      return next;
+    });
+  };
+
+  const advancedSummary = useMemo(() => {
+    const distinct = new Set(Object.values(models));
+    if (distinct.size === 1) {
+      const only = [...distinct][0];
+      const label = only === DEFAULT_MODEL ? "Opus 4.7" : modelLabel(only);
+      return `4 agents · ${label}`;
+    }
+    return `${distinct.size} models in mix`;
+  }, [models]);
 
   // Format-check is synchronous and runs every keystroke; the GitHub
   // existence check debounces to 450ms after the user stops typing.
@@ -224,6 +292,66 @@ export function NewProjectModal({ children }: { children: ReactElement }) {
               <UrlStatusLine state={urlState} />
             </div>
 
+            {/* Advanced — per-agent model assignment for the 4 builders */}
+            <div className="rounded-lg border border-neutral-200 bg-white">
+              <button
+                type="button"
+                onClick={() => setAdvancedOpen((v) => !v)}
+                aria-expanded={advancedOpen}
+                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-neutral-50"
+              >
+                <span className="flex items-center gap-2">
+                  <CaretDown
+                    size={11}
+                    className={cn(
+                      "text-neutral-400 transition-transform",
+                      advancedOpen && "rotate-180",
+                    )}
+                  />
+                  <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-500">
+                    Advanced
+                  </span>
+                  <span className="font-mono text-[11px] text-neutral-400">
+                    · {advancedSummary}
+                  </span>
+                </span>
+                <span className="font-mono text-[10px] text-neutral-400">
+                  {advancedOpen ? "hide" : "configure"}
+                </span>
+              </button>
+              {advancedOpen && (
+                <div className="space-y-1.5 border-t border-neutral-100 px-3 py-2.5">
+                  {BUILDER_AGENTS.map((a) => (
+                    <div
+                      key={a.id}
+                      className="flex items-center justify-between gap-3"
+                    >
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span
+                          className="h-1.5 w-1.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: a.color }}
+                        />
+                        <span className="font-display text-[12.5px] font-medium text-neutral-900">
+                          {a.name}
+                        </span>
+                        <span className="truncate font-mono text-[10px] uppercase tracking-wider text-neutral-400">
+                          {a.role}
+                        </span>
+                      </div>
+                      <ModelPill
+                        size="sm"
+                        value={models[a.id]}
+                        onChange={(m) => setModel(a.id, m)}
+                      />
+                    </div>
+                  ))}
+                  <p className="pt-1 text-[10.5px] text-neutral-400">
+                    Each builder agent runs concurrently. Defaults to Opus 4.7.
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* Action row */}
             <div className="flex items-center justify-between pt-1">
               <p className="text-[10.5px] text-neutral-400">
@@ -350,5 +478,12 @@ function UrlStatusLine({ state }: { state: UrlState }) {
       </span>
     </motion.p>
   );
+}
+
+function modelLabel(id: string): string {
+  if (id === "claude-opus-4-7") return "Opus 4.7";
+  if (id === "claude-sonnet-4-6") return "Sonnet 4.6";
+  if (id === "claude-haiku-4-5") return "Haiku 4.5";
+  return id;
 }
 

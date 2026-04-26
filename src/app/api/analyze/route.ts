@@ -43,6 +43,10 @@ export async function POST(req: NextRequest): Promise<Response> {
       status: 400,
     });
   }
+  // models is optional; if present must be an object of partial overrides.
+  if (body.models && typeof body.models !== "object") {
+    return new Response("models must be an object", { status: 400 });
+  }
 
   // Preflight the Anthropic key so invalid keys return a proper HTTP
   // status instead of leaking an auth error deep inside the SSE body.

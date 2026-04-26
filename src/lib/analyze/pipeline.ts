@@ -1,22 +1,18 @@
-// Four-agent analyze pipeline using the Claude Agent SDK.
+// Four-agent analyze pipeline. Uses the plain @anthropic-ai/sdk with
+// `client.messages.stream()` so it works on Vercel serverless without
+// needing the Claude Code CLI binary that claude-agent-sdk spawns.
 //
-// Structure + Dependency + Semantic run in parallel (each is an
-// isolated `query()` instance of Claude Opus 4.7 — the SDK spawns
-// a Claude Code subprocess per call, which gets us retry/backoff,
-// structured JSON output, and token/cost telemetry for free).
-// Oracle synthesizes after the three complete.
+// Structure + Dependency + Semantic run in parallel. Each agent emits
+// JSONL — one node/edge/summary per line — which the pipeline parses
+// incrementally and yields as `emit_node` / `emit_edge` / `emit_summary`
+// AgentEvents. The LiveBuildView consumes those events to grow the
+// force graph in real time. Oracle synthesizes after the three settle
+// and emits a single canonical JSON graph.
 //
-// Node-runtime only. The user's Anthropic key is injected per-call
-// via `options.env` so concurrent requests on the same lambda don't
-// stomp each other's `process.env`.
+// Per-agent model assignment is supported via the `models` field on
+// AnalyzeInput. Defaults to `claude-opus-4-7` for everyone.
 
 import Anthropic from "@anthropic-ai/sdk";
-import {
-  query,
-  type Options,
-  type SDKMessage,
-  type SDKResultMessage,
-} from "@anthropic-ai/claude-agent-sdk";
 import type {
   CausalEdge,
   CausalGraph,
@@ -27,16 +23,19 @@ import {
   SEMANTIC_PROMPT,
   STRUCTURE_PROMPT,
   ORACLE_PROMPT,
+  type BuilderAgentId,
 } from "./prompts";
 import { verifyGraphEdges } from "./ast-verify";
 
-const MODEL = "claude-opus-4-7";
+const DEFAULT_MODEL = "claude-opus-4-7";
 
 export interface TreeEntry {
   path: string;
   size?: number;
   type: "file" | "dir";
 }
+
+export type ModelMap = Partial<Record<BuilderAgentId, string>>;
 
 export interface AnalyzeInput {
   owner: string;
@@ -47,6 +46,8 @@ export interface AnalyzeInput {
   files?: { path: string; content: string }[];
   /** User's Anthropic key — never persisted server-side. */
   apiKey: string;
+  /** Per-agent model overrides; defaults to Opus 4.7 for missing entries. */
+  models?: ModelMap;
 }
 
 export type AgentStage =
@@ -56,19 +57,26 @@ export type AgentStage =
   | "oracle"
   | "done";
 
+export type AgentStatus =
+  | "started"
+  | "completed"
+  | "error"
+  | "thinking"
+  | "tool_use"
+  | "emit_node"
+  | "emit_edge"
+  | "emit_summary"
+  | "progress";
+
 export interface AgentEvent {
   stage: AgentStage;
-  status: "started" | "completed" | "error" | "thinking" | "tool_use";
-  /** When completed, the partial output so far. */
+  status: AgentStatus;
+  /** Final payload on completed; single emitted item on emit_*; count on progress. */
   payload?: unknown;
   message?: string;
 }
 
-/**
- * Preflight — verify the API key works before opening the SSE stream.
- * Without this, the UI only finds out about a bad key minutes later
- * inside the SSE body.
- */
+/** Preflight: verify the API key works before opening the SSE stream. */
 export async function preflightKey(apiKey: string): Promise<{
   ok: boolean;
   status?: number;
@@ -77,7 +85,7 @@ export async function preflightKey(apiKey: string): Promise<{
   if (!apiKey) return { ok: false, error: "missing Anthropic key" };
   try {
     const probe = new Anthropic({ apiKey });
-    await probe.models.retrieve("claude-opus-4-7");
+    await probe.models.retrieve(DEFAULT_MODEL);
     return { ok: true };
   } catch (e) {
     const err = e as { status?: number; message?: string };
@@ -88,143 +96,312 @@ export async function preflightKey(apiKey: string): Promise<{
 export async function* runAnalyze(
   input: AnalyzeInput,
 ): AsyncGenerator<AgentEvent, CausalGraph, void> {
-  yield { stage: "structure", status: "started" };
-  yield { stage: "dependency", status: "started" };
-  yield { stage: "semantic", status: "started" };
-
-  // Use allSettled so a single agent error doesn't kill the whole run.
-  const [structureRes, dependencyRes, semanticRes] = await Promise.allSettled([
-    runStructure(input),
-    runDependency(input),
-    runSemantic(input),
-  ]);
-
-  const nodes =
-    structureRes.status === "fulfilled"
-      ? structureRes.value
-      : heuristicNodes(input.tree);
-  if (structureRes.status === "rejected") {
-    yield {
-      stage: "structure",
-      status: "error",
-      message: errString(structureRes.reason),
-    };
-  }
-  yield { stage: "structure", status: "completed", payload: nodes };
-
-  const edgesRaw =
-    dependencyRes.status === "fulfilled" ? dependencyRes.value : [];
-  if (dependencyRes.status === "rejected") {
-    yield {
-      stage: "dependency",
-      status: "error",
-      message: errString(dependencyRes.reason),
-    };
-  }
-  yield { stage: "dependency", status: "completed", payload: edgesRaw };
-
-  const summariesRaw =
-    semanticRes.status === "fulfilled" ? semanticRes.value : [];
-  if (semanticRes.status === "rejected") {
-    yield {
-      stage: "semantic",
-      status: "error",
-      message: errString(semanticRes.reason),
-    };
-  }
-  yield { stage: "semantic", status: "completed", payload: summariesRaw };
-
-  // Drop orphan edges / summaries before Oracle sees them
-  const nodeIds = new Set(nodes.map((n) => n.id));
-  const edges = edgesRaw.filter(
-    (e) => nodeIds.has(e.source) && nodeIds.has(e.target),
-  );
-  const summaries = summariesRaw.filter((s) => nodeIds.has(s.id));
-
-  yield { stage: "oracle", status: "started" };
-  let graph: CausalGraph;
-  try {
-    graph = await runOracle(input, nodes, edges, summaries);
-  } catch (e) {
-    // Fallback: synthesize a graph locally from the three inputs so the
-    // demo path never dies on a single Oracle failure.
-    graph = {
-      repo: `${input.owner}/${input.repo}`,
-      commit: input.commit,
-      rootLabel: input.repo,
-      nodes: nodes.map((n) => ({
-        ...n,
-        summary: summaries.find((s) => s.id === n.id)?.summary ?? n.summary,
-      })),
-      edges,
-    };
-    yield {
-      stage: "oracle",
-      status: "error",
-      message: `Oracle fell back to local synthesis: ${errString(e)}`,
-    };
-  }
-  // AST-verify every edge against real source. Edges Oracle hallucinated
-  // get `verified: false`; edges that line up with imports/requires in
-  // the source get `verified: true`. The viewer renders the two classes
-  // differently so users (and agents) can trust-gate.
-  const stats = verifyGraphEdges(graph, input.files);
-  yield {
-    stage: "oracle",
-    status: "completed",
-    payload: graph,
-    message: `${stats.verified}/${stats.total} edges AST-verified`,
+  // Producer/consumer queue — three agents stream concurrently and
+  // funnel emit events into a single ordered yield.
+  const queue: AgentEvent[] = [];
+  let waiter: (() => void) | null = null;
+  const wake = () => {
+    const w = waiter;
+    waiter = null;
+    w?.();
   };
-  yield { stage: "done", status: "completed", payload: graph };
-  return graph;
+  const enqueue = (ev: AgentEvent) => {
+    queue.push(ev);
+    wake();
+  };
+
+  const client = new Anthropic({ apiKey: input.apiKey });
+
+  // Collected outputs from the three parallel agents.
+  let collectedNodes: CausalNode[] = [];
+  let collectedEdges: CausalEdge[] = [];
+  let collectedSummaries: { id: string; summary: string }[] = [];
+
+  let producersDone = false;
+  let oracleGraph: CausalGraph | null = null;
+
+  // Run all three builders concurrently. Each emits JSONL; the
+  // line-handler parses each line, pushes to its collector, and
+  // enqueues an emit event.
+  const runners = (async () => {
+    enqueue({ stage: "structure", status: "started" });
+    enqueue({ stage: "dependency", status: "started" });
+    enqueue({ stage: "semantic", status: "started" });
+
+    const [structureRes, dependencyRes, semanticRes] = await Promise.allSettled([
+      streamStructure(client, input, enqueue, (n) => collectedNodes.push(n)),
+      streamDependency(client, input, enqueue, (e) => collectedEdges.push(e)),
+      streamSemantic(client, input, enqueue, (s) => collectedSummaries.push(s)),
+    ]);
+
+    if (structureRes.status === "rejected") {
+      enqueue({
+        stage: "structure",
+        status: "error",
+        message: errString(structureRes.reason),
+      });
+      // Heuristic fallback so the run can continue.
+      collectedNodes = heuristicNodes(input.tree);
+    }
+    enqueue({
+      stage: "structure",
+      status: "completed",
+      payload: collectedNodes,
+    });
+
+    if (dependencyRes.status === "rejected") {
+      enqueue({
+        stage: "dependency",
+        status: "error",
+        message: errString(dependencyRes.reason),
+      });
+    }
+    enqueue({
+      stage: "dependency",
+      status: "completed",
+      payload: collectedEdges,
+    });
+
+    if (semanticRes.status === "rejected") {
+      enqueue({
+        stage: "semantic",
+        status: "error",
+        message: errString(semanticRes.reason),
+      });
+    }
+    enqueue({
+      stage: "semantic",
+      status: "completed",
+      payload: collectedSummaries,
+    });
+
+    // Drop orphan edges / summaries before Oracle.
+    const nodeIds = new Set(collectedNodes.map((n) => n.id));
+    const cleanEdges = collectedEdges.filter(
+      (e) => nodeIds.has(e.source) && nodeIds.has(e.target),
+    );
+    const cleanSummaries = collectedSummaries.filter((s) => nodeIds.has(s.id));
+
+    enqueue({ stage: "oracle", status: "started" });
+    try {
+      oracleGraph = await runOracle(
+        client,
+        input,
+        collectedNodes,
+        cleanEdges,
+        cleanSummaries,
+      );
+    } catch (e) {
+      // Local synthesis fallback so the demo path never dies on Oracle.
+      oracleGraph = {
+        repo: `${input.owner}/${input.repo}`,
+        commit: input.commit,
+        rootLabel: input.repo,
+        nodes: collectedNodes.map((n) => ({
+          ...n,
+          summary:
+            cleanSummaries.find((s) => s.id === n.id)?.summary ?? n.summary,
+        })),
+        edges: cleanEdges,
+      };
+      enqueue({
+        stage: "oracle",
+        status: "error",
+        message: `Oracle fell back to local synthesis: ${errString(e)}`,
+      });
+    }
+    const stats = verifyGraphEdges(oracleGraph, input.files);
+    enqueue({
+      stage: "oracle",
+      status: "completed",
+      payload: oracleGraph,
+      message: `${stats.verified}/${stats.total} edges AST-verified`,
+    });
+    enqueue({ stage: "done", status: "completed", payload: oracleGraph });
+  })().finally(() => {
+    producersDone = true;
+    wake();
+  });
+
+  while (true) {
+    if (queue.length > 0) {
+      yield queue.shift()!;
+      continue;
+    }
+    if (producersDone) break;
+    await new Promise<void>((resolve) => {
+      waiter = resolve;
+    });
+  }
+
+  await runners;
+  if (!oracleGraph) {
+    throw new Error("analyze pipeline ended without an Oracle graph");
+  }
+  return oracleGraph;
 }
 
-// ───────── stage implementations (SDK-backed) ─────────
+// ───────── per-agent streamers ─────────
 
-async function runStructure(input: AnalyzeInput): Promise<CausalNode[]> {
-  const prompt = `Repository: ${input.owner}/${input.repo}\nCommit: ${input.commit}\n\nFile tree (JSON):\n\`\`\`json\n${JSON.stringify(
-    input.tree,
-  )}\n\`\`\`\n\nReturn ONLY a JSON array of CausalNode objects. No prose, no fences.`;
-  const text = await runAgent(input.apiKey, STRUCTURE_PROMPT, prompt);
-  return parseJsonArray<CausalNode>(text);
-}
-
-async function runDependency(input: AnalyzeInput): Promise<CausalEdge[]> {
-  if (!input.files || input.files.length === 0) return [];
-  const prompt = `Repository: ${input.owner}/${input.repo}\n\nSource files:\n\`\`\`json\n${JSON.stringify(
-    input.files,
-  )}\n\`\`\`\n\nReturn ONLY a JSON array of CausalEdge objects { source, target, kind }. No prose, no fences.`;
-  const text = await runAgent(input.apiKey, DEPENDENCY_PROMPT, prompt);
-  return parseJsonArray<CausalEdge>(text);
-}
-
-async function runSemantic(
+async function streamStructure(
+  client: Anthropic,
   input: AnalyzeInput,
-): Promise<{ id: string; summary: string }[]> {
+  enqueue: (ev: AgentEvent) => void,
+  collect: (n: CausalNode) => void,
+): Promise<void> {
+  const userPrompt = `Repository: ${input.owner}/${input.repo}\nCommit: ${input.commit}\n\nFile tree (JSON array of {path,size,type}):\n${JSON.stringify(
+    input.tree,
+  )}\n\nEmit one JSON line per node, then {"type":"end"}.`;
+
+  let count = 0;
+  await streamJsonlAgent({
+    client,
+    apiKey: input.apiKey,
+    model: input.models?.structure ?? DEFAULT_MODEL,
+    system: STRUCTURE_PROMPT,
+    user: userPrompt,
+    onLine: (obj) => {
+      const node = (obj as { node?: CausalNode }).node;
+      if (obj.type === "node" && node && typeof node.id === "string") {
+        collect(node);
+        count++;
+        enqueue({ stage: "structure", status: "emit_node", payload: node });
+        if (count % 5 === 0) {
+          enqueue({ stage: "structure", status: "progress", payload: { count } });
+        }
+      }
+    },
+    fallbackArrayKey: "node",
+    onFallbackItem: (item) => {
+      const n = item as CausalNode;
+      if (typeof n?.id !== "string") return;
+      collect(n);
+      enqueue({ stage: "structure", status: "emit_node", payload: n });
+    },
+  });
+}
+
+async function streamDependency(
+  client: Anthropic,
+  input: AnalyzeInput,
+  enqueue: (ev: AgentEvent) => void,
+  collect: (e: CausalEdge) => void,
+): Promise<void> {
+  if (!input.files || input.files.length === 0) return;
+  const userPrompt = `Repository: ${input.owner}/${input.repo}\n\nSource files (JSON):\n${JSON.stringify(
+    input.files,
+  )}\n\nEmit one JSON line per edge, then {"type":"end"}.`;
+
+  let count = 0;
+  await streamJsonlAgent({
+    client,
+    apiKey: input.apiKey,
+    model: input.models?.dependency ?? DEFAULT_MODEL,
+    system: DEPENDENCY_PROMPT,
+    user: userPrompt,
+    onLine: (obj) => {
+      const edge = (obj as { edge?: CausalEdge }).edge;
+      if (
+        obj.type === "edge" &&
+        edge &&
+        typeof edge.source === "string" &&
+        typeof edge.target === "string"
+      ) {
+        collect(edge);
+        count++;
+        enqueue({ stage: "dependency", status: "emit_edge", payload: edge });
+        if (count % 10 === 0) {
+          enqueue({
+            stage: "dependency",
+            status: "progress",
+            payload: { count },
+          });
+        }
+      }
+    },
+    fallbackArrayKey: "edge",
+    onFallbackItem: (item) => {
+      const e = item as CausalEdge;
+      if (typeof e?.source !== "string" || typeof e?.target !== "string") return;
+      collect(e);
+      enqueue({ stage: "dependency", status: "emit_edge", payload: e });
+    },
+  });
+}
+
+async function streamSemantic(
+  client: Anthropic,
+  input: AnalyzeInput,
+  enqueue: (ev: AgentEvent) => void,
+  collect: (s: { id: string; summary: string }) => void,
+): Promise<void> {
   const files = input.tree.filter((t) => t.type === "file");
-  const prompt = `Repository: ${input.owner}/${input.repo}\n\nNodes to summarize:\n\`\`\`json\n${JSON.stringify(
+  const userPrompt = `Repository: ${input.owner}/${input.repo}\n\nNodes to summarize (JSON):\n${JSON.stringify(
     files,
-  )}\n\`\`\`${
+  )}${
     input.files
-      ? `\n\nFile contents (for context):\n\`\`\`json\n${JSON.stringify(input.files)}\n\`\`\``
+      ? `\n\nFile contents (for context):\n${JSON.stringify(input.files)}`
       : ""
-  }\n\nReturn ONLY a JSON array of { id, summary } objects. No prose, no fences.`;
-  const text = await runAgent(input.apiKey, SEMANTIC_PROMPT, prompt);
-  return parseJsonArray<{ id: string; summary: string }>(text);
+  }\n\nEmit one JSON line per summary, then {"type":"end"}.`;
+
+  let count = 0;
+  await streamJsonlAgent({
+    client,
+    apiKey: input.apiKey,
+    model: input.models?.semantic ?? DEFAULT_MODEL,
+    system: SEMANTIC_PROMPT,
+    user: userPrompt,
+    onLine: (obj) => {
+      const summary = (obj as { summary?: { id?: string; summary?: string } })
+        .summary;
+      if (
+        obj.type === "summary" &&
+        summary &&
+        typeof summary.id === "string" &&
+        typeof summary.summary === "string"
+      ) {
+        const s = summary as { id: string; summary: string };
+        collect(s);
+        count++;
+        enqueue({ stage: "semantic", status: "emit_summary", payload: s });
+        if (count % 5 === 0) {
+          enqueue({
+            stage: "semantic",
+            status: "progress",
+            payload: { count },
+          });
+        }
+      }
+    },
+    fallbackArrayKey: "summary",
+    onFallbackItem: (item) => {
+      const s = item as { id: string; summary: string };
+      if (typeof s?.id !== "string") return;
+      collect(s);
+      enqueue({ stage: "semantic", status: "emit_summary", payload: s });
+    },
+  });
 }
 
 async function runOracle(
+  client: Anthropic,
   input: AnalyzeInput,
   nodes: CausalNode[],
   edges: CausalEdge[],
   summaries: { id: string; summary: string }[],
 ): Promise<CausalGraph> {
-  const prompt = `Repository: ${input.owner}/${input.repo}\nCommit: ${input.commit}\n\nInputs:\n\n\`\`\`json\n${JSON.stringify(
+  const userPrompt = `Repository: ${input.owner}/${input.repo}\nCommit: ${input.commit}\n\nInputs:\n\n${JSON.stringify(
     { nodes, edges, summaries },
     null,
     2,
-  )}\n\`\`\`\n\nReturn ONLY a JSON object { nodes, edges, rootLabel?, commit? }. No prose, no fences.`;
-  const text = await runAgent(input.apiKey, ORACLE_PROMPT, prompt, 16384);
+  )}\n\nReturn a single JSON object { nodes, edges, rootLabel?, commit? }. No prose, no fences.`;
+
+  const text = await streamFullText(client, {
+    model: input.models?.oracle ?? DEFAULT_MODEL,
+    system: ORACLE_PROMPT,
+    user: userPrompt,
+    maxTokens: 16384,
+  });
   const raw = parseJsonObject<CausalGraph>(text);
   return {
     ...raw,
@@ -234,56 +411,109 @@ async function runOracle(
   };
 }
 
+// ───────── streaming primitives ─────────
+
+interface StreamJsonlArgs {
+  client: Anthropic;
+  apiKey: string;
+  model: string;
+  system: string;
+  user: string;
+  /** Called for every JSON object successfully parsed from a single line. */
+  onLine: (obj: { type?: string; [k: string]: unknown }) => void;
+  /** Field key under which fallback-array items are nested (e.g. "node"). */
+  fallbackArrayKey: string;
+  /** Called for each item recovered from the fallback array path. */
+  onFallbackItem: (item: unknown) => void;
+}
+
 /**
- * One managed-agent call. Spawns the Claude Code subprocess with a
- * fresh `env` per invocation so concurrent requests don't collide
- * on `process.env`. No Claude Code tools (`tools: []`), no
- * `~/.claude` settings (`settingSources: []`) — we're in isolation
- * mode, just using the SDK's prompt-and-stream plumbing.
+ * Streams a JSONL agent. As text deltas arrive, parses on newline and
+ * fires onLine for each successfully-parsed JSON object. After the
+ * stream ends, if NO lines parsed, falls back to scanning the full
+ * accumulated text for a `[ … ]` JSON array (legacy "return one
+ * array" output) and emits items via onFallbackItem.
  */
-async function runAgent(
-  apiKey: string,
-  systemPrompt: string,
-  userPrompt: string,
-  _maxTokensHint: number = 8192,
-): Promise<string> {
-  const options: Options = {
-    env: { ...(process.env as Record<string, string>), ANTHROPIC_API_KEY: apiKey },
-    settingSources: [],
-    allowedTools: [],
-    systemPrompt,
-    model: MODEL,
-    maxTurns: 3,
-    permissionMode: "bypassPermissions",
+async function streamJsonlAgent(args: StreamJsonlArgs): Promise<void> {
+  const stream = args.client.messages.stream({
+    model: args.model,
+    max_tokens: 8192,
+    system: args.system,
+    messages: [{ role: "user", content: args.user }],
+  });
+
+  let buffer = "";
+  let allText = "";
+  let parsedAny = false;
+
+  const handleLine = (line: string) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    // Strip optional trailing comma (some models add it).
+    const candidate = trimmed.replace(/,\s*$/, "");
+    try {
+      const obj = JSON.parse(candidate) as { type?: string };
+      args.onLine(obj);
+      parsedAny = true;
+    } catch {
+      // not JSON — discard silently
+    }
   };
 
-  let finalText = "";
-  let result: SDKResultMessage | null = null;
-  const iter = query({ prompt: userPrompt, options });
-  for await (const msg of iter as AsyncGenerator<SDKMessage>) {
-    if (msg.type === "assistant") {
-      const content = msg.message?.content;
-      if (Array.isArray(content)) {
-        for (const block of content) {
-          if ((block as { type?: string }).type === "text") {
-            finalText += (block as { text?: string }).text ?? "";
-          }
-        }
+  for await (const event of stream) {
+    if (
+      event.type === "content_block_delta" &&
+      event.delta.type === "text_delta"
+    ) {
+      const t = event.delta.text;
+      allText += t;
+      buffer += t;
+      let idx;
+      while ((idx = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 1);
+        handleLine(line);
       }
-    } else if (msg.type === "result") {
-      result = msg as SDKResultMessage;
     }
   }
+  if (buffer.trim()) handleLine(buffer);
 
-  if (result && "subtype" in result && result.subtype !== "success") {
-    const subtype = (result as { subtype?: string }).subtype ?? "error";
-    throw new Error(`agent ${subtype}`);
+  // Fallback: model returned an array instead of JSONL.
+  if (!parsedAny) {
+    const cleaned = stripCodeFence(allText);
+    try {
+      const parsed = JSON.parse(cleaned);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) args.onFallbackItem(item);
+      }
+    } catch {
+      // give up silently — caller's collected list will just be empty
+    }
   }
-  // If the SDK ran but produced no text (rare), surface that.
-  if (!finalText.trim()) {
-    throw new Error("agent produced no text output");
+}
+
+/** Plain text-stream helper for Oracle (single JSON blob expected). */
+async function streamFullText(
+  client: Anthropic,
+  args: { model: string; system: string; user: string; maxTokens: number },
+): Promise<string> {
+  const stream = client.messages.stream({
+    model: args.model,
+    max_tokens: args.maxTokens,
+    system: args.system,
+    messages: [{ role: "user", content: args.user }],
+  });
+  let text = "";
+  for await (const event of stream) {
+    if (
+      event.type === "content_block_delta" &&
+      event.delta.type === "text_delta"
+    ) {
+      text += event.delta.text;
+    }
   }
-  return finalText;
+  if (!text.trim()) throw new Error("agent produced no text output");
+  return text;
 }
 
 // ───────── helpers ─────────
@@ -296,15 +526,6 @@ function errString(e: unknown): string {
 function stripCodeFence(s: string): string {
   const fence = s.match(/```(?:json)?\n?([\s\S]+?)\n?```/);
   return fence ? fence[1].trim() : s.trim();
-}
-
-function parseJsonArray<T>(text: string): T[] {
-  try {
-    const parsed = JSON.parse(stripCodeFence(text));
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
 }
 
 function parseJsonObject<T>(text: string): T {

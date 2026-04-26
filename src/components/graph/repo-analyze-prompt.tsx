@@ -14,44 +14,35 @@ import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useSettings } from "@/lib/settings";
 import { Logo } from "@/components/brand/logo";
 import { CausalGraphViewer } from "./causal-graph-viewer";
-import { AgentRail, type AgentState } from "./agent-rail";
-import type { CausalGraph } from "@/lib/graph/types";
+import {
+  LiveBuildView,
+  type AgentLiveState,
+} from "./live-build-view";
+import { BUILDER_AGENTS, type BuilderAgentId } from "@/lib/analyze/prompts";
+import type {
+  CausalEdge,
+  CausalGraph,
+  CausalNode,
+} from "@/lib/graph/types";
 
-function initialAgents(): AgentState[] {
-  return [
-    {
-      id: "structure",
-      name: "structure",
-      description: "walks the tree, classifies files by layer",
-      status: "pending",
-      progress: [0, 2],
-      events: [],
-    },
-    {
-      id: "dependency",
-      name: "dependency",
-      description: "extracts imports, calls, reads, writes",
-      status: "pending",
-      progress: [0, 2],
-      events: [],
-    },
-    {
-      id: "semantic",
-      name: "semantic",
-      description: "one-sentence summary per node",
-      status: "pending",
-      progress: [0, 2],
-      events: [],
-    },
-    {
-      id: "oracle",
-      name: "oracle",
-      description: "synthesizes + verifies the graph",
-      status: "pending",
-      progress: [0, 2],
-      events: [],
-    },
-  ];
+const DEFAULT_MODEL = "claude-opus-4-7";
+
+function initialAgents(): Record<BuilderAgentId, AgentLiveState> {
+  return {
+    structure: { id: "structure", status: "pending", count: 0 },
+    dependency: { id: "dependency", status: "pending", count: 0 },
+    semantic: { id: "semantic", status: "pending", count: 0 },
+    oracle: { id: "oracle", status: "pending", count: 0 },
+  };
+}
+
+function initialModels(): Record<BuilderAgentId, string> {
+  return {
+    structure: DEFAULT_MODEL,
+    dependency: DEFAULT_MODEL,
+    semantic: DEFAULT_MODEL,
+    oracle: DEFAULT_MODEL,
+  };
 }
 
 export function RepoAnalyzePrompt({
@@ -65,12 +56,21 @@ export function RepoAnalyzePrompt({
   const auth = useGithubAuth();
   const githubToken = auth.token ?? settings.githubToken;
 
-  const [agents, setAgents] = useState<AgentState[]>(initialAgents);
-  const [stage, setStage] = useState<"idle" | "fetching" | "running" | "done" | "error">(
-    "idle",
+  const [agents, setAgents] = useState<Record<BuilderAgentId, AgentLiveState>>(
+    initialAgents,
   );
+  const [models, setModels] = useState<Record<BuilderAgentId, string>>(
+    () => readModelsFromStorage() ?? initialModels(),
+  );
+  const [stage, setStage] = useState<
+    "idle" | "fetching" | "running" | "done" | "error"
+  >("idle");
   const [error, setError] = useState<string | null>(null);
   const [graph, setGraph] = useState<CausalGraph | null>(null);
+  // Live-build state. Nodes/edges accumulate as agents emit; pulse
+  // markers fade in the LiveBuildView renderer.
+  const [liveNodes, setLiveNodes] = useState<CausalNode[]>([]);
+  const [liveEdges, setLiveEdges] = useState<CausalEdge[]>([]);
   const abortRef = useRef<AbortController | null>(null);
 
   const canAnalyze = Boolean(settings.anthropicKey);
@@ -78,35 +78,26 @@ export function RepoAnalyzePrompt({
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const updateAgent = useCallback(
-    (id: string, patch: Partial<AgentState>) => {
-      setAgents((as) => as.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+    (id: BuilderAgentId, patch: Partial<AgentLiveState>) => {
+      setAgents((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
     },
     [],
   );
-  const pushEvent = useCallback(
-    (id: string, text: string, kind: "action" | "finding" | "done" | "error") => {
-      setAgents((as) =>
-        as.map((a) =>
-          a.id === id
-            ? {
-                ...a,
-                events: [...a.events, { ts: Date.now(), kind, text }],
-                progress: [
-                  Math.min(a.progress[1], a.events.length + 1),
-                  a.progress[1],
-                ] as [number, number],
-              }
-            : a,
-        ),
-      );
-    },
-    [],
-  );
+
+  const setModel = useCallback((id: BuilderAgentId, model: string) => {
+    setModels((prev) => {
+      const next = { ...prev, [id]: model };
+      writeModelsToStorage(next);
+      return next;
+    });
+  }, []);
 
   const startAnalysis = async () => {
     if (!canAnalyze) return;
     setError(null);
     setGraph(null);
+    setLiveNodes([]);
+    setLiveEdges([]);
     setStage("fetching");
     setAgents(initialAgents());
     const controller = new AbortController();
@@ -145,16 +136,7 @@ export function RepoAnalyzePrompt({
           type: (t.type === "tree" ? "dir" : "file") as "file" | "dir",
         }));
 
-      pushEvent(
-        "structure",
-        `Fetched ${entries.length} tree entries from ${owner}/${repo}`,
-        "finding",
-      );
-
-      // 1.5) Fetch the most graph-worthy source files so the Dependency
-      // agent can actually extract edges. Without this, runDependency
-      // returns [] and the graph is all islands (no arrows). Audit
-      // finding — this was the #1 demo-breaker.
+      // Curate source files for Dependency.
       const fileCandidates = entries
         .filter((e) => e.type === "file" && !!e.path)
         .filter((e) => {
@@ -167,21 +149,14 @@ export function RepoAnalyzePrompt({
         })
         .filter((e) => {
           if (typeof e.size === "number" && e.size > 50_000) return false;
-          // Skip noisy paths that never carry signal.
-          if (/(^|\/)(node_modules|dist|build|\.next|\.venv|\.git)\//.test(
-            e.path,
-          ))
+          if (
+            /(^|\/)(node_modules|dist|build|\.next|\.venv|\.git)\//.test(e.path)
+          )
             return false;
           if (/(^|\/)__tests__|\.(spec|test)\./.test(e.path)) return false;
           return true;
         })
         .slice(0, 25);
-
-      pushEvent(
-        "dependency",
-        `Reading ${fileCandidates.length} source files for edge extraction`,
-        "action",
-      );
 
       const files: { path: string; content: string }[] = [];
       for (const c of fileCandidates) {
@@ -198,8 +173,6 @@ export function RepoAnalyzePrompt({
             typeof data.content === "string"
           ) {
             const text = atob(data.content.replace(/\n/g, ""));
-            // Trim any single file past 30KB to keep the analyze payload
-            // under Vercel's 4.5 MB body cap with plenty of headroom.
             files.push({ path: c.path, content: text.slice(0, 30_000) });
           }
         } catch {
@@ -207,11 +180,8 @@ export function RepoAnalyzePrompt({
         }
       }
 
-      // 2) POST /api/analyze, stream SSE, dispatch to agents
+      // 2) POST /api/analyze, stream SSE
       setStage("running");
-      updateAgent("structure", { status: "running", startedAt: Date.now() });
-      updateAgent("dependency", { status: "running", startedAt: Date.now() });
-      updateAgent("semantic", { status: "running", startedAt: Date.now() });
 
       const res = await fetch("/api/analyze", {
         method: "POST",
@@ -224,8 +194,9 @@ export function RepoAnalyzePrompt({
           owner,
           repo,
           commit: commitSha,
-          tree: entries.slice(0, 1500), // cap payload
+          tree: entries.slice(0, 1500),
           files,
+          models,
         }),
       });
       if (!res.body) throw new Error("Analyze endpoint returned no body");
@@ -262,25 +233,21 @@ export function RepoAnalyzePrompt({
             continue;
           }
           if (event === "agent") {
-            handleAgentEvent(parsed as {
-              stage: string;
-              status: string;
-              payload?: unknown;
-              message?: string;
-            });
+            handleAgentEvent(
+              parsed as {
+                stage: BuilderAgentId | "done" | string;
+                status: string;
+                payload?: unknown;
+                message?: string;
+              },
+            );
           } else if (event === "done") {
             const finalGraph = parsed as CausalGraph;
             setGraph(finalGraph);
             setStage("done");
-            setAgents((as) =>
-              as.map((a) => ({
-                ...a,
-                status: "done",
-                finishedAt: a.finishedAt ?? Date.now(),
-                progress: [a.progress[1], a.progress[1]] as [number, number],
-              })),
-            );
-            // Auto-save to library
+            for (const a of BUILDER_AGENTS) {
+              updateAgent(a.id, { status: "done" });
+            }
             try {
               await saveEntry({
                 owner,
@@ -309,72 +276,96 @@ export function RepoAnalyzePrompt({
   };
 
   const handleAgentEvent = (ev: {
-    stage: string;
+    stage: BuilderAgentId | "done" | string;
     status: string;
     payload?: unknown;
     message?: string;
   }) => {
-    const id = ev.stage;
-    if (ev.status === "started") {
-      updateAgent(id, {
-        status: "running",
-        startedAt: Date.now(),
-        progress: [1, 2],
-      });
-      pushEvent(id, `started`, "action");
-    } else if (ev.status === "completed") {
-      const count =
-        Array.isArray(ev.payload) ? (ev.payload as unknown[]).length : 0;
-      pushEvent(id, `produced ${count} ${id === "oracle" ? "graph" : "entries"}`, "finding");
-      updateAgent(id, {
-        status: "done",
-        finishedAt: Date.now(),
-        progress: [2, 2],
-      });
-    } else if (ev.status === "error") {
-      pushEvent(id, ev.message ?? "error", "error");
-      updateAgent(id, { status: "error", finishedAt: Date.now() });
+    const id = ev.stage as BuilderAgentId;
+    if (!isBuilder(id)) return;
+
+    switch (ev.status) {
+      case "started":
+        updateAgent(id, { status: "running" });
+        break;
+      case "completed":
+        updateAgent(id, { status: "done" });
+        break;
+      case "error":
+        updateAgent(id, { status: "error", message: ev.message });
+        break;
+      case "emit_node": {
+        const n = ev.payload as CausalNode;
+        if (!n?.id) return;
+        setLiveNodes((prev) => {
+          if (prev.some((x) => x.id === n.id)) return prev;
+          // Tag with _pulse so the renderer paints a brief glow.
+          return [...prev, { ...n, _pulse: Date.now() } as CausalNode];
+        });
+        setAgents((prev) => ({
+          ...prev,
+          structure: {
+            ...prev.structure,
+            count: prev.structure.count + 1,
+          },
+        }));
+        break;
+      }
+      case "emit_edge": {
+        const e = ev.payload as CausalEdge;
+        if (!e?.source || !e?.target) return;
+        setLiveEdges((prev) => {
+          const dupe = prev.some(
+            (x) =>
+              x.source === e.source && x.target === e.target && x.kind === e.kind,
+          );
+          if (dupe) return prev;
+          return [...prev, { ...e, _pulse: Date.now() } as CausalEdge];
+        });
+        setAgents((prev) => ({
+          ...prev,
+          dependency: {
+            ...prev.dependency,
+            count: prev.dependency.count + 1,
+          },
+        }));
+        break;
+      }
+      case "emit_summary":
+        setAgents((prev) => ({
+          ...prev,
+          semantic: {
+            ...prev.semantic,
+            count: prev.semantic.count + 1,
+          },
+        }));
+        break;
+      case "progress":
+        // Counts are already maintained via emit_*; ignore the
+        // periodic progress event for now.
+        break;
     }
   };
 
+  const isBuildLive = stage === "fetching" || stage === "running";
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-6 py-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-neutral-200 bg-neutral-50/60 p-10 text-center">
-          <div className="relative mb-5">
-            <div className="absolute inset-0 animate-pulse rounded-full bg-[#E838A4]/15 blur-2xl" />
-            <div className="relative flex h-12 w-12 items-center justify-center rounded-full border border-neutral-200 bg-white">
-              <Logo size={20} className="text-neutral-900" />
-            </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="font-mono text-[10px] uppercase tracking-wider text-neutral-400">
+            {stage === "done" ? "Mapped" : "Mapping"}
           </div>
-          <div className="mb-2 font-mono text-[10px] uppercase tracking-wider text-neutral-400">
-            {stage === "done" ? "Mapped" : "Not yet mapped"}
-          </div>
-          <h1 className="mb-2 font-display text-2xl font-medium tracking-[-0.02em] sm:text-3xl">
+          <h1 className="font-display text-2xl font-medium tracking-[-0.02em] sm:text-3xl">
             {stage === "done" ? "Saved to library" : "Map"}{" "}
             <span className="font-mono text-[0.72em] text-neutral-500">
               {owner}/{repo}
             </span>
           </h1>
-          <p className="mb-5 max-w-md text-sm leading-relaxed text-neutral-500">
-            {stage === "done"
-              ? "Four Claude Opus 4.7 agents produced this graph. Open the full viewer below or in your Library."
-              : "Four Claude Opus 4.7 agents run server-side with your key. The graph arrives in ~20–40s depending on repo size."}
-          </p>
-
-          {!canAnalyze ? (
-            <MissingKeyCard />
-          ) : stage === "idle" || stage === "error" ? (
-            <Button
-              onClick={startAnalysis}
-              className="h-11 bg-[#E838A4] px-5 text-sm text-white hover:bg-[#C92E8E]"
-            >
-              <Sparkle size={15} weight="duotone" className="mr-1.5" />
-              {stage === "error" ? "Retry analyze" : "Run the 4-agent analyze"}
-              <ArrowRight size={14} className="ml-1.5" />
-            </Button>
-          ) : stage === "done" ? (
-            <div className="flex items-center gap-2">
+        </div>
+        <div className="flex items-center gap-2">
+          {stage === "done" ? (
+            <>
               <Link
                 href={`/app/${owner}/${repo}`}
                 className="inline-flex h-9 items-center gap-1.5 rounded-md bg-neutral-900 px-4 text-xs text-white transition-colors hover:bg-neutral-800"
@@ -388,35 +379,103 @@ export function RepoAnalyzePrompt({
               >
                 Projects
               </Link>
-            </div>
+            </>
+          ) : !canAnalyze ? null : (stage === "idle" || stage === "error") ? (
+            <Button
+              onClick={startAnalysis}
+              className="h-10 bg-[#E838A4] px-5 text-sm text-white hover:bg-[#C92E8E]"
+            >
+              <Sparkle size={15} weight="duotone" className="mr-1.5" />
+              {stage === "error" ? "Retry analyze" : "Run the 4-agent build"}
+              <ArrowRight size={14} className="ml-1.5" />
+            </Button>
           ) : (
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#E838A4]/30 bg-[#E838A4]/10 px-3 py-1 text-xs text-[#C92E8E]">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#E838A4]/30 bg-[#E838A4]/10 px-3 py-1 text-xs text-[#C92E8E]">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#E838A4]" />
               {stage === "fetching" ? "fetching repo tree" : "4 agents streaming"}
-            </div>
+            </span>
           )}
-
-          {error && (
-            <p className="mt-4 max-w-md flex items-start gap-2 text-xs text-red-500">
-              <Warning size={13} className="mt-0.5 shrink-0" />
-              {error}
-            </p>
-          )}
-        </div>
-
-        <div className="h-full min-h-[480px]">
-          <AgentRail agents={agents} />
         </div>
       </div>
 
-      {/* When done, render the finished graph inline. */}
-      {graph && stage === "done" && (
-        <div className="h-[calc(100vh-360px)] min-h-[520px] w-full">
-          <CausalGraphViewer graph={graph} />
+      {!canAnalyze ? (
+        <div className="flex justify-center">
+          <MissingKeyCard />
         </div>
+      ) : (
+        <div className="h-[calc(100vh-220px)] min-h-[560px] w-full">
+          {isBuildLive ? (
+            <LiveBuildView
+              agents={agents}
+              models={models}
+              onModelChange={setModel}
+              nodes={liveNodes}
+              edges={liveEdges}
+              modelsLocked={true}
+              footerNote={error ?? undefined}
+            />
+          ) : graph && stage === "done" ? (
+            <CausalGraphViewer graph={graph} />
+          ) : (
+            // idle / error — placeholder showing the current model config
+            <LiveBuildView
+              agents={agents}
+              models={models}
+              onModelChange={setModel}
+              nodes={[]}
+              edges={[]}
+              modelsLocked={false}
+              footerNote={error ?? "Click Run to start the build"}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Logo + bg accent */}
+      <div className="pointer-events-none fixed bottom-6 right-6 opacity-30">
+        <Logo size={20} className="text-neutral-900" />
+      </div>
+
+      {error && stage === "error" && (
+        <p className="flex items-start gap-2 text-xs text-red-500">
+          <Warning size={13} className="mt-0.5 shrink-0" />
+          {error}
+        </p>
       )}
     </div>
   );
+}
+
+function isBuilder(id: string): id is BuilderAgentId {
+  return BUILDER_AGENTS.some((a) => a.id === id);
+}
+
+const MODELS_LS_KEY = "causalist:builder-models:v1";
+
+function readModelsFromStorage(): Record<BuilderAgentId, string> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(MODELS_LS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return {
+      structure: parsed.structure ?? DEFAULT_MODEL,
+      dependency: parsed.dependency ?? DEFAULT_MODEL,
+      semantic: parsed.semantic ?? DEFAULT_MODEL,
+      oracle: parsed.oracle ?? DEFAULT_MODEL,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeModelsToStorage(m: Record<BuilderAgentId, string>): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(MODELS_LS_KEY, JSON.stringify(m));
+  } catch {
+    // ignore quota errors
+  }
 }
 
 function MissingKeyCard() {
@@ -427,8 +486,8 @@ function MissingKeyCard() {
         Add your Anthropic API key to analyze
       </div>
       <p className="max-w-sm text-xs text-amber-800/70">
-        Your key is sent directly to the analyze route as a Bearer header.
-        We never store it.
+        Your key is sent directly to the analyze route as a Bearer header. We
+        never store it.
       </p>
       <Link
         href="/app/settings"
