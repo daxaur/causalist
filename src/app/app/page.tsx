@@ -12,11 +12,13 @@ import {
   GithubLogo,
   Plus,
   Terminal,
+  Trash,
 } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
 import { useGithubAuth } from "@/hooks/use-github-auth";
 import { useSettings } from "@/lib/settings";
-import { useLibrary } from "@/lib/library/store";
+import { useLibrary, remove as removeLocalEntry } from "@/lib/library/store";
+import { cn } from "@/lib/utils";
 import type { LibraryIndexEntry } from "@/lib/library/types";
 import { NewProjectModal } from "@/components/projects/new-project-modal";
 import { ConnectClaudeCard } from "@/components/projects/connect-claude-card";
@@ -271,7 +273,13 @@ export default function ProjectsPage() {
           ) : (
             <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {filtered.map((e) => (
-                <SavedRow key={e.id} entry={e} />
+                <SavedRow
+                  key={e.id}
+                  entry={e}
+                  onDeleted={() =>
+                    setBus((b) => ({ events: b.events + 1 }))
+                  }
+                />
               ))}
             </ul>
           )}
@@ -304,12 +312,58 @@ export default function ProjectsPage() {
   );
 }
 
-function SavedRow({ entry }: { entry: LibraryIndexEntry }) {
+function SavedRow({
+  entry,
+  onDeleted,
+}: {
+  entry: LibraryIndexEntry;
+  onDeleted?: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirming) {
+      setConfirming(true);
+      // Reset confirmation after 3s if the user doesn't follow up.
+      window.setTimeout(() => setConfirming(false), 3000);
+      return;
+    }
+    setBusy(true);
+    // Best-effort server delete (only matters when authed). Errors
+    // are non-fatal — if the server delete fails the local one will
+    // still vanish from the list and the user can retry.
+    try {
+      await fetch(
+        `/api/projects/delete?owner=${encodeURIComponent(entry.owner)}&repo=${encodeURIComponent(entry.repo)}`,
+        { method: "DELETE", credentials: "same-origin" },
+      );
+    } catch {
+      // ignore — fall through to local delete
+    }
+    // Server-only entries (id starts with "server:") have no local
+    // copy to drop. The library hook will refresh real entries on
+    // its own next tick via the `causalist:library-changed` event
+    // that remove() emits.
+    if (!entry.id.startsWith("server:")) {
+      try {
+        await removeLocalEntry(entry.id);
+      } catch {
+        // ignore
+      }
+    }
+    toast.success(`Deleted ${entry.owner}/${entry.repo}`);
+    onDeleted?.();
+    setBusy(false);
+  };
+
   return (
-    <li>
+    <li className="group/row relative">
       <Link
         href={`/app/${entry.owner}/${entry.repo}`}
-        className="group flex items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-white px-3.5 py-2.5 transition-all hover:border-accent-magenta/40 hover:shadow-[0_1px_0_rgba(0,0,0,0.02)]"
+        className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-white px-3.5 py-2.5 transition-all hover:border-accent-magenta/40 hover:shadow-[0_1px_0_rgba(0,0,0,0.02)]"
       >
         <div className="min-w-0">
           <div className="truncate font-mono text-[13px] text-neutral-900">
@@ -331,10 +385,28 @@ function SavedRow({ entry }: { entry: LibraryIndexEntry }) {
           </span>
           <ArrowUpRight
             size={12}
-            className="text-neutral-300 transition-transform group-hover:translate-x-0.5 group-hover:text-neutral-900"
+            className="text-neutral-300 transition-transform group-hover/row:translate-x-0.5 group-hover/row:text-neutral-900"
           />
         </div>
       </Link>
+      {/* Delete affordance — hidden until row hover so it doesn't add
+          visual noise to the grid. Two-step confirm so a stray click
+          doesn't nuke a project. */}
+      <button
+        type="button"
+        onClick={handleDelete}
+        disabled={busy}
+        title={confirming ? "Click again to confirm" : "Delete project"}
+        className={cn(
+          "absolute right-2 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-md border bg-white transition-all",
+          confirming
+            ? "border-red-300 bg-red-50 text-red-600 opacity-100"
+            : "border-neutral-200 text-neutral-400 opacity-0 hover:border-red-200 hover:text-red-500 group-hover/row:opacity-100",
+          busy && "cursor-wait opacity-50",
+        )}
+      >
+        <Trash size={12} weight={confirming ? "fill" : "regular"} />
+      </button>
     </li>
   );
 }
