@@ -98,76 +98,99 @@ export function FadeUpStagger({
   );
 }
 
-/** Magenta dot with one or more concentric rings. The Causalist mark
- *  in atmosphere form. */
-export function CausalistMark({
-  size = 96,
-  color = COLORS.magenta,
-  pulse = true,
+/** Causalist logo — the actual brand mark. Open arc (the "C") with
+ *  two endpoint dots: top-right is an outline ring, bottom-right is a
+ *  filled disc. Identical to /public/icon.svg and the Logo component
+ *  in src/components/brand/logo.tsx, redrawn at video resolution.
+ *
+ *  When `startFrame` is set, the arc strokes in over 16 frames, then
+ *  the open ring fades in, then the filled dot lands. Otherwise the
+ *  whole mark is fully visible.
+ */
+export function CausalistLogo({
+  size = 240,
+  color = COLORS.ink,
+  accent = COLORS.magenta,
+  startFrame,
 }: {
   size?: number;
   color?: string;
-  pulse?: boolean;
+  accent?: string;
+  startFrame?: number;
 }) {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const t = (frame % (fps * 3)) / (fps * 3); // 3-second loop
-  const ringScale = pulse ? 1 + t * 0.4 : 1;
-  const ringOpacity = pulse ? 1 - t : 0.4;
-  const dotSize = size * 0.25;
+  const animated = typeof startFrame === "number";
+
+  // Arc length for the open-C path, in viewBox units. The path sweeps
+  // ~270° around radius 8.5 ≈ 40 units.
+  const ARC_LEN = 42;
+
+  const draw = animated
+    ? interpolate(frame, [startFrame!, startFrame! + 16], [0, 1], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+        easing: easeOutCubic,
+      })
+    : 1;
+  const ringIn = animated
+    ? interpolate(frame, [startFrame! + 12, startFrame! + 22], [0, 1], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+        easing: easeOutCubic,
+      })
+    : 1;
+  const dotIn = animated
+    ? interpolate(frame, [startFrame! + 18, startFrame! + 26], [0, 1], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+        easing: easeOutCubic,
+      })
+    : 1;
+
+  // Stroke width scaled relative to size (matches the live Logo at
+  // ~7% of viewport). 1.75 stroke at viewBox 24 = ~7.3%.
+  const stroke = (size / 24) * 1.75;
 
   return (
-    <div
-      style={{
-        position: "relative",
-        width: size,
-        height: size,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      style={{ overflow: "visible" }}
     >
-      {/* Outer pinging ring */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          borderRadius: "9999px",
-          border: `1px solid ${color}`,
-          opacity: ringOpacity,
-          transform: `scale(${ringScale})`,
-        }}
+      {/* The C — open arc */}
+      <path
+        d="M18 5.2 A 8.5 8.5 0 1 0 18 18.8"
+        strokeDasharray={ARC_LEN}
+        strokeDashoffset={ARC_LEN * (1 - draw)}
       />
-      {/* Static rings */}
-      <div
-        style={{
-          position: "absolute",
-          inset: size * 0.12,
-          borderRadius: "9999px",
-          border: `1px solid ${color}`,
-          opacity: 0.4,
-        }}
+      {/* Top-right open ring */}
+      <circle
+        cx="18"
+        cy="5.2"
+        r="1.9"
+        opacity={ringIn}
+        transform={`translate(18 5.2) scale(${ringIn}) translate(-18 -5.2)`}
       />
-      <div
-        style={{
-          position: "absolute",
-          inset: size * 0.24,
-          borderRadius: "9999px",
-          border: `1px solid ${color}`,
-          opacity: 0.6,
-        }}
+      {/* Bottom-right filled magenta dot — the brand's punctuation */}
+      <circle
+        cx="18"
+        cy="18.8"
+        r="1.9"
+        fill={accent}
+        stroke="none"
+        opacity={dotIn}
+        transform={`translate(18 18.8) scale(${dotIn}) translate(-18 -18.8)`}
       />
-      {/* Center dot */}
-      <div
-        style={{
-          width: dotSize,
-          height: dotSize,
-          borderRadius: "9999px",
-          backgroundColor: color,
-          boxShadow: `0 0 ${dotSize / 2}px ${color}55`,
-        }}
-      />
-    </div>
+      {/* eslint-disable-next-line — preserve attr for static reads */}
+      <title>Causalist</title>
+      {/* unused but suppresses lint */}
+      <desc data-stroke={stroke} />
+    </svg>
   );
 }
 

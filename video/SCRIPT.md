@@ -12,21 +12,18 @@ The PR/GitHub cuts from the previous edit are dropped. The story is "agents draw
 
 | # | t | Source | Composition / SR | Length | Voiceover (optional) |
 |---|---|---|---|---|---|
-| 1 | 0.0 | Remotion | `cold-open` | 5.0s | *silent — let the mark land* |
-| 2 | 5.0 | Remotion | `logo-draws-as-graph` | 5.0s | "Causalist." |
-| 3 | 10.0 | Remotion | `the-problem` | 3.0s | "Claude Code grepped four hundred eighty-seven files to find three affected tests." |
-| 4 | 13.0 | Remotion | `the-pivot` | 3.0s | "There's a faster way." |
-| 5 | 16.0 | Remotion | `bringing-causality-to-agents` | 4.0s | "Bringing causality closer to agents." |
-| 6 | 20.0 | **Screen rec** | **SR-1: paste-url-and-build** | ~14s | *the live build view: nodes pop in, edges trace, agent chips pulse — this is the headline shot* |
-| 7 | 34.0 | Remotion | `agents-on-graph` | 6.0s | "Four agents in parallel — each with a different model, your choice." |
-| 8 | 40.0 | **Screen rec** | **SR-2: select-and-ask** | ~12s | *select a few nodes, open the Agents tab, ask "trace the blast radius" — the swarm answers in graph terms* |
-| 9 | 52.0 | Remotion | `claude-code-builds-for-you` | 5.0s | "Eleven graph-aware tools, exposed over MCP." |
-|10 | 57.0 | **Screen rec** | **SR-3: claude-code-uses-mcp** | ~9s | *terminal: Claude Code calls a Causalist tool, returns a structured answer* |
-|11 | 66.0 | Remotion | `closing` | 4.0s | "Causalist. Open source. Built with Claude Opus 4.7." |
+| 1 | 0.0 | Remotion | `cold-open` | 3.5s | *silent — let the logo draw itself in* |
+| 2 | 3.5 | Remotion | `the-problem` | 2.5s | "Claude Code grepped four hundred eighty-seven files to find three affected tests." |
+| 3 | 6.0 | Remotion | `the-pivot` | 2.5s | "There's a faster way." |
+| 4 | 8.5 | Remotion | `bringing-causality-to-agents` | 3.0s | "Bringing causality closer to agents." |
+| 5 | 11.5 | **Screen rec** | **SR-1: paste-url-and-build** | ~14s | *the live build view: nodes pop in, edges trace, agent chips pulse — this is the headline shot* |
+| 6 | 25.5 | Remotion | `agents-on-graph` | 4.0s | "Four agents — Structure, Dependency, Semantic, Oracle — one graph." |
+| 7 | 29.5 | **Screen rec** | **SR-2: select-and-ask** | ~12s | *select a few nodes, open the Agents tab, ask "trace the blast radius" — the swarm answers in graph terms* |
+| 8 | 41.5 | Remotion | `claude-code-builds-for-you` | 3.5s | "Connect Claude Code, let it build for you." |
+| 9 | 45.0 | **Screen rec** | **SR-3: claude-code-uses-mcp** | ~9s | *terminal: Claude Code calls a Causalist tool, returns a structured answer* |
+|10 | 54.0 | Remotion | `closing` | 3.5s | "Causalist. Built with Claude Opus 4.7." |
 
-**Total:** ~70s with the SRs paced as above. Aim under 75s — winning hackathon demos are tight.
-
-`logo-draws-as-graph-alt` is an alternate brand opener (wordmark + horizontal agent row + "see what your code actually means" tagline). Use it as the cold-open replacement if a softer, less geometric mood lands better in the cut.
+**Total:** ~57s with the SRs paced as above. Tight, focused, every Remotion cut centered on the absolute middle of the frame.
 
 ---
 

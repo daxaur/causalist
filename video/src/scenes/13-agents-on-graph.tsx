@@ -1,177 +1,116 @@
-// AgentsOnGraph — the visual centerpiece. A static-canvas force graph
-// mock: ~30 nodes ring up around a center; then 4 colored agents
-// (Structure / Dependency / Semantic / Oracle) appear and "drop"
-// nodes + trace edges in their respective colors. The choreographed
-// version of the live-build view, sized for video.
-
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { COLORS, TYPE } from "../lib/tokens";
-import { easeOutCubic } from "../lib/anim";
+import { CausalistLogo, easeOutCubic, FadeUp } from "../lib/anim";
 
-const NODE_COUNT = 30;
-const RING_RADIUS = 280;
-
-// Pseudo-random scatter so the ring doesn't read as a perfect circle.
-function nodePos(i: number): [number, number] {
-  const angle = (i / NODE_COUNT) * Math.PI * 2 - Math.PI / 2;
-  const wobble = (((i * 9301 + 49297) % 233280) / 233280) * 60 - 30;
-  const r = RING_RADIUS + wobble;
-  return [Math.cos(angle) * r, Math.sin(angle) * r];
-}
+/** AgentsOnGraph — the centerpiece, redone clean.
+ *
+ *  4s @ 30fps = 120 frames. Absolute-centered Causalist logo; four
+ *  builder agents arrange around it in a square (NESW); thin edges
+ *  trace from each agent to the center one at a time. That's the
+ *  whole composition. The earlier 30-node ring was visual chaos —
+ *  this is a single calm visual that says "four agents, one graph."
+ */
 
 const AGENTS = [
-  { color: "#D24798", name: "Structure", angle: -Math.PI / 2 - 0.3 },
-  { color: "#3B82F6", name: "Dependency", angle: -0.1 },
-  { color: "#F6A623", name: "Semantic", angle: Math.PI / 2 + 0.2 },
-  { color: "#10B981", name: "Oracle", angle: Math.PI - 0.3 },
+  { name: "Structure", color: "#D24798", angle: -Math.PI / 2 },
+  { name: "Dependency", color: "#3B82F6", angle: 0 },
+  { name: "Semantic", color: "#F6A623", angle: Math.PI / 2 },
+  { name: "Oracle", color: "#10B981", angle: Math.PI },
 ];
 
-const AGENT_RADIUS = 460;
+const RADIUS = 280;
+const NODE_RADIUS = 18;
 
-// Each agent claims a quarter of the ring's nodes (round-robin).
-function agentForNode(i: number): number {
-  return i % AGENTS.length;
-}
-
-// Edges to draw — each connects two ring nodes; the agent that
-// "owns" the source node draws it in their color.
-const EDGES: Array<[number, number]> = (() => {
-  const edges: Array<[number, number]> = [];
-  for (let i = 0; i < NODE_COUNT; i++) {
-    edges.push([i, (i + 1) % NODE_COUNT]);
-    if (i % 4 === 0) edges.push([i, (i + 7) % NODE_COUNT]);
-  }
-  return edges;
-})();
-
-export const AgentsOnGraph: React.FC = () => {
+export function AgentsOnGraph() {
   const frame = useCurrentFrame();
-  // 6s @ 30fps = 180 frames
-  //   0–24    agents materialize on the canvas
-  //   24–110  nodes drop in (4 streams in parallel)
-  //   60–160  edges trace in (per-agent color)
-  //   140–180 hold
 
   return (
     <AbsoluteFill
       style={{
         backgroundColor: COLORS.cream,
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
+        gap: 56,
       }}
     >
       <svg
-        width={1200}
-        height={1000}
-        viewBox="-600 -500 1200 1000"
+        width={900}
+        height={780}
+        viewBox="-450 -390 900 780"
+        style={{ overflow: "visible" }}
       >
-        {/* Edges — drawn beneath nodes */}
-        {EDGES.map(([a, b], i) => {
-          const owner = agentForNode(a);
-          const start = 60 + i * 1.6;
+        {/* Edges from each agent to the center logo, traced one at a time */}
+        {AGENTS.map((a, i) => {
+          const start = 24 + i * 8;
           const t = interpolate(frame, [start, start + 18], [0, 1], {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
             easing: easeOutCubic,
           });
-          const [x1, y1] = nodePos(a);
-          const [x2, y2] = nodePos(b);
-          const dx = x2 - x1;
-          const dy = y2 - y1;
+          const x2 = Math.cos(a.angle) * RADIUS;
+          const y2 = Math.sin(a.angle) * RADIUS;
+          // Edge starts at the agent and extends inward toward the
+          // center logo. Stop short of both endpoints so the line
+          // doesn't visually overlap the disc or the logo glyph.
+          const innerStop = 90; // logo radius room
+          const outerStop = NODE_RADIUS + 4;
+          const startX = (x2 / RADIUS) * (RADIUS - outerStop);
+          const startY = (y2 / RADIUS) * (RADIUS - outerStop);
+          const endXFinal = (x2 / RADIUS) * innerStop;
+          const endYFinal = (y2 / RADIUS) * innerStop;
+          const endX = startX + (endXFinal - startX) * t;
+          const endY = startY + (endYFinal - startY) * t;
           return (
             <line
               key={`e${i}`}
-              x1={x1}
-              y1={y1}
-              x2={x1 + dx * t}
-              y2={y1 + dy * t}
-              stroke={AGENTS[owner].color}
-              strokeWidth={1.2}
+              x1={startX}
+              y1={startY}
+              x2={endX}
+              y2={endY}
+              stroke={a.color}
+              strokeWidth={1.5}
               strokeLinecap="round"
-              opacity={0.42}
+              opacity={0.55}
             />
           );
         })}
 
-        {/* Ring nodes — "dropped" by their owning agent */}
-        {Array.from({ length: NODE_COUNT }, (_, i) => {
-          const owner = agentForNode(i);
-          const start = 24 + i * 2.6;
+        {/* Agent dots — appear in sequence, dead-positioned */}
+        {AGENTS.map((a, i) => {
+          const start = 8 + i * 6;
           const t = interpolate(frame, [start, start + 14], [0, 1], {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
             easing: easeOutCubic,
           });
-          const [nx, ny] = nodePos(i);
-          // Travel from agent to node — visualizes the "drop."
-          const ax = Math.cos(AGENTS[owner].angle) * AGENT_RADIUS;
-          const ay = Math.sin(AGENTS[owner].angle) * AGENT_RADIUS;
-          const x = ax + (nx - ax) * t;
-          const y = ay + (ny - ay) * t;
-          // Pulse for ~10 frames after landing.
-          const pulseFrame = start + 14;
-          const pulse = interpolate(
-            frame,
-            [pulseFrame, pulseFrame + 10],
-            [1, 0],
-            { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-          );
+          const x = Math.cos(a.angle) * RADIUS;
+          const y = Math.sin(a.angle) * RADIUS;
           return (
-            <g key={`n${i}`} transform={`translate(${x} ${y})`}>
-              {pulse > 0 && (
-                <circle r={14 * (1 + (1 - pulse))} fill={AGENTS[owner].color} opacity={0.18 * pulse} />
-              )}
+            <g key={`a${i}`} transform={`translate(${x} ${y})`}>
               <circle
-                r={5.5 * t}
-                fill={AGENTS[owner].color}
+                r={NODE_RADIUS * t}
+                fill={a.color}
                 opacity={t}
               />
-            </g>
-          );
-        })}
-
-        {/* Agent avatars — sit at the corners around the ring */}
-        {AGENTS.map((a, i) => {
-          const start = i * 5;
-          const t = interpolate(frame, [start, start + 18], [0, 1], {
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-            easing: easeOutCubic,
-          });
-          const x = Math.cos(a.angle) * AGENT_RADIUS;
-          const y = Math.sin(a.angle) * AGENT_RADIUS;
-          // Soft pulse while "working" (between frames 30–150).
-          const working = frame > 30 && frame < 150;
-          const ringScale = working
-            ? 1 + ((frame - 30) % 30) / 30
-            : 1;
-          const ringOpacity = working
-            ? 1 - (((frame - 30) % 30) / 30)
-            : 0;
-          return (
-            <g key={`a${i}`} transform={`translate(${x} ${y}) scale(${t})`}>
+              {/* Soft halo behind */}
               <circle
-                r={32}
-                fill="none"
-                stroke={a.color}
-                strokeWidth={1}
-                opacity={ringOpacity * 0.6}
-                style={{ transform: `scale(${ringScale})`, transformOrigin: "center" }}
+                r={(NODE_RADIUS + 8) * t}
+                fill={a.color}
+                opacity={0.12 * t}
               />
-              <circle r={26} fill={a.color} opacity={0.16} />
-              <circle r={18} fill={a.color} />
               <text
                 x={0}
-                y={56}
+                y={NODE_RADIUS + 32}
                 textAnchor="middle"
                 style={{
                   fontFamily: TYPE.mono,
-                  fontSize: 14,
-                  letterSpacing: "0.18em",
-                  textTransform: "uppercase",
+                  fontSize: 16,
                   fill: COLORS.ink,
-                  opacity: 0.7,
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                  opacity: 0.7 * t,
                 }}
               >
                 {a.name}
@@ -179,7 +118,39 @@ export const AgentsOnGraph: React.FC = () => {
             </g>
           );
         })}
+
+        {/* Center: the actual Causalist logo */}
+        <g transform="translate(-90 -90)">
+          <foreignObject width={180} height={180}>
+            <div
+              style={{
+                width: 180,
+                height: 180,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <CausalistLogo size={150} startFrame={0} />
+            </div>
+          </foreignObject>
+        </g>
       </svg>
+
+      <FadeUp startFrame={70} durationFrames={20}>
+        <p
+          style={{
+            fontFamily: TYPE.mono,
+            fontSize: 16,
+            color: COLORS.midGray,
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            margin: 0,
+          }}
+        >
+          four agents · one graph
+        </p>
+      </FadeUp>
     </AbsoluteFill>
   );
-};
+}

@@ -1,62 +1,60 @@
-// Big headline cut. The thesis in three lines: "Bringing causality
-// closer to agents." Subtle subtitle. Quiet text reveals — no motion
-// theater here, the message does the work.
-
 import { AbsoluteFill } from "remotion";
 import { COLORS, TYPE } from "../lib/tokens";
-import { Eyebrow, FadeUp, MaskUpText } from "../lib/anim";
+import { FadeUp, MaskUpText } from "../lib/anim";
 
-export const BringingCausalityToAgents: React.FC = () => {
+/** Scene — the thesis. 3s @ 30fps = 90 frames.
+ *  Single centered headline + one-line italic subtitle. No eyebrow,
+ *  no left-padding — just the message, dead center. */
+export function BringingCausalityToAgents() {
   return (
     <AbsoluteFill
       style={{
         backgroundColor: COLORS.cream,
         display: "flex",
         flexDirection: "column",
-        alignItems: "flex-start",
+        alignItems: "center",
         justifyContent: "center",
-        paddingLeft: 180,
-        paddingRight: 180,
-        gap: 28,
+        gap: 36,
+        padding: 80,
       }}
     >
-      <FadeUp startFrame={4} durationFrames={14}>
-        <Eyebrow>02 / why</Eyebrow>
-      </FadeUp>
-
-      <MaskUpText startFrame={14} durationFrames={22}>
-        <div
+      <MaskUpText startFrame={4} durationFrames={20}>
+        <h1
           style={{
             fontFamily: TYPE.display,
-            fontSize: 144,
+            fontSize: 116,
             fontWeight: 500,
             letterSpacing: "-0.04em",
             color: COLORS.ink,
-            lineHeight: 1.02,
+            lineHeight: 1.05,
+            textAlign: "center",
             maxWidth: 1500,
+            margin: 0,
           }}
         >
           Bringing causality{" "}
           <span style={{ color: COLORS.magenta }}>closer to agents.</span>
-        </div>
+        </h1>
       </MaskUpText>
 
-      <FadeUp startFrame={50} durationFrames={20}>
-        <div
+      <FadeUp startFrame={36} durationFrames={20}>
+        <p
           style={{
             fontFamily: TYPE.body,
-            fontSize: 38,
+            fontSize: 28,
             color: COLORS.midGray,
             letterSpacing: "-0.005em",
             lineHeight: 1.4,
-            maxWidth: 1100,
+            maxWidth: 980,
             fontStyle: "italic",
+            textAlign: "center",
+            margin: 0,
           }}
         >
-          Make any repo legible — in graph form — for the model that&rsquo;s
-          about to change it.
-        </div>
+          Make any repo legible — in graph form — for the model that&rsquo;s about
+          to change it.
+        </p>
       </FadeUp>
     </AbsoluteFill>
   );
-};
+}

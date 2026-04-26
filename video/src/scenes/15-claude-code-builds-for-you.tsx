@@ -1,34 +1,23 @@
-// MCP / CLI cut. Headline + 11 graph-aware tool pill chips falling
-// into a clean grid. Sells the "connect Claude Code, let it build for
-// you" arm of the story.
-
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { COLORS, TYPE } from "../lib/tokens";
-import { easeOutCubic, Eyebrow, FadeUp, MaskUpText } from "../lib/anim";
+import { CausalistLogo, easeOutCubic, FadeUp, MaskUpText } from "../lib/anim";
 
-// Mirrors packages/mcp/src/tools.ts — kept hand-typed to keep the
-// video bundle independent of the app's package graph. If the tool
-// list changes, update here.
-const TOOLS = [
-  "find_node",
-  "get_neighbors",
-  "blast_radius",
-  "shortest_path",
-  "list_layer",
-  "list_kind",
-  "summarize_node",
-  "explain_subgraph",
-  "search_nodes",
-  "diff_commits",
-  "create_project",
-];
-
-export const ClaudeCodeBuildsForYou: React.FC = () => {
+/** Claude Code <-> Causalist cut. 3.5s @ 30fps = 105 frames.
+ *  Centered. Two logos side by side connected by a thin magenta edge
+ *  that traces in. Headline beneath. No pill chips, no MCP tool list
+ *  — judges don't read tool names off a 3-second cut anyway. */
+export function ClaudeCodeBuildsForYou() {
   const frame = useCurrentFrame();
-  // 5s @ 30fps = 150 frames
-  //   0–18  eyebrow + headline land
-  //   18–80 tools fall in (staggered)
-  //   80–150 hold
+  const edge = interpolate(frame, [12, 36], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: easeOutCubic,
+  });
+  const claudeIn = interpolate(frame, [0, 16], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: easeOutCubic,
+  });
 
   return (
     <AbsoluteFill
@@ -36,104 +25,108 @@ export const ClaudeCodeBuildsForYou: React.FC = () => {
         backgroundColor: COLORS.cream,
         display: "flex",
         flexDirection: "column",
-        alignItems: "flex-start",
+        alignItems: "center",
         justifyContent: "center",
-        paddingLeft: 180,
-        paddingRight: 180,
-        gap: 32,
+        gap: 56,
       }}
     >
-      <FadeUp startFrame={2} durationFrames={14}>
-        <Eyebrow>04 / connect</Eyebrow>
-      </FadeUp>
+      {/* Logo pair */}
+      <svg width={780} height={220} viewBox="-390 -110 780 220">
+        {/* Connector line */}
+        <line
+          x1={-150}
+          y1={0}
+          x2={-150 + 300 * edge}
+          y2={0}
+          stroke={COLORS.magenta}
+          strokeWidth={2}
+          strokeLinecap="round"
+          opacity={0.55}
+        />
 
-      <MaskUpText startFrame={10} durationFrames={20}>
-        <div
+        {/* Claude wordmark mark on the left — uses the public asset */}
+        <g
+          transform={`translate(-260 -80) scale(${claudeIn})`}
+          opacity={claudeIn}
+          style={{ transformOrigin: "left top" }}
+        >
+          <foreignObject width={220} height={160}>
+            <div
+              style={{
+                width: 220,
+                height: 160,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/claude-mark.svg"
+                alt="Claude"
+                style={{
+                  width: 110,
+                  height: 110,
+                  filter:
+                    "invert(34%) sepia(93%) saturate(2200%) hue-rotate(298deg) brightness(96%) contrast(94%)",
+                }}
+              />
+            </div>
+          </foreignObject>
+        </g>
+
+        {/* Causalist logo on the right */}
+        <g transform="translate(40 -80)">
+          <foreignObject width={220} height={160}>
+            <div
+              style={{
+                width: 220,
+                height: 160,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <CausalistLogo size={140} startFrame={20} />
+            </div>
+          </foreignObject>
+        </g>
+      </svg>
+
+      {/* Headline */}
+      <MaskUpText startFrame={36} durationFrames={20}>
+        <h1
           style={{
             fontFamily: TYPE.display,
-            fontSize: 124,
+            fontSize: 96,
             fontWeight: 500,
             letterSpacing: "-0.04em",
             color: COLORS.ink,
-            lineHeight: 1.02,
-            maxWidth: 1500,
+            lineHeight: 1.05,
+            textAlign: "center",
+            maxWidth: 1300,
+            margin: 0,
           }}
         >
           Connect Claude Code,{" "}
           <span style={{ color: COLORS.magenta }}>let it build for you.</span>
-        </div>
+        </h1>
       </MaskUpText>
 
-      <FadeUp startFrame={36} durationFrames={18}>
-        <div
+      <FadeUp startFrame={64} durationFrames={20}>
+        <p
           style={{
-            fontFamily: TYPE.body,
-            fontSize: 30,
+            fontFamily: TYPE.mono,
+            fontSize: 16,
             color: COLORS.midGray,
-            letterSpacing: "-0.005em",
-            lineHeight: 1.4,
-            maxWidth: 1100,
-            fontStyle: "italic",
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            margin: 0,
           }}
         >
-          MCP server · CLI · {TOOLS.length} graph-aware tools the agent can
-          call directly.
-        </div>
+          mcp · cli · 11 graph-aware tools
+        </p>
       </FadeUp>
-
-      {/* Tool pills */}
-      <div
-        style={{
-          marginTop: 16,
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 12,
-          maxWidth: 1500,
-        }}
-      >
-        {TOOLS.map((t, i) => {
-          const start = 56 + i * 4;
-          const opacity = interpolate(
-            frame,
-            [start, start + 14],
-            [0, 1],
-            {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-              easing: easeOutCubic,
-            },
-          );
-          const ty = interpolate(
-            frame,
-            [start, start + 14],
-            [10, 0],
-            {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-              easing: easeOutCubic,
-            },
-          );
-          return (
-            <div
-              key={t}
-              style={{
-                opacity,
-                transform: `translateY(${ty}px)`,
-                fontFamily: TYPE.mono,
-                fontSize: 22,
-                color: COLORS.ink,
-                backgroundColor: "white",
-                border: `1px solid ${COLORS.hairline}`,
-                borderRadius: 999,
-                padding: "10px 22px",
-                letterSpacing: "-0.01em",
-              }}
-            >
-              {t}
-            </div>
-          );
-        })}
-      </div>
     </AbsoluteFill>
   );
-};
+}
