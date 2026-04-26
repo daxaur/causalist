@@ -121,69 +121,70 @@ export function ApiKeysPanel({ authenticated }: { authenticated: boolean }) {
   };
 
   return (
-    <section className="mt-10 rounded-xl border border-neutral-200 bg-white p-6">
-      <header className="mb-4 flex items-start justify-between gap-4">
+    <section className="mt-10 rounded-2xl border border-neutral-200 bg-white p-7">
+      <header className="mb-5 flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <Key size={14} className="text-accent-magenta" weight="fill" />
-            <h2 className="font-display text-base font-medium tracking-tight text-neutral-900">
+            <Key size={16} className="text-accent-magenta" weight="fill" />
+            <h2 className="font-display text-lg font-medium tracking-tight text-neutral-900">
               API keys
             </h2>
           </div>
-          <p className="mt-1 max-w-md text-[12.5px] leading-relaxed text-neutral-500">
-            Use these to let an agent — Claude Code via MCP, a CI job, anything
-            — create projects on your account without the pair-code dance.
-            Tied to your GitHub identity, scoped to your account only.
+          <p className="mt-2 max-w-xl text-[15px] leading-relaxed text-neutral-600">
+            Each key is a long random token (<code className="font-mono text-[13px]">cspl_live_…</code>)
+            that lets an agent — Claude Code, a CI job, anything that can make
+            an HTTP request — act on your account. Tied to your GitHub
+            identity, scoped to your account only. Revoke any time.
           </p>
         </div>
       </header>
 
       {!authenticated ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 text-[12.5px] text-amber-800">
+        <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-5 text-[15px] text-amber-900">
           Sign in with GitHub to mint API keys.
         </div>
       ) : (
         <>
           {/* One-time reveal panel — shown after a successful mint */}
           {revealedToken && (
-            <div className="mb-4 rounded-lg border border-accent-magenta/30 bg-accent-magenta/[0.04] p-4">
-              <div className="flex items-start gap-2 text-[12.5px] text-neutral-900">
+            <div className="mb-5 rounded-xl border border-accent-magenta/30 bg-accent-magenta/[0.04] p-5">
+              <div className="flex items-start gap-3 text-[15px] text-neutral-900">
                 <Warning
-                  size={14}
+                  size={18}
                   weight="fill"
                   className="mt-0.5 shrink-0 text-accent-magenta"
                 />
                 <div>
-                  <div className="font-medium">
+                  <div className="font-semibold">
                     Copy this key now — it won&rsquo;t be shown again.
                   </div>
-                  <p className="mt-0.5 text-[11.5px] text-neutral-500">
-                    We store only its hash. If you lose it, mint a new one.
+                  <p className="mt-1 text-[14px] leading-relaxed text-neutral-600">
+                    We only store its hash. If you lose it, mint a new one.
                   </p>
                 </div>
               </div>
-              <div className="mt-3 flex items-center gap-2 rounded-md border border-neutral-200 bg-white p-2">
-                <code className="flex-1 select-all overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[12px] text-neutral-900">
+              <div className="mt-4 flex items-center gap-2 rounded-lg border border-neutral-200 bg-white p-3">
+                <code className="flex-1 select-all overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[14px] text-neutral-900">
                   {revealedToken}
                 </code>
                 <button
                   type="button"
                   onClick={onCopy}
                   className={cn(
-                    "inline-flex h-7 items-center gap-1 rounded-md px-2 text-[11px] font-medium transition-colors",
+                    "inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-[13px] font-medium transition-colors",
                     copied
                       ? "bg-emerald-100 text-emerald-700"
                       : "bg-neutral-900 text-white hover:bg-neutral-800",
                   )}
                 >
-                  {copied ? <Check size={11} weight="bold" /> : <Copy size={11} />}
+                  {copied ? <Check size={13} weight="bold" /> : <Copy size={13} />}
                   {copied ? "Copied" : "Copy"}
                 </button>
               </div>
               <button
                 type="button"
                 onClick={() => setRevealedToken(null)}
-                className="mt-2 text-[11px] text-neutral-500 underline-offset-2 hover:text-neutral-900 hover:underline"
+                className="mt-3 text-[13px] text-neutral-500 underline-offset-2 hover:text-neutral-900 hover:underline"
               >
                 I&rsquo;ve saved it — dismiss
               </button>
@@ -191,48 +192,48 @@ export function ApiKeysPanel({ authenticated }: { authenticated: boolean }) {
           )}
 
           {/* Mint row */}
-          <div className="mb-5 flex items-center gap-2">
+          <div className="mb-6 flex items-center gap-2">
             <Input
               placeholder="Name (e.g. claude-code, github-action)"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="h-9 flex-1 text-[12.5px]"
+              className="h-11 flex-1 text-[14px]"
               maxLength={80}
             />
             <Button
               onClick={onMint}
               disabled={minting}
-              className="h-9 bg-accent-magenta px-3 text-white hover:bg-accent-magenta/90 disabled:opacity-50"
+              className="h-11 bg-accent-magenta px-4 text-[14px] text-white hover:bg-accent-magenta/90 disabled:opacity-50"
             >
-              <Plus size={12} weight="bold" className="mr-1" />
+              <Plus size={14} weight="bold" className="mr-1.5" />
               {minting ? "Creating…" : "Create key"}
             </Button>
           </div>
 
           {/* Existing keys */}
           {loading && keys === null ? (
-            <div className="text-[12px] text-neutral-400">Loading…</div>
+            <div className="text-[14px] text-neutral-400">Loading…</div>
           ) : keys && keys.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-neutral-200 bg-neutral-50/60 p-5 text-center text-[12.5px] text-neutral-500">
+            <div className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50/60 p-6 text-center text-[15px] text-neutral-500">
               No keys yet. Create one above to wire an agent to your account.
             </div>
           ) : (
-            <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
+            <ul className="divide-y divide-neutral-100 rounded-xl border border-neutral-200">
               {keys?.map((k) => (
                 <li
                   key={k.id}
-                  className="flex items-center justify-between gap-3 px-3 py-2.5"
+                  className="flex items-center justify-between gap-3 px-4 py-3"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 text-[12.5px]">
-                      <span className="font-medium text-neutral-900">
+                    <div className="flex items-center gap-2 text-[14.5px]">
+                      <span className="font-semibold text-neutral-900">
                         {k.name}
                       </span>
-                      <code className="font-mono text-[11px] text-neutral-500">
+                      <code className="font-mono text-[12.5px] text-neutral-500">
                         {k.keyPrefix}…
                       </code>
                     </div>
-                    <div className="mt-0.5 font-mono text-[10.5px] text-neutral-400">
+                    <div className="mt-1 font-mono text-[12px] text-neutral-400">
                       Created {fmtDate(k.createdAt)}
                       {k.lastUsedAt
                         ? ` · last used ${fmtDate(k.lastUsedAt)}`
@@ -243,19 +244,25 @@ export function ApiKeysPanel({ authenticated }: { authenticated: boolean }) {
                     type="button"
                     onClick={() => onRevoke(k.id, k.keyPrefix)}
                     aria-label="Revoke"
-                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600"
                   >
-                    <Trash size={12} />
+                    <Trash size={14} />
                   </button>
                 </li>
               ))}
             </ul>
           )}
 
-          <p className="mt-3 text-[11px] text-neutral-400">
-            Use as <code className="font-mono">Authorization: Bearer
-            cspl_live_…</code> on{" "}
-            <code className="font-mono">POST /api/projects</code>.
+          <p className="mt-4 text-[13px] leading-relaxed text-neutral-500">
+            Use as{" "}
+            <code className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[12.5px]">
+              Authorization: Bearer cspl_live_…
+            </code>{" "}
+            on{" "}
+            <code className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[12.5px]">
+              POST /api/projects
+            </code>
+            .
           </p>
         </>
       )}
