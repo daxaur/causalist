@@ -81,15 +81,16 @@ export function RepoAnalyzePrompt({
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  // On mount: check the library for a previously-built graph for this
-  // owner/repo. If there is one (terminal upload, prior browser run,
-  // anything), render it immediately and skip the analyze prompt.
-  // Re-runs whenever the library fires its changed event so a fresh
-  // upload while the page is open also takes effect.
+  // On mount: check the library, then the server, for a previously-
+  // built graph for this owner/repo. If found, render immediately
+  // and skip the analyze prompt. Re-runs whenever the library fires
+  // its changed event so a fresh upload while the page is open also
+  // takes effect.
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
+        // 1) Local IndexedDB library (fast)
         const idx = await listIndex();
         const match = idx.find(
           (e) =>
@@ -104,7 +105,42 @@ export function RepoAnalyzePrompt({
             setGraph(full.graph);
             setStage("done");
             void touch(match.id);
+            return;
           }
+        }
+        // 2) Server fallback — graph might exist from a different
+        //    device or terminal session. Costs one HTTP round-trip;
+        //    silent if not signed in / no row.
+        try {
+          const res = await fetch(
+            `/api/projects/get-graph?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`,
+            { credentials: "same-origin" },
+          );
+          if (cancelled) return;
+          if (res.ok) {
+            const data = (await res.json()) as {
+              found?: boolean;
+              graph?: CausalGraph;
+            };
+            if (data.found && data.graph) {
+              setGraph(data.graph);
+              setStage("done");
+              // Also hydrate the local library so subsequent loads
+              // are instant.
+              try {
+                await saveEntry({
+                  owner,
+                  repo,
+                  graph: data.graph,
+                  sourceCommitSha: data.graph.commit,
+                });
+              } catch {
+                // best-effort cache only
+              }
+            }
+          }
+        } catch {
+          // server unreachable — analyze prompt will appear
         }
       } catch {
         // ignore — fall through to the analyze prompt
@@ -139,6 +175,25 @@ export function RepoAnalyzePrompt({
       return next;
     });
   }, []);
+
+  // Auto-start the build the moment hydration confirms there's no
+  // existing graph. Pasting a URL → Map it → / app/owner/repo
+  // should drop the user straight into the live build view, not
+  // show a "Run the 4-agent build" button they have to click.
+  // Guarded by a ref so we only fire once per page mount.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (autoStarted.current) return;
+    if (hydrating) return;
+    if (graph) return; // already loaded from library or server
+    if (stage !== "idle") return;
+    if (!canAnalyze) return; // gate handles the missing-key UX
+    autoStarted.current = true;
+    void startAnalysis();
+    // intentionally no startAnalysis in deps — its identity changes
+    // every render and we only want the auto-fire trigger
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrating, graph, stage, canAnalyze]);
 
   const startAnalysis = async () => {
     if (!canAnalyze) return;
@@ -296,6 +351,7 @@ export function RepoAnalyzePrompt({
             for (const a of BUILDER_AGENTS) {
               updateAgent(a.id, { status: "done" });
             }
+            // Save to local IndexedDB library (per-browser cache)
             try {
               await saveEntry({
                 owner,
@@ -305,6 +361,22 @@ export function RepoAnalyzePrompt({
               });
             } catch {
               // non-fatal
+            }
+            // Mirror to Supabase so other devices / browsers / cold
+            // loads can fetch it back. Cookie auth, best-effort.
+            try {
+              await fetch("/api/projects/save-graph", {
+                method: "POST",
+                credentials: "same-origin",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  owner,
+                  repo,
+                  graph: finalGraph,
+                }),
+              });
+            } catch {
+              // best-effort — local library still has it
             }
           } else if (event === "error") {
             const msg =
