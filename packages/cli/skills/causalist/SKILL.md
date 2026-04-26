@@ -51,34 +51,60 @@ If `causalist login` hasn't been run, tell the user:
 > "Mint an API key at https://causalist.xyz/app/settings (sign in with
 > GitHub first), then run `causalist login --api-key <KEY>`."
 
-## Creating a new project
+## Creating a new project — full local build
 
-When the user wants Causalist to map a new repo:
+When the user wants Causalist to map a new repo, **you build it
+yourself, right here in the terminal**:
 
 ```bash
 causalist project create <github-url-or-owner/repo>
 ```
 
-This **registers** the project on the user's account and returns a
-`viewerUrl`. The actual 4-agent build runs **in the user's browser**
-when they open that URL — that's where their Anthropic key and GitHub
-OAuth token live. The agent should:
+This runs the full 4-agent pipeline (Structure / Dependency /
+Semantic / Oracle) **locally** using `$ANTHROPIC_API_KEY` from the
+environment, then uploads the finished graph to the user's account
+via the API key. The user's `/app` tab (if open) saves the entry to
+their library on receipt.
 
-1. Call `causalist project create` — quick, returns immediately.
-2. Tell the user: *"I created project X. Open `<viewerUrl>` in a
-   browser signed in with the same GitHub account — the build will
-   run there in 20–60 seconds, then you can ask me questions about
-   the graph."*
-3. **Don't claim "I'm building it now."** Nothing is building yet.
-   The build starts when the user opens the URL.
+You will see live progress: "Structure agent — classifying nodes ✓",
+"Dependency agent — extracting edges ✓", etc. The whole thing takes
+20–60 seconds depending on repo size. **The build completes before
+this command returns.** Once it's done, the graph is real and
+queryable — you can immediately follow up with `causalist blast`,
+`causalist tests`, etc.
 
-Private repos work fine — the user's GitHub OAuth has `repo` scope,
-so when their browser fetches the tree + files it sees private repos
-the same way they do.
+### Required env
 
-Once the build completes, the project is private to the user's
-account. Sharing happens only through the explicit `/s/[id]`
-share-link feature (opt-in).
+- `ANTHROPIC_API_KEY` — for the four agent calls
+- `CAUSALIST_API_KEY` — auth to the user's Causalist account
+  (auto-loaded from `~/.causalist/session.json` after `causalist
+  login`)
+- `GITHUB_TOKEN` — only needed for **private** repos. The user's
+  PAT or OAuth token. Public repos work without it.
+
+### When to use `--no-build`
+
+```bash
+causalist project create <repo> --no-build
+```
+
+If `ANTHROPIC_API_KEY` isn't set or the user explicitly wants the
+build to run in their browser (so the cost is on their browser-side
+key, not the terminal env), pass `--no-build`. The command returns
+immediately with a viewer URL the user opens to trigger the
+in-browser build.
+
+### Private repos
+
+Both paths handle private repos. For the local-build path, set
+`GITHUB_TOKEN` to a PAT with `repo` scope. For the browser-build
+path, the user's GitHub OAuth cookie already has `repo` scope.
+
+### Don't lie about state
+
+If you just ran `causalist project create <repo>`, the build has
+already happened — say so. If you ran it with `--no-build`, the
+build hasn't started — tell the user to open the URL.
 
 ## Decision tree (which graph-query command for which question)
 

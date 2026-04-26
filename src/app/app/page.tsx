@@ -60,6 +60,9 @@ export default function ProjectsPage() {
   useEffect(() => {
     if (!auth.userId) return;
     const es = new EventSource(`/api/stream/user-${auth.userId}`);
+
+    // project_added — agent registered a project but didn't build it
+    // (legacy "open this URL to build" flow)
     const onProject = (e: MessageEvent) => {
       setBus((b) => ({ events: b.events + 1 }));
       try {
@@ -68,10 +71,9 @@ export default function ProjectsPage() {
         };
         const p = data.project;
         if (!p?.owner || !p?.repo) return;
-        const slug = `${p.owner}/${p.repo}`;
-        const label = p.nickname || slug;
+        const label = p.nickname || `${p.owner}/${p.repo}`;
         toast.success(`Project added · ${label}`, {
-          description: "Sent by an agent via your API key.",
+          description: "Open it to run the build.",
           action: {
             label: "Open",
             onClick: () => router.push(`/app/${p.owner}/${p.repo}`),
@@ -82,8 +84,44 @@ export default function ProjectsPage() {
       }
     };
     es.addEventListener("project_added", onProject);
+
+    // graph_uploaded — agent ran the FULL build in the terminal and
+    // uploaded the finished graph. Save straight to library so it
+    // appears in Your projects without the user opening anything.
+    const onGraph = async (e: MessageEvent) => {
+      setBus((b) => ({ events: b.events + 1 }));
+      try {
+        const data = JSON.parse(e.data) as {
+          project?: { owner?: string; repo?: string; nickname?: string };
+          graph?: import("@/lib/graph/types").CausalGraph;
+        };
+        const p = data.project;
+        const g = data.graph;
+        if (!p?.owner || !p?.repo || !g) return;
+        const { saveEntry } = await import("@/lib/library/store");
+        await saveEntry({
+          owner: p.owner,
+          repo: p.repo,
+          graph: g,
+          sourceCommitSha: g.commit,
+        });
+        const label = p.nickname || `${p.owner}/${p.repo}`;
+        toast.success(`Built by Claude Code · ${label}`, {
+          description: `${g.nodes.length} nodes · ${g.edges.length} edges`,
+          action: {
+            label: "Open",
+            onClick: () => router.push(`/app/${p.owner}/${p.repo}`),
+          },
+        });
+      } catch {
+        // ignore malformed events
+      }
+    };
+    es.addEventListener("graph_uploaded", onGraph);
+
     return () => {
       es.removeEventListener("project_added", onProject);
+      es.removeEventListener("graph_uploaded", onGraph);
       es.close();
     };
   }, [auth.userId, router]);

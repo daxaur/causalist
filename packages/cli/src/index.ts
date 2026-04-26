@@ -20,7 +20,7 @@ program
   .description(
     "Causal graph CLI for any GitHub repo — paired with Claude Code via skill or MCP.",
   )
-  .version("0.3.0");
+  .version("0.4.0");
 
 // 11 graph-query subcommands (mirrors the MCP tool surface) — JSON
 // to stdout for agents, plain text in TTY. These are the agent-first
@@ -57,10 +57,13 @@ const projectCmd = program
   .description("Manage your Causalist projects from the CLI");
 projectCmd
   .command("create")
-  .description("Create a new private project on your account")
+  .description(
+    "Build a project locally with the 4-agent pipeline + upload to your Causalist account",
+  )
   .argument("<url-or-slug>", "github URL or owner/repo")
   .option("--api-key <key>", "Causalist API key (overrides env / login)")
   .option("--nickname <name>", "friendly name shown in the projects list")
+  .option("--no-build", "skip the local build — just register the project shell")
   .option("--web <url>", "base URL of the Causalist web app", "https://causalist.xyz")
   .action(projectCreate);
 
