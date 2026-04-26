@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { usePairStatus } from "@/hooks/use-pair-status";
 import {
   ArrowRight,
@@ -51,6 +53,42 @@ export default function ProjectsPage() {
       es.close();
     };
   }, [pair.sessionId]);
+
+  // API-key channel — when an agent calls POST /api/projects with a
+  // Bearer token tied to this user's GitHub identity, the project
+  // arrives here and we offer to open it. This is the API-only path:
+  // no pair-code dance required, just a key the user minted in /app/settings.
+  const router = useRouter();
+  useEffect(() => {
+    if (!auth.userId) return;
+    const es = new EventSource(`/api/stream/user-${auth.userId}`);
+    const onProject = (e: MessageEvent) => {
+      setBus((b) => ({ events: b.events + 1 }));
+      try {
+        const data = JSON.parse(e.data) as {
+          project?: { owner?: string; repo?: string; nickname?: string };
+        };
+        const p = data.project;
+        if (!p?.owner || !p?.repo) return;
+        const slug = `${p.owner}/${p.repo}`;
+        const label = p.nickname || slug;
+        toast.success(`Project added · ${label}`, {
+          description: "Sent by an agent via your API key.",
+          action: {
+            label: "Open",
+            onClick: () => router.push(`/app/${p.owner}/${p.repo}`),
+          },
+        });
+      } catch {
+        // ignore malformed events
+      }
+    };
+    es.addEventListener("project_added", onProject);
+    return () => {
+      es.removeEventListener("project_added", onProject);
+      es.close();
+    };
+  }, [auth.userId, router]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

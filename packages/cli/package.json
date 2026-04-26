@@ -1,6 +1,6 @@
 {
   "name": "causalist-cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Causal graph CLI for Claude Code — eleven graph-query subcommands + an Anthropic Skill that teaches the agent when to use them.",
   "bin": {

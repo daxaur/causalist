@@ -1,6 +1,6 @@
 {
   "name": "causalist-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Model Context Protocol server for Causalist — agents get typed access to the causal graph of any mapped GitHub repository.",
   "bin": {
     "causalist-mcp": "dist/index.js"

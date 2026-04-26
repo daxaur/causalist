@@ -27,6 +27,7 @@ export async function GET(req: NextRequest): Promise<Response> {
 
   return NextResponse.json({
     authenticated: true,
+    userId: user.id,
     login: user.login,
     avatar_url: user.avatar_url,
     token,

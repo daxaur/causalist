@@ -21,6 +21,7 @@ import {
   saveSettings,
   useSettings,
 } from "@/lib/settings";
+import { ApiKeysPanel } from "@/components/settings/api-keys-panel";
 
 export default function SettingsPage() {
   const settings = useSettings();
@@ -247,8 +248,11 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* API keys — mint, list, revoke. Tied to GitHub identity. */}
+        <ApiKeysPanel authenticated={auth.authenticated} />
+
         {/* Privacy footer */}
-        <div className="mt-12 flex items-start gap-3 rounded-lg border border-neutral-100 bg-neutral-50/60 p-4 text-xs text-neutral-500">
+        <div className="mt-8 flex items-start gap-3 rounded-lg border border-neutral-100 bg-neutral-50/60 p-4 text-xs text-neutral-500">
           <Shield size={14} weight="duotone" className="mt-0.5 shrink-0" />
           <p>
             Keys live in browser storage only. Analyze requests call

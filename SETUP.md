@@ -26,7 +26,39 @@ npx -y causalist-cli@latest --help                # prints command list
 
 ## 2. Enable Supabase on production
 
-Swap `/s/<id>` share links from 500-on-prod to actually working, and make pair codes survive cross-lambda on Vercel.
+Swap `/s/<id>` share links from 500-on-prod to actually working, persist
+API keys and pair codes across lambdas on Vercel.
+
+### Tables to create (Supabase SQL editor)
+
+```sql
+-- API keys (Bearer auth for agents / CI)
+create table if not exists causalist_api_keys (
+  id uuid primary key,
+  user_id bigint not null,
+  user_login text not null,
+  key_prefix text not null,
+  key_hash text not null unique,
+  name text not null,
+  created_at timestamptz not null default now(),
+  last_used_at timestamptz
+);
+create index if not exists causalist_api_keys_user_id
+  on causalist_api_keys (user_id);
+create index if not exists causalist_api_keys_key_hash
+  on causalist_api_keys (key_hash);
+
+-- Pair codes (legacy device-pairing flow)
+create table if not exists causalist_pair_codes (
+  code text primary key,
+  session_id uuid not null,
+  token text not null,
+  created_at timestamptz not null default now(),
+  claimed_at timestamptz
+);
+```
+
+### Set the env vars
 
 ```bash
 # URL (non-sensitive)

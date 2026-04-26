@@ -1,13 +1,16 @@
 ---
 name: causalist
 description: |
-  Query a typed causal graph of any code repository paired with
-  Causalist. TRIGGER on questions about cross-file impact, blast
-  radius, which tests cover a change, who writes to a piece of state,
-  dependency paths, layer membership, topological build order, or
-  edge sanity ("is this import real?"). Phrases like "what breaks if
-  I change X", "what depends on", "affected tests", "who writes to",
-  "find path from", "is the import real" should fire this skill.
+  Query a typed causal graph of any code repository, and create new
+  Causalist projects on the user's account. TRIGGER on questions about
+  cross-file impact, blast radius, which tests cover a change, who
+  writes to a piece of state, dependency paths, layer membership,
+  topological build order, edge sanity ("is this import real?"), or
+  when the user asks to map / register a new repository as a Causalist
+  project. Phrases like "what breaks if I change X", "what depends
+  on", "affected tests", "who writes to", "find path from", "is the
+  import real", "map this repo", "create a Causalist project" should
+  fire this skill.
   SKIP for pure single-file refactors or syntax-only questions.
 when_to_use: |
   - "what breaks if I change <file/symbol>"  →  causalist blast
@@ -18,6 +21,7 @@ when_to_use: |
   - "what's structurally similar to <node>"  →  causalist similar
   - "give me the build order for these"      →  causalist topo
   - "what's in the api / data / ui layer"    →  causalist layer
+  - "create a project for <repo>"            →  causalist project create
 allowed-tools: Bash(causalist *) Bash(jq *)
 argument-hint: "<question or node id>"
 ---
@@ -25,25 +29,41 @@ argument-hint: "<question or node id>"
 # Causalist — typed graph queries for any repo
 
 You have a CLI named `causalist` on PATH that queries a typed causal
-graph for the active project. It's faster and cheaper than re-grepping
-the repo: every command returns structured JSON in one round-trip.
+graph for the active project, and creates new projects on the user's
+Causalist account. Every command returns structured JSON in one
+round-trip — faster and cheaper than re-grepping the repo.
 
-## Resolve the session first
+## Setup (one time)
 
-Run this once at the start of any task that touches code structure:
+The user mints an API key in `causalist.xyz/app/settings` and runs:
 
 ```bash
-causalist info --json | jq '{session, repo}'
+causalist login --api-key cspl_live_…
 ```
 
-If `session` is `null`, the repo isn't paired yet. Tell the user:
+After that, every `causalist` command on this machine is authenticated
+to their account. **No pair codes, no browser tab, no 6-char dance.**
+The key is stored at `~/.causalist/session.json`. You can also export
+`CAUSALIST_API_KEY=cspl_live_…` for shell-wide use.
 
-> "Generate a pair code at https://causalist.xyz/pair, then run
-> `causalist pair <code>`."
+If `causalist login` hasn't been run, tell the user:
 
-If they have one, you're ready.
+> "Mint an API key at https://causalist.xyz/app/settings (sign in with
+> GitHub first), then run `causalist login --api-key <KEY>`."
 
-## Decision tree (which command for which question)
+## Creating a new project
+
+When the user wants Causalist to map a new repo:
+
+```bash
+causalist project create <github-url-or-owner/repo>
+```
+
+Returns a viewer URL the user opens in a browser signed in with the
+same GitHub identity. The build runs there. The project is private to
+their account.
+
+## Decision tree (which graph-query command for which question)
 
 | Question shape | Command |
 |---|---|
@@ -57,13 +77,13 @@ If they have one, you're ready.
 | List nodes in a semantic layer | `causalist layer <api\|data\|logic\|ui\|test\|config\|infra> --json` |
 | Inspect one node | `causalist node <id> --json` |
 | Direct edges in/out of a node | `causalist neighbors <id> --json` |
+| Register a new repo as a project | `causalist project create <url-or-slug>` |
 
 Every command:
 
 - Defaults to JSON when stdout is piped (`--json` to force).
 - Returns `{ ok: bool, summary: string, data?: ... }`.
-- Exits `0` on success, `1` on `ok: false`, `2` on fatal errors (read stderr).
-- Reads the active session from `~/.causalist/session.json` automatically.
+- Exits `0` on success, `1` on `ok: false`, `2` on fatal errors.
 
 ## Composing
 
@@ -96,22 +116,20 @@ Edges in the graph carry a `verified` flag:
 
 Always check `verified` on edges that drive your decisions.
 
-## Citing nodes back to the user
-
-When you reference a finding, link it to the live graph so the user
-can click through:
-
-```
-https://causalist.xyz/app/preview/<session>?node=<id>
-```
-
-(Use the `session` from `causalist info`.)
-
 ## When the CLI fails
 
 If `causalist` exits with code 2, surface the stderr message to the
 user and stop. Don't retry. Common causes:
 
-- Session not paired → tell them to visit `/pair`.
+- No API key → tell them to run `causalist login --api-key <KEY>`
+  (mint at `causalist.xyz/app/settings`).
 - Network error → confirm `causalist.xyz` is reachable.
 - Node id not found → list candidates with `causalist layer <best-guess>`.
+
+## Legacy: pair-code path (rarely needed)
+
+The 6-char `causalist pair <code>` flow still works, but it only
+covers the live browser-tab streaming case. For everything an agent
+does — querying the graph, creating projects — the API key is the
+better path. Don't suggest the pair-code dance unless the user
+explicitly asks for live browser-tab streaming.

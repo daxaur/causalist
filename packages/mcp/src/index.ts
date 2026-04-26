@@ -63,6 +63,12 @@ let CACHED_AT = 0;
 let SESSION_SRC: { session: string; web: string } | null = null;
 const REFRESH_TTL_MS = 10_000;
 
+// API-key path — preferred for create_project. Set via
+// CAUSALIST_API_KEY env var or --api-key flag at launch. The base URL
+// is derived from --web (default: https://causalist.xyz).
+let API_KEY: string | null = null;
+let API_WEB = "https://causalist.xyz";
+
 const TOOLS = [
   {
     name: "query_node",
@@ -438,21 +444,58 @@ async function exec(
       };
     }
     case "create_project": {
-      if (!SESSION_SRC) {
-        return {
-          ok: false,
-          summary:
-            "Not paired — start the MCP server with --session <id> or run `causalist init` first.",
-        };
-      }
       const owner = String(args.owner ?? "").trim();
       const repo = String(args.repo ?? "").trim();
       if (!owner || !repo) {
         return { ok: false, summary: "Both owner and repo are required" };
       }
-      const url = `${SESSION_SRC.web.replace(/\/$/, "")}/api/projects/push`;
+      const webBase = (SESSION_SRC?.web ?? API_WEB).replace(/\/$/, "");
+
+      // Preferred path: Bearer-authed API key (no pair needed). Set
+      // CAUSALIST_API_KEY in the env or pass --api-key on launch.
+      if (API_KEY) {
+        try {
+          const res = await fetch(`${webBase}/api/projects`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${API_KEY}`,
+            },
+            body: JSON.stringify({ owner, repo, nickname: args.nickname }),
+          });
+          const body = (await res.json().catch(() => ({}))) as {
+            error?: string;
+            viewerUrl?: string;
+          };
+          if (!res.ok) {
+            return {
+              ok: false,
+              summary: `Create failed: ${res.status} ${body.error ?? res.statusText}`,
+            };
+          }
+          return {
+            ok: true,
+            summary: `Project "${owner}/${repo}" created. ${body.viewerUrl ?? ""}`.trim(),
+            data: { owner, repo, viewerUrl: body.viewerUrl },
+          };
+        } catch (e) {
+          return {
+            ok: false,
+            summary: `Create error: ${e instanceof Error ? e.message : String(e)}`,
+          };
+        }
+      }
+
+      // Legacy fallback: pair-session push to the live browser tab.
+      if (!SESSION_SRC) {
+        return {
+          ok: false,
+          summary:
+            "No CAUSALIST_API_KEY set and no paired session. Mint a key in causalist.xyz/app/settings (recommended) or run `causalist init`.",
+        };
+      }
       try {
-        const res = await fetch(url, {
+        const res = await fetch(`${webBase}/api/projects/push`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -473,7 +516,7 @@ async function exec(
         }
         return {
           ok: true,
-          summary: `Project "${owner}/${repo}" pushed to the browser.`,
+          summary: `Project "${owner}/${repo}" pushed to the paired browser.`,
           data: { owner, repo },
         };
       } catch (e) {
@@ -518,7 +561,7 @@ async function loadLocalGraph(path: string): Promise<void> {
 }
 
 async function main() {
-  // Flags: --session <id> --web <url> --graph <path>
+  // Flags: --session <id> --web <url> --graph <path> --api-key <key>
   const argv = process.argv.slice(2);
   const get = (flag: string) => {
     const i = argv.indexOf(flag);
@@ -527,18 +570,26 @@ async function main() {
   const session = get("--session") ?? process.env.CAUSALIST_SESSION;
   const web = get("--web") ?? process.env.CAUSALIST_WEB ?? "https://causalist.xyz";
   const localPath = get("--graph");
+  const apiKey = get("--api-key") ?? process.env.CAUSALIST_API_KEY;
+
+  API_WEB = web;
+  if (apiKey) API_KEY = apiKey;
 
   if (localPath) {
     await loadLocalGraph(localPath);
   } else if (session) {
     await loadSessionGraph(web, session);
   } else {
-    // Try the default session file written by `causalist pair`
+    // Try the default session file written by `causalist init` (legacy)
     try {
       const file = resolve(homedir(), ".causalist", "session.json");
       const raw = await readFile(file, "utf-8");
-      const parsed = JSON.parse(raw) as { sessionId?: string };
+      const parsed = JSON.parse(raw) as {
+        sessionId?: string;
+        apiKey?: string;
+      };
       if (parsed.sessionId) await loadSessionGraph(web, parsed.sessionId);
+      if (parsed.apiKey && !API_KEY) API_KEY = parsed.apiKey;
     } catch {
       // first-run: no session, server still starts
     }

@@ -83,7 +83,7 @@ export async function exchangeCodeForToken(
 
 export async function fetchGithubUser(
   token: string,
-): Promise<{ login: string; avatar_url: string } | null> {
+): Promise<{ id: number; login: string; avatar_url: string } | null> {
   try {
     const res = await fetch("https://api.github.com/user", {
       headers: {
@@ -94,10 +94,11 @@ export async function fetchGithubUser(
     });
     if (!res.ok) return null;
     const json = (await res.json()) as {
+      id: number;
       login: string;
       avatar_url: string;
     };
-    return { login: json.login, avatar_url: json.avatar_url };
+    return { id: json.id, login: json.login, avatar_url: json.avatar_url };
   } catch {
     return null;
   }

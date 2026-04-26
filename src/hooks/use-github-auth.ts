@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 interface AuthState {
   authenticated: boolean;
+  /** Numeric GitHub user id — stable across login renames. */
+  userId?: number;
   login?: string;
   avatar_url?: string;
   token?: string;
