@@ -48,14 +48,21 @@ interface Run {
   startedAt: number;
 }
 
-// Suggestion chips — pre-fill the textarea, not separate code paths.
-// They're seeds; the user can type anything. This is plan-mode.
+// Suggestion chips — pre-fill the textarea. Phrased as causal
+// questions ("why might this fail?", "what does this break?") so the
+// agent leans on the graph instead of doing a generic linter pass.
 const SUGGESTIONS = [
-  "Audit for bugs and propose fixes",
-  "Find security issues and patch them",
-  "Look for perf hot paths to optimize",
-  "Suggest safe refactors",
-  "Explain what these files do",
+  "What breaks if these files change?",
+  "Why might this fail under load?",
+  "What does this depend on, and what depends on it?",
+  "Find the root cause of any latent bugs",
+  "Which tests cover this — and which should I add?",
+];
+
+const MODELS = [
+  { id: "claude-opus-4-7", label: "Opus 4.7" },
+  { id: "claude-sonnet-4-6", label: "Sonnet 4.6" },
+  { id: "claude-haiku-4-5", label: "Haiku 4.5" },
 ];
 
 export function AgentAssignPanel({
@@ -71,6 +78,7 @@ export function AgentAssignPanel({
 }) {
   const [runs, setRuns] = useState<Run[]>([]);
   const [plan, setPlan] = useState("");
+  const [model, setModel] = useState<string>(MODELS[0].id);
   const auth = useGithubAuth();
   const settings = useSettings();
   const cancelRef = useRef<Map<string, AbortController>>(new Map());
@@ -142,6 +150,7 @@ export function AgentAssignPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           plan: trimmed,
+          model,
           repo: graph.repo,
           branch: "main",
           selectedNodeIds: nodeIds,
@@ -357,6 +366,8 @@ export function AgentAssignPanel({
           submit={submit}
           selectedCount={selectedIds.size}
           isRealRepo={isRealRepo}
+          model={model}
+          setModel={setModel}
         />
       ) : (
         <KeyGate />
@@ -372,12 +383,16 @@ function Composer({
   submit,
   selectedCount,
   isRealRepo,
+  model,
+  setModel,
 }: {
   plan: string;
   setPlan: (v: string) => void;
   submit: () => void;
   selectedCount: number;
   isRealRepo: boolean;
+  model: string;
+  setModel: (v: string) => void;
 }) {
   const canSend = plan.trim().length > 0 && selectedCount > 0 && isRealRepo;
   return (
@@ -434,19 +449,33 @@ function Composer({
           className="w-full resize-none rounded-xl bg-transparent px-3 py-2.5 text-[13px] leading-snug text-neutral-900 placeholder:text-neutral-400 focus:outline-none"
         />
 
-        {/* Suggestion chips + send button row */}
+        {/* Model picker + suggestion chips + send button row */}
         <div className="flex items-end justify-between gap-2 border-t border-neutral-100 px-2 py-1.5">
-          <div className="flex flex-wrap gap-1">
-            {SUGGESTIONS.slice(0, 3).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setPlan(s)}
-                className="rounded-md px-1.5 py-0.5 text-[12px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
-              >
-                {s.split(" ").slice(0, 3).join(" ")}…
-              </button>
-            ))}
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              aria-label="Model"
+              className="h-6 max-w-[110px] cursor-pointer rounded-md border border-neutral-200 bg-white px-1.5 font-mono text-[11px] text-neutral-600 hover:border-neutral-300 focus:border-accent-magenta focus:outline-none focus:ring-2 focus:ring-accent-magenta/15"
+            >
+              {MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            <div className="flex min-w-0 flex-wrap gap-1">
+              {SUGGESTIONS.slice(0, 2).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setPlan(s)}
+                  className="rounded-md px-1.5 py-0.5 text-[12px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+                >
+                  {s.split(" ").slice(0, 3).join(" ")}…
+                </button>
+              ))}
+            </div>
           </div>
           <button
             type="button"

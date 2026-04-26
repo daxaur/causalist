@@ -20,6 +20,8 @@ interface RunBody {
   selectedNodeIds: string[];
   nodePathMap: Record<string, string>;
   apiKey: string;
+  /** Optional model override; defaults to claude-opus-4-7. */
+  model?: string;
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -70,6 +72,7 @@ export async function POST(req: Request): Promise<Response> {
         for await (const ev of runAgent({
           apiKey: body.apiKey,
           plan: body.plan,
+          model: body.model,
           repo: body.repo,
           branch: body.branch ?? "main",
           selectedNodeIds: body.selectedNodeIds,

@@ -1,12 +1,8 @@
-// Real Claude-Agent-SDK runner for the Agents tab. Streams events the
-// route can forward via SSE: started, file_loaded, thinking, finding,
-// patch, summary, done, error.
+// Agent runner — uses the plain Anthropic SDK (HTTP only) instead of
+// claude-agent-sdk so it runs on Vercel serverless functions without
+// needing the Claude Code CLI binary.
 
-import {
-  query,
-  type Options,
-  type SDKMessage,
-} from "@anthropic-ai/claude-agent-sdk";
+import Anthropic from "@anthropic-ai/sdk";
 import {
   GENERAL_PROMPT,
   buildUserPrompt,
@@ -14,7 +10,8 @@ import {
   type AgentRunOutput,
 } from "./prompts";
 
-const MODEL = "claude-opus-4-7";
+const DEFAULT_MODEL = "claude-opus-4-7";
+const MAX_TOKENS = 16_000;
 
 export type AgentEvent =
   | { type: "started"; nodeCount: number; plan: string }
@@ -30,12 +27,14 @@ export interface RunOptions {
   apiKey: string;
   /** Free-form plain-English instruction the user typed. */
   plan: string;
+  /** Optional model override; defaults to Opus 4.7. */
+  model?: string;
   repo: string; // "owner/name"
   branch: string;
   selectedNodeIds: string[];
   /** Map of nodeId -> { path } so the runner can fetch real source. */
   nodePathMap: Record<string, string>;
-  /** GitHub access token for fetching file contents (and later for PR push). */
+  /** GitHub access token for fetching file contents. */
   githubToken?: string;
   signal?: AbortSignal;
 }
@@ -92,36 +91,28 @@ export async function* runAgent(
     selectedNodeIds,
   };
 
-  const userPrompt = buildUserPrompt(input);
-  const sysPrompt = GENERAL_PROMPT;
-
-  const sdkOpts: Options = {
-    env: {
-      ...(process.env as Record<string, string>),
-      ANTHROPIC_API_KEY: opts.apiKey,
-    },
-    settingSources: [],
-    allowedTools: [],
-    systemPrompt: sysPrompt,
-    model: MODEL,
-    maxTurns: 3,
-    permissionMode: "bypassPermissions",
-  };
-
+  const client = new Anthropic({ apiKey: opts.apiKey });
   let finalText = "";
+
   try {
-    const iter = query({ prompt: userPrompt, options: sdkOpts });
-    for await (const msg of iter as AsyncGenerator<SDKMessage>) {
+    const stream = client.messages.stream(
+      {
+        model: opts.model ?? DEFAULT_MODEL,
+        max_tokens: MAX_TOKENS,
+        system: GENERAL_PROMPT,
+        messages: [{ role: "user", content: buildUserPrompt(input) }],
+      },
+      { signal: opts.signal },
+    );
+
+    // Accumulate text deltas as the model streams.
+    for await (const event of stream) {
       if (opts.signal?.aborted) break;
-      if (msg.type === "assistant") {
-        const content = msg.message?.content;
-        if (Array.isArray(content)) {
-          for (const block of content) {
-            if ((block as { type?: string }).type === "text") {
-              finalText += (block as { text?: string }).text ?? "";
-            }
-          }
-        }
+      if (
+        event.type === "content_block_delta" &&
+        event.delta.type === "text_delta"
+      ) {
+        finalText += event.delta.text;
       }
     }
   } catch (e) {
@@ -183,14 +174,11 @@ async function fetchFile(
 }
 
 function parseAgentJson(text: string): AgentRunOutput | null {
-  // Strip code fence if present, then attempt to parse the largest
-  // top-level JSON object in the text.
   const cleaned = stripCodeFence(text);
   try {
     const parsed = JSON.parse(cleaned) as Partial<AgentRunOutput>;
     return normalize(parsed);
   } catch {
-    // last resort: find the first { and matching } via brace scan
     const objMatch = cleaned.match(/\{[\s\S]*\}/);
     if (!objMatch) return null;
     try {
