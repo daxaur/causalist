@@ -7,16 +7,30 @@ export const COLORS = {
   cream: "#faf9f5",
   creamShadow: "#e8e6dc",
   ink: "#141413",
-  midGray: "#b0aea5",
+  // Captions: previous "midGray" (#b0aea5) was too light against cream
+  // and the user couldn't read it from a distance. Bumped to a
+  // proper neutral that holds at small sizes but stays subordinate
+  // to the headline.
+  midGray: "#5a554c",
+  // Soft tone for background hairlines + ghost details.
+  softGray: "#9a948a",
   hairline: "rgba(20, 20, 19, 0.08)",
   magenta: "#D24798", // desaturated 12% from #E838A4 for cream pairing
   magentaPure: "#E838A4", // for ink-dark scenes
   magentaSoft: "rgba(210, 71, 152, 0.08)",
 };
 
+// Brand fonts — pinned to the same families the web app loads from
+// Fontshare (see src/app/layout.tsx). Clash Display for headlines,
+// Satoshi for body + captions. No mono — the prior JetBrains Mono
+// captions read as code, not brand. If a Satoshi weight isn't
+// available the system sans fallback handles it cleanly.
 export const TYPE = {
-  display: '"Clash Display", "Styrene B", "Inter", system-ui, sans-serif',
-  body: '"Tiempos Text", "Tiempos", Georgia, serif',
+  display: '"Clash Display", "Satoshi", ui-sans-serif, system-ui, sans-serif',
+  // Body uses Satoshi too — the previous Tiempos serif had nothing
+  // to do with the actual product UI.
+  body: '"Satoshi", "Clash Display", ui-sans-serif, system-ui, sans-serif',
+  // Mono retained for tiny brand markers (eyebrows / metadata).
   mono: '"JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace',
 };
 
