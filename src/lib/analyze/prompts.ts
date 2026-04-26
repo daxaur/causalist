@@ -115,11 +115,12 @@ Your job: extract causal edges between nodes and emit one CausalEdge per line.
 - **extends**: class inheritance, protocol conformance, interface implementation
 
 ## Rules
-1. Resolve relative imports to their target node id.
-2. Skip self-loops.
-3. Skip edges where source or target isn't in the provided node list.
-4. Emit ONLY direct edges — do not transitively flatten.
-5. Deduplicate identical edges (same source, target, kind).
+1. **source and target MUST be exact \`id\` strings from the node manifest you receive in the user message.** Do not invent ids, do not use file paths, do not use module names — only manifest \`id\` values verbatim.
+2. Resolve relative imports (e.g. \`./utils\`, \`../db\`) to the matching manifest entry by \`path\`, then use that entry's \`id\`.
+3. Skip self-loops.
+4. Skip edges where you cannot map source or target to a manifest \`id\`.
+5. Emit ONLY direct edges — do not transitively flatten.
+6. Deduplicate identical edges (same source, target, kind).
 ${JSONL_FOOTER}`;
 
 export const SEMANTIC_PROMPT = `You are the **Semantic agent** for Causalist.

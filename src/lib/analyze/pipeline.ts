@@ -120,25 +120,26 @@ export async function* runAnalyze(
   let producersDone = false;
   let oracleGraph: CausalGraph | null = null;
 
-  // Run all three builders concurrently. Each emits JSONL; the
-  // line-handler parses each line, pushes to its collector, and
-  // enqueues an emit event.
+  // Sequenced pipeline: Structure first (so Dep + Sem know what node
+  // IDs exist), then Dependency + Semantic in parallel against that
+  // node list. This is also the better demo: nodes appear first as the
+  // file tree, then edges trace between them — the live force graph
+  // visibly grows in two phases.
   const runners = (async () => {
     enqueue({ stage: "structure", status: "started" });
-    enqueue({ stage: "dependency", status: "started" });
-    enqueue({ stage: "semantic", status: "started" });
-
-    const [structureRes, dependencyRes, semanticRes] = await Promise.allSettled([
-      streamStructure(client, input, enqueue, (n) => collectedNodes.push(n)),
-      streamDependency(client, input, enqueue, (e) => collectedEdges.push(e)),
-      streamSemantic(client, input, enqueue, (s) => collectedSummaries.push(s)),
-    ]);
-
-    if (structureRes.status === "rejected") {
+    let structureErr: unknown = null;
+    try {
+      await streamStructure(client, input, enqueue, (n) =>
+        collectedNodes.push(n),
+      );
+    } catch (e) {
+      structureErr = e;
+    }
+    if (structureErr) {
       enqueue({
         stage: "structure",
         status: "error",
-        message: errString(structureRes.reason),
+        message: errString(structureErr),
       });
       // Heuristic fallback so the run can continue.
       collectedNodes = heuristicNodes(input.tree);
@@ -148,6 +149,18 @@ export async function* runAnalyze(
       status: "completed",
       payload: collectedNodes,
     });
+
+    // Now Dependency + Semantic — both informed by the real node list.
+    enqueue({ stage: "dependency", status: "started" });
+    enqueue({ stage: "semantic", status: "started" });
+    const [dependencyRes, semanticRes] = await Promise.allSettled([
+      streamDependency(client, input, collectedNodes, enqueue, (e) =>
+        collectedEdges.push(e),
+      ),
+      streamSemantic(client, input, collectedNodes, enqueue, (s) =>
+        collectedSummaries.push(s),
+      ),
+    ]);
 
     if (dependencyRes.status === "rejected") {
       enqueue({
@@ -175,12 +188,14 @@ export async function* runAnalyze(
       payload: collectedSummaries,
     });
 
-    // Drop orphan edges / summaries before Oracle.
-    const nodeIds = new Set(collectedNodes.map((n) => n.id));
-    const cleanEdges = collectedEdges.filter(
-      (e) => nodeIds.has(e.source) && nodeIds.has(e.target),
+    // Resolve edge endpoints to canonical node IDs (handles cases
+    // where the model emits the path or a relative variant), then drop
+    // anything that still doesn't map to a real node.
+    const cleanEdges = resolveEdges(collectedEdges, collectedNodes);
+    const summariesById = new Set(collectedNodes.map((n) => n.id));
+    const cleanSummaries = collectedSummaries.filter((s) =>
+      summariesById.has(s.id),
     );
-    const cleanSummaries = collectedSummaries.filter((s) => nodeIds.has(s.id));
 
     enqueue({ stage: "oracle", status: "started" });
     try {
@@ -284,11 +299,22 @@ async function streamStructure(
 async function streamDependency(
   client: Anthropic,
   input: AnalyzeInput,
+  nodes: CausalNode[],
   enqueue: (ev: AgentEvent) => void,
   collect: (e: CausalEdge) => void,
 ): Promise<void> {
   if (!input.files || input.files.length === 0) return;
-  const userPrompt = `Repository: ${input.owner}/${input.repo}\n\nSource files (JSON):\n${JSON.stringify(
+  // Compact node manifest: just id + path + layer. Source/target on
+  // emitted edges MUST be one of these `id` values verbatim. Without
+  // this, Dependency invents IDs the orphan filter then drops.
+  const nodeManifest = nodes.map((n) => ({
+    id: n.id,
+    path: n.path,
+    layer: n.layer,
+  }));
+  const userPrompt = `Repository: ${input.owner}/${input.repo}\n\n## Node manifest\nThese are the EXACT id strings you must use as edge source/target. Do NOT invent new ids — if a file isn't in the manifest, skip the edge.\n${JSON.stringify(
+    nodeManifest,
+  )}\n\n## Source files\n${JSON.stringify(
     input.files,
   )}\n\nEmit one JSON line per edge, then {"type":"end"}.`;
 
@@ -332,15 +358,18 @@ async function streamDependency(
 async function streamSemantic(
   client: Anthropic,
   input: AnalyzeInput,
+  nodes: CausalNode[],
   enqueue: (ev: AgentEvent) => void,
   collect: (s: { id: string; summary: string }) => void,
 ): Promise<void> {
-  const files = input.tree.filter((t) => t.type === "file");
-  const userPrompt = `Repository: ${input.owner}/${input.repo}\n\nNodes to summarize (JSON):\n${JSON.stringify(
-    files,
+  // Pass Structure's node manifest so summaries key off the same `id`
+  // values the rest of the pipeline expects.
+  const nodeManifest = nodes.map((n) => ({ id: n.id, path: n.path }));
+  const userPrompt = `Repository: ${input.owner}/${input.repo}\n\n## Nodes to summarize\nUse the EXACT id strings from this manifest as the \`id\` on each emitted summary.\n${JSON.stringify(
+    nodeManifest,
   )}${
     input.files
-      ? `\n\nFile contents (for context):\n${JSON.stringify(input.files)}`
+      ? `\n\n## File contents (for context)\n${JSON.stringify(input.files)}`
       : ""
   }\n\nEmit one JSON line per summary, then {"type":"end"}.`;
 
@@ -521,6 +550,47 @@ async function streamFullText(
 function errString(e: unknown): string {
   if (e instanceof Error) return e.message;
   return String(e);
+}
+
+/**
+ * Map model-emitted edge endpoints back to canonical node IDs. Even
+ * with a node manifest in the prompt, models occasionally emit the
+ * `path` instead of the `id`, or a path with leading "./" / "../",
+ * or a slashed variant of the underscore id. This resolver tries each
+ * shape; only edges where BOTH ends resolve survive.
+ */
+function resolveEdges(
+  edges: CausalEdge[],
+  nodes: CausalNode[],
+): CausalEdge[] {
+  const byId = new Map(nodes.map((n) => [n.id, n.id]));
+  const byPath = new Map(nodes.map((n) => [n.path, n.id]));
+  const bySlashedId = new Map(
+    nodes.map((n) => [n.id.replaceAll("__", "/"), n.id]),
+  );
+
+  const resolve = (raw: string): string | null => {
+    if (byId.has(raw)) return byId.get(raw)!;
+    if (byPath.has(raw)) return byPath.get(raw)!;
+    if (bySlashedId.has(raw)) return bySlashedId.get(raw)!;
+    const stripped = raw.replace(/^\.\/?/, "").replace(/\\/g, "/");
+    if (byPath.has(stripped)) return byPath.get(stripped)!;
+    if (bySlashedId.has(stripped)) return bySlashedId.get(stripped)!;
+    return null;
+  };
+
+  const out: CausalEdge[] = [];
+  const seen = new Set<string>();
+  for (const e of edges) {
+    const s = resolve(e.source);
+    const t = resolve(e.target);
+    if (!s || !t || s === t) continue;
+    const key = `${s}->${t}|${e.kind}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ ...e, source: s, target: t });
+  }
+  return out;
 }
 
 function stripCodeFence(s: string): string {

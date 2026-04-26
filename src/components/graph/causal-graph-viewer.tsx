@@ -267,8 +267,10 @@ export function CausalGraphViewer({
         dForce.forceCollide?.((n: { size?: number }) => (n.size ?? 4) + 4),
       );
       g.numDimensions(3);
-      // Reheat briefly so the new forces take effect
-      if (typeof g.d3ReheatSimulation === "function") g.d3ReheatSimulation();
+      // Don't reheat — the simulation is mid-cool from initial mount
+      // and the new forces take effect on the next tick. Reheating
+      // here was the cause of "the graph never stops jiggling" because
+      // it reset the alpha to 1 every time graph data updated.
     })();
     return () => {
       cancelled = true;
@@ -624,7 +626,13 @@ export function CausalGraphViewer({
     onNodeHover: (n: VisNode | null) => setHover(n?.id ?? null),
     onBackgroundClick: () => clearSelection(),
     backgroundColor: CANVAS_BG,
-    cooldownTicks: 150,
+    // Cool fast and stop. With many isolated nodes (e.g. low-edge
+    // graphs) the default decay leaves them drifting forever — that
+    // reads as "the page is glitching." Settle in ~3s and freeze.
+    cooldownTicks: 80,
+    cooldownTime: 3000,
+    d3AlphaDecay: 0.05,
+    d3VelocityDecay: 0.55,
   };
 
   const paletteActions: PaletteAction[] = useMemo(() => {
