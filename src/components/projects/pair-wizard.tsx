@@ -116,7 +116,7 @@ export function PairWizard({ children }: { children: ReactElement }) {
                 {phase === "code" && "Run the pair command"}
                 {phase === "paired" && "You're all set"}
               </DialogTitle>
-              <DialogDescription className="mt-0.5 text-[11px] text-neutral-500">
+              <DialogDescription className="mt-0.5 text-[12.5px] leading-snug text-neutral-500">
                 {phase === "install" && "One command. The CLI ships eleven graph-aware tools and a Claude Code skill."}
                 {phase === "code" && "Copy this into a terminal where Claude Code can see it. We'll know when it ran."}
                 {phase === "paired" && "This browser is paired. Claude Code can now query the graph and push projects to your list."}
@@ -134,7 +134,7 @@ export function PairWizard({ children }: { children: ReactElement }) {
                   copied={copied === "install"}
                   onCopy={() => copy(installCmd, "install")}
                 />
-                <p className="text-[11.5px] leading-snug text-neutral-500">
+                <p className="text-[12.5px] leading-snug text-neutral-500">
                   This installs <code className="font-mono">causalist-cli</code> and
                   drops a <code className="font-mono">SKILL.md</code> into{" "}
                   <code className="font-mono">~/.claude/skills/causalist/</code>{" "}
@@ -169,7 +169,7 @@ export function PairWizard({ children }: { children: ReactElement }) {
                       <div className="mt-1 font-mono text-[28px] font-medium tracking-[0.2em] text-neutral-900">
                         {code}
                       </div>
-                      <div className="mt-1 text-[10.5px] text-neutral-500">
+                      <div className="mt-1 text-[12px] text-neutral-500">
                         expires in 10 min · works once
                       </div>
                     </div>
@@ -178,7 +178,7 @@ export function PairWizard({ children }: { children: ReactElement }) {
                       copied={copied === "pair"}
                       onCopy={() => copy(pairCmd, "pair")}
                     />
-                    <div className="flex items-center justify-between text-[11px] text-neutral-500">
+                    <div className="flex items-center justify-between text-[12px] text-neutral-500">
                       {pairing ? (
                         <span className="flex items-center gap-1.5 font-mono text-accent-magenta">
                           <CircleNotch size={11} className="animate-spin" />
@@ -206,7 +206,7 @@ export function PairWizard({ children }: { children: ReactElement }) {
                   <CheckCircle size={14} weight="fill" className="shrink-0 text-emerald-600" />
                   Claude Code is paired with this browser.
                 </div>
-                <p className="text-[11.5px] leading-snug text-neutral-500">
+                <p className="text-[12.5px] leading-snug text-neutral-500">
                   Try asking Claude Code: <em>&ldquo;what tests cover src/auth/login.ts in this repo?&rdquo;</em>{" "}
                   — it&rsquo;ll fire the skill and call{" "}
                   <code className="font-mono">causalist tests</code> instead of grepping.

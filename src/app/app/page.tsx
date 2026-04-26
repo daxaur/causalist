@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { usePairStatus } from "@/hooks/use-pair-status";
 import {
   ArrowRight,
   ArrowUpRight,
@@ -36,19 +37,20 @@ export default function ProjectsPage() {
 
   // Live SSE listener — when the MCP server pushes a new project to
   // this paired browser, the library refreshes and the new entry
-  // appears here without a manual reload.
+  // appears here without a manual reload. Re-subscribes whenever the
+  // pair sessionId changes (unpair / re-pair) so we don't leak the
+  // previous EventSource.
+  const pair = usePairStatus();
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const sessionId = window.localStorage.getItem("causalist:pair:session");
-    if (!sessionId) return;
-    const es = new EventSource(`/api/stream/${sessionId}`);
+    if (!pair.sessionId) return;
+    const es = new EventSource(`/api/stream/${pair.sessionId}`);
     const onProject = () => setBus((b) => ({ events: b.events + 1 }));
     es.addEventListener("project_added", onProject);
     return () => {
       es.removeEventListener("project_added", onProject);
       es.close();
     };
-  }, []);
+  }, [pair.sessionId]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();

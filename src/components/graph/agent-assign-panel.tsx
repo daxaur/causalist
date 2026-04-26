@@ -311,7 +311,7 @@ export function AgentAssignPanel({
     <div className="flex h-full flex-col">
       {/* Demo banner — preview/reference graphs aren't real repos */}
       {!isRealRepo && (
-        <div className="shrink-0 border-b border-amber-200 bg-amber-50/60 px-4 py-2 text-[11px] text-amber-800">
+        <div className="shrink-0 border-b border-amber-200 bg-amber-50/60 px-4 py-2 text-[12px] text-amber-800">
           <span className="font-medium">Demo mode.</span> Sample graphs aren&rsquo;t
           tied to a real repo, so agents can&rsquo;t fetch files or open PRs.
         </div>
@@ -386,7 +386,7 @@ function Composer({
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent-magenta/40 to-transparent" />
 
       {/* Context chip — what's attached */}
-      <div className="mb-2 flex items-center justify-between text-[10.5px]">
+      <div className="mb-2 flex items-center justify-between text-[12px]">
         {selectedCount > 0 ? (
           <span className="inline-flex items-center gap-1 rounded-full border border-accent-magenta/30 bg-accent-magenta/[0.06] px-2 py-0.5 font-mono text-accent-magenta">
             <span className="h-1.5 w-1.5 rounded-full bg-accent-magenta shadow-[0_0_4px_rgba(232,56,164,0.6)]" />
@@ -441,7 +441,7 @@ function Composer({
                 key={s}
                 type="button"
                 onClick={() => setPlan(s)}
-                className="rounded-md px-1.5 py-0.5 text-[10.5px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+                className="rounded-md px-1.5 py-0.5 text-[12px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
               >
                 {s.split(" ").slice(0, 3).join(" ")}…
               </button>
@@ -477,7 +477,7 @@ function KeyGate() {
         <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-accent-magenta shadow-[0_0_8px_rgba(232,56,164,0.6)]" />
         Anthropic key required
       </div>
-      <p className="mt-1 text-[11.5px] leading-snug text-neutral-500">
+      <p className="mt-1 text-[12.5px] leading-snug text-neutral-500">
         Agents call Claude Opus 4.7 from your browser. Key stays local — never
         touches our servers.
       </p>
@@ -526,7 +526,7 @@ function EmptyChat({
             key={s}
             type="button"
             onClick={() => onPick(s)}
-            className="rounded-full border border-neutral-200 bg-white px-3 py-1 text-[11px] text-neutral-600 shadow-sm transition-all hover:border-accent-magenta hover:text-accent-magenta hover:shadow-[0_0_0_3px_rgba(232,56,164,0.08)]"
+            className="rounded-full border border-neutral-200 bg-white px-3 py-1 text-[12px] text-neutral-600 shadow-sm transition-all hover:border-accent-magenta hover:text-accent-magenta hover:shadow-[0_0_0_3px_rgba(232,56,164,0.08)]"
           >
             {s}
           </button>
@@ -692,7 +692,7 @@ function RunThread({
           <button
             onClick={onCancel}
             type="button"
-            className="inline-flex h-7 items-center gap-1 rounded-md border border-neutral-200 bg-white px-2 text-[10.5px] text-neutral-500 transition-colors hover:border-neutral-300 hover:text-neutral-900"
+            className="inline-flex h-7 items-center gap-1 rounded-md border border-neutral-200 bg-white px-2 text-[12px] text-neutral-500 transition-colors hover:border-neutral-300 hover:text-neutral-900"
           >
             <Stop size={10} weight="fill" />
             cancel

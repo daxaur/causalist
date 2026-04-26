@@ -2,7 +2,7 @@
 
 import { del, get, keys, set } from "idb-keyval";
 import { nanoid } from "nanoid";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { CausalGraph } from "@/lib/graph/types";
 import type { LibraryEntry, LibraryIndexEntry } from "./types";
 
@@ -166,7 +166,10 @@ export function useLibrary(): {
   const [entries, setEntries] = useState<LibraryIndexEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const reload = () => {
+  // Stable reload function — useCallback prevents the consumer from
+  // seeing a fresh function ref on every render and accidentally
+  // looping a useEffect that depends on `reload`.
+  const reload = useCallback(() => {
     let cancelled = false;
     setLoading(true);
     readIndex().then((idx) => {
@@ -177,7 +180,7 @@ export function useLibrary(): {
     return () => {
       cancelled = true;
     };
-  };
+  }, []);
 
   useEffect(() => {
     const cleanup = reload();
@@ -193,8 +196,7 @@ export function useLibrary(): {
         window.removeEventListener("storage", onChange);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [reload]);
 
   return { entries, loading, reload };
 }

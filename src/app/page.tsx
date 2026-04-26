@@ -78,9 +78,9 @@ function Footer() {
             </span>
           </Link>
           <p className="mt-3 text-[13px] leading-relaxed text-neutral-500">
-            Maps any GitHub repo into a typed causal graph. Claude Code reads
-            it through eleven typed tools instead of grepping every file —
-            cheaper context, sharper answers.
+            Maps any GitHub repo into a typed causal graph you can navigate
+            in 3D. Plug it into Claude Code (optional) and the agent gets
+            eleven graph-aware tools instead of grepping every file.
           </p>
           <div className="mt-5 flex items-center gap-2">
             <a
