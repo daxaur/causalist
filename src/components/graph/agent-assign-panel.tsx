@@ -385,16 +385,17 @@ function Composer({
       {/* Magenta accent strip on top — quiet brand presence */}
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent-magenta/40 to-transparent" />
 
-      {/* Context chip — what's attached */}
+      {/* Scope chip — what the agent will read. Phrased as files-to-read,
+          not "nodes attached" so it doesn't sound like N agents will run. */}
       <div className="mb-2 flex items-center justify-between text-[12px]">
         {selectedCount > 0 ? (
-          <span className="inline-flex items-center gap-1 rounded-full border border-accent-magenta/30 bg-accent-magenta/[0.06] px-2 py-0.5 font-mono text-accent-magenta">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent-magenta shadow-[0_0_4px_rgba(232,56,164,0.6)]" />
-            {selectedCount} node{selectedCount === 1 ? "" : "s"} attached
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-magenta/30 bg-accent-magenta/[0.06] px-2.5 py-0.5 font-mono text-accent-magenta">
+            <CausalThinkingIcon size={11} />
+            agent will read {selectedCount} file{selectedCount === 1 ? "" : "s"}
           </span>
         ) : (
           <span className="font-mono text-neutral-400">
-            select nodes in the graph to attach context
+            select files in the graph to scope the agent
           </span>
         )}
         <span className="font-mono text-neutral-400">
@@ -492,8 +493,9 @@ function KeyGate() {
   );
 }
 
-/** Empty-state hero — concentric magenta rings, Causalist aesthetic.
- *  No icon clutter; the rings carry the brand. */
+/** Empty-state hero — small causal-graph "thinking" mark (3 nodes
+ *  connected by lines that slowly draw in sequence). No clutter,
+ *  reads as agents-on-a-graph at a glance. */
 function EmptyChat({
   onPick,
   hasSelection,
@@ -503,21 +505,15 @@ function EmptyChat({
 }) {
   return (
     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-      {/* Concentric rings — the Causalist mark in atmosphere form */}
-      <div className="relative mb-6 h-20 w-20">
-        <span className="absolute inset-0 animate-ping rounded-full border border-accent-magenta/30" style={{ animationDuration: "3.5s" }} />
-        <span className="absolute inset-2 rounded-full border border-accent-magenta/40" />
-        <span className="absolute inset-4 rounded-full border border-accent-magenta/60" />
-        <span className="absolute inset-[34px] rounded-full bg-accent-magenta shadow-[0_0_12px_rgba(232,56,164,0.5)]" />
-      </div>
+      <CausalThinkingIcon size={56} />
 
-      <div className="font-display text-[18px] font-medium tracking-tight text-neutral-900">
-        Point an agent at it.
+      <div className="mt-5 font-display text-[18px] font-medium tracking-tight text-neutral-900">
+        {hasSelection ? "Tell the agent what to do." : "Pick files. Then tell the agent."}
       </div>
-      <p className="mt-1.5 max-w-[280px] text-[12.5px] leading-relaxed text-neutral-500">
+      <p className="mt-1.5 max-w-[300px] text-[12.5px] leading-relaxed text-neutral-500">
         {hasSelection
-          ? "Describe a fix or audit — Auditor, Security, Performance, Refactor — and Claude reads the selected files, proposes a real PR."
-          : "Multi-select nodes in the graph, then tell the agents what to do. Audit, patch, refactor, explain."}
+          ? "Audit, patch, refactor, explain — the agent reads the selected files and can open a real PR."
+          : "Click nodes in the graph to scope the agent. One agent runs over your selection at a time."}
       </p>
 
       <div className="mt-5 flex flex-wrap justify-center gap-1.5">
@@ -533,6 +529,99 @@ function EmptyChat({
         ))}
       </div>
     </div>
+  );
+}
+
+/** Three-node causal thinking icon. Edges draw in a slow loop so the
+ *  agent feels alive without resorting to the pulsing-dot trope. Used
+ *  in the empty hero AND inline in the scope chip. */
+function CausalThinkingIcon({ size = 56 }: { size?: number }) {
+  // Three node positions in a 100×100 viewBox.
+  const nodes: Array<[number, number]> = [
+    [22, 32],
+    [78, 22],
+    [54, 78],
+  ];
+  const edges: Array<[number, number]> = [
+    [0, 1],
+    [1, 2],
+    [0, 2],
+  ];
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      fill="none"
+      style={{ display: "block" }}
+    >
+      <defs>
+        {edges.map((_, i) => {
+          const [a, b] = edges[i];
+          const [x1, y1] = nodes[a];
+          const [x2, y2] = nodes[b];
+          const id = `causal-edge-${i}`;
+          return (
+            <linearGradient
+              key={id}
+              id={id}
+              x1={x1}
+              y1={y1}
+              x2={x2}
+              y2={y2}
+              gradientUnits="userSpaceOnUse"
+            >
+              <stop offset="0%" stopColor="#D24798" stopOpacity={0.4} />
+              <stop offset="100%" stopColor="#D24798" stopOpacity={0.9} />
+            </linearGradient>
+          );
+        })}
+      </defs>
+      {edges.map((edge, i) => {
+        const [a, b] = edge;
+        const [x1, y1] = nodes[a];
+        const [x2, y2] = nodes[b];
+        return (
+          <line
+            key={i}
+            x1={x1}
+            y1={y1}
+            x2={x2}
+            y2={y2}
+            stroke={`url(#causal-edge-${i})`}
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeDasharray="80 80"
+            style={{
+              animation: `causal-trace 2.4s ${i * 0.4}s ease-in-out infinite`,
+            }}
+          />
+        );
+      })}
+      {nodes.map((n, i) => (
+        <circle
+          key={i}
+          cx={n[0]}
+          cy={n[1]}
+          r={6}
+          fill="#D24798"
+          style={{
+            animation: `causal-pulse-soft 2.4s ${i * 0.4}s ease-in-out infinite`,
+          }}
+        />
+      ))}
+      <style>{`
+        @keyframes causal-trace {
+          0%, 12% { stroke-dashoffset: 80; opacity: 0.2; }
+          50%      { stroke-dashoffset: 0;  opacity: 1;   }
+          100%    { stroke-dashoffset: -80; opacity: 0.2; }
+        }
+        @keyframes causal-pulse-soft {
+          0%, 100% { opacity: 0.55; }
+          50%      { opacity: 1; }
+        }
+      `}</style>
+    </svg>
   );
 }
 
