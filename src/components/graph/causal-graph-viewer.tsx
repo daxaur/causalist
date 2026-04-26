@@ -639,24 +639,40 @@ export function CausalGraphViewer({
     d3AlphaDecay: 0.06,
     d3VelocityDecay: 0.7,
     onEngineStop: () => {
-      // Zero out residual velocities so any stray re-render won't see
-      // leftover momentum and start drifting nodes again. Don't call
-      // pauseAnimation() — that halts the render loop entirely and
-      // hover/select visual feedback would freeze with it.
+      // Zero out residual velocities AND pin every node at its final
+      // position by writing fx/fy/fz. The d3 force engine treats
+      // nodes with fx/fy/fz set as immovable — even if the user
+      // drags one, the others stay put and the simulation has
+      // nothing to relax. This is what kept the demo glitching when
+      // the user dragged a node: drag re-energized the engine and
+      // every other node would jump.
       try {
         for (const n of (data.nodes as unknown) as Array<{
+          x?: number;
+          y?: number;
+          z?: number;
           vx?: number;
           vy?: number;
           vz?: number;
+          fx?: number;
+          fy?: number;
+          fz?: number;
         }>) {
           n.vx = 0;
           n.vy = 0;
           n.vz = 0;
+          if (n.x != null) n.fx = n.x;
+          if (n.y != null) n.fy = n.y;
+          if (n.z != null) n.fz = n.z;
         }
       } catch {
         // best-effort only
       }
     },
+    // Disable drag entirely. With pinned nodes drag would be a no-op
+    // anyway; turning it off also kills the cursor change so the UI
+    // doesn't suggest an interaction we don't support.
+    enableNodeDrag: false,
   };
 
   const paletteActions: PaletteAction[] = useMemo(() => {

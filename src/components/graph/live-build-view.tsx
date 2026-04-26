@@ -116,6 +116,26 @@ export function LiveBuildView({
     return () => ro.disconnect();
   }, []);
 
+  // Camera follow: as the graph grows, periodically zoom-to-fit so
+  // the user always sees the whole shape forming. Without this, new
+  // nodes fall off-screen and the canvas reads as half-empty.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fgRef = useRef<any>(null);
+  useEffect(() => {
+    if (nodes.length === 0) return;
+    const id = window.setInterval(() => {
+      const fg = fgRef.current;
+      if (fg && typeof fg.zoomToFit === "function") {
+        try {
+          fg.zoomToFit(400, 60);
+        } catch {
+          // ignore — fit can throw before the layout has any nodes
+        }
+      }
+    }, 1200);
+    return () => window.clearInterval(id);
+  }, [nodes.length]);
+
   const data = useMemo(
     () => ({
       nodes: nodes as VisNode[],
@@ -158,21 +178,40 @@ export function LiveBuildView({
         ) : (
           size.w > 0 && (
             <ForceGraph2D
+              ref={fgRef}
               graphData={data}
               width={size.w}
               height={size.h}
               backgroundColor={CANVAS_BG}
-              // Keep the simulation warm enough that newly-emitted
-              // nodes can find their seat, but with much higher
-              // friction so existing nodes don't keep ricocheting
-              // around the canvas every time a new arrival shifts the
-              // equilibrium. The old (0.01 / 0.35) values made the
-              // graph "pop" — small graphs especially.
+              // Demo-tuned so new arrivals settle quickly into a
+              // coherent cluster instead of scattering. High friction
+              // (velocityDecay 0.78), weak charge so nodes don't
+              // explode outward, short link distance so connected
+              // pairs sit close. Center force pulls everything to (0,0).
               cooldownTicks={Infinity}
-              d3AlphaDecay={0.035}
-              d3VelocityDecay={0.7}
-              warmupTicks={20}
+              d3AlphaDecay={0.04}
+              d3VelocityDecay={0.78}
+              warmupTicks={30}
+              d3AlphaMin={0.02}
               nodeRelSize={5}
+              linkDirectionalParticles={0}
+              onEngineTick={() => {
+                // Soft "gravity to center" so nothing drifts past the
+                // viewport. Cheap per-tick mutation; runs at ~60Hz
+                // while the engine is warm and stops when alpha hits
+                // alphaMin.
+                for (const n of data.nodes as Array<{
+                  x?: number;
+                  y?: number;
+                  vx?: number;
+                  vy?: number;
+                }>) {
+                  if (n.x != null && n.y != null) {
+                    n.vx = (n.vx ?? 0) - n.x * 0.0009;
+                    n.vy = (n.vy ?? 0) - n.y * 0.0009;
+                  }
+                }
+              }}
               linkColor={(l) => {
                 const link = l as VisEdge;
                 const fresh =

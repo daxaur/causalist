@@ -451,8 +451,23 @@ export function RepoAnalyzePrompt({
         if (!n?.id) return;
         setLiveNodes((prev) => {
           if (prev.some((x) => x.id === n.id)) return prev;
-          // Tag with _pulse so the renderer paints a brief glow.
-          return [...prev, { ...n, _pulse: Date.now() } as CausalNode];
+          // Pre-position the node in a tight ring around origin so the
+          // force layout starts from a coherent shape instead of
+          // scattering 100+ nodes across the canvas. ForceGraph2D
+          // mutates x/y in place, but if the node lacks them on
+          // first paint the lib spawns it at random canvas
+          // coordinates — that's what made the live build look like
+          // "points spreading to wilderness".
+          const idx = prev.length;
+          const angle = (idx * 137.5 * Math.PI) / 180; // golden angle
+          const r = 8 + Math.sqrt(idx) * 6;
+          const seeded = {
+            ...n,
+            x: Math.cos(angle) * r,
+            y: Math.sin(angle) * r,
+            _pulse: Date.now(),
+          } as CausalNode;
+          return [...prev, seeded];
         });
         setAgents((prev) => ({
           ...prev,
