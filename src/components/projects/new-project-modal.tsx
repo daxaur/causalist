@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ModelPill } from "@/components/agents/model-pill";
 import { BUILDER_AGENTS, type BuilderAgentId } from "@/lib/analyze/prompts";
+import { stdTransition } from "@/lib/motion";
 
 const DEFAULT_MODEL = "claude-opus-4-7";
 const MODELS_LS_KEY = "causalist:builder-models:v1";
@@ -397,7 +398,7 @@ function UrlStatusGlyph({ state }: { state: UrlState["kind"] }) {
         key="valid"
         initial={{ scale: 0.4, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 500, damping: 18 }}
+        transition={stdTransition}
       >
         <CheckCircle size={16} weight="fill" className="text-emerald-500" />
       </motion.div>
@@ -409,7 +410,7 @@ function UrlStatusGlyph({ state }: { state: UrlState["kind"] }) {
         key="warn"
         initial={{ scale: 0.4, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 500, damping: 18 }}
+        transition={stdTransition}
       >
         <Warning size={14} weight="fill" className="text-red-500" />
       </motion.div>

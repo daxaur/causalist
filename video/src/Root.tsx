@@ -1,25 +1,29 @@
 import { Composition } from "remotion";
 
+// Production cuts (in story order). The four "kept" anchors are the
+// cold-open / problem / pivot / closing; the new graph-themed cuts
+// (logo-as-graph, agents-on-graph, bringing-causality-to-agents,
+// claude-code-builds-for-you) carry the rest of the story. The PR
+// cuts and the section bridges were dropped — see SCRIPT.md for the
+// edit timeline.
+
 import { ColdOpen } from "./scenes/01-cold-open";
 import { TheProblem } from "./scenes/02-the-problem";
 import { ThePivot } from "./scenes/03-the-pivot";
-import { SectionMap } from "./scenes/04-section-map";
-import { FourAgents } from "./scenes/05-four-agents";
-import { AstVerified } from "./scenes/06-ast-verified";
-import { SectionPoint } from "./scenes/07-section-point";
-import { PrOpened } from "./scenes/08-pr-opened";
-import { SectionConnect } from "./scenes/09-section-connect";
 import { Closing } from "./scenes/10-closing";
+import { LogoDrawsAsGraph } from "./scenes/11-logo-draws-as-graph";
+import { LogoDrawsAsGraphAlt } from "./scenes/12-logo-draws-as-graph-alt";
+import { AgentsOnGraph } from "./scenes/13-agents-on-graph";
+import { BringingCausalityToAgents } from "./scenes/14-bringing-causality-to-agents";
+import { ClaudeCodeBuildsForYou } from "./scenes/15-claude-code-builds-for-you";
 
 const FPS = 30;
 const W = 1920;
 const H = 1080;
 
-// Each scene is a separate composition so you can render them
-// individually (`remotion render src/index.ts cold-open out/...mp4`)
-// and stitch with screen recordings in the editor.
 export const RemotionRoot = () => (
   <>
+    {/* Anchors */}
     <Composition
       id="cold-open"
       component={ColdOpen}
@@ -45,57 +49,55 @@ export const RemotionRoot = () => (
       height={H}
     />
     <Composition
-      id="section-map"
-      component={SectionMap}
-      durationInFrames={90}
-      fps={FPS}
-      width={W}
-      height={H}
-    />
-    <Composition
-      id="four-agents"
-      component={FourAgents}
-      durationInFrames={90}
-      fps={FPS}
-      width={W}
-      height={H}
-    />
-    <Composition
-      id="ast-verified"
-      component={AstVerified}
-      durationInFrames={90}
-      fps={FPS}
-      width={W}
-      height={H}
-    />
-    <Composition
-      id="section-point"
-      component={SectionPoint}
-      durationInFrames={90}
-      fps={FPS}
-      width={W}
-      height={H}
-    />
-    <Composition
-      id="pr-opened"
-      component={PrOpened}
-      durationInFrames={90}
-      fps={FPS}
-      width={W}
-      height={H}
-    />
-    <Composition
-      id="section-connect"
-      component={SectionConnect}
-      durationInFrames={90}
-      fps={FPS}
-      width={W}
-      height={H}
-    />
-    <Composition
       id="closing"
       component={Closing}
       durationInFrames={120}
+      fps={FPS}
+      width={W}
+      height={H}
+    />
+
+    {/* Brand opener — two variants, pick one in the cut */}
+    <Composition
+      id="logo-draws-as-graph"
+      component={LogoDrawsAsGraph}
+      durationInFrames={150}
+      fps={FPS}
+      width={W}
+      height={H}
+    />
+    <Composition
+      id="logo-draws-as-graph-alt"
+      component={LogoDrawsAsGraphAlt}
+      durationInFrames={150}
+      fps={FPS}
+      width={W}
+      height={H}
+    />
+
+    {/* Centerpiece — agents drawing the graph */}
+    <Composition
+      id="agents-on-graph"
+      component={AgentsOnGraph}
+      durationInFrames={180}
+      fps={FPS}
+      width={W}
+      height={H}
+    />
+
+    {/* Story headlines */}
+    <Composition
+      id="bringing-causality-to-agents"
+      component={BringingCausalityToAgents}
+      durationInFrames={120}
+      fps={FPS}
+      width={W}
+      height={H}
+    />
+    <Composition
+      id="claude-code-builds-for-you"
+      component={ClaudeCodeBuildsForYou}
+      durationInFrames={150}
       fps={FPS}
       width={W}
       height={H}

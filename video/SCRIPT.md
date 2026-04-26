@@ -1,67 +1,63 @@
 # Causalist demo video — script + edit list
 
-**Total target:** ~75 seconds. **Aspect:** 1920×1080 @ 30fps. **Style:** Anthropic-clean (cream `#faf9f5` ground, ink `#141413` text, magenta `#D24798` as the only accent). **Sound:** ambient pad (very low) + a single soft bell hit on each hard cut. No music bed.
+**Total target:** ~70 seconds. **Aspect:** 1920×1080 @ 30fps. **Style:** Anthropic-clean (cream `#faf9f5` ground, ink `#141413` text, magenta `#D24798` as the only accent). **Render quality:** h264 / crf 14 (visually lossless). **Sound:** ambient pad (very low) + a single soft bell hit on each hard cut. No music bed.
 
-The 10 Remotion compositions below are the **cuts**. Between them you slot **screen recordings** of the live product. Each cut is camera-locked; the screen recording sections are where the user sees motion.
+The Remotion compositions below are the **cuts**. Between them you slot **screen recordings** of the live product. The headline beat is **the live build view** — judges should see Causalist drawing the graph in real time within the first 15 seconds.
+
+The PR/GitHub cuts from the previous edit are dropped. The story is "agents drawing the graph" + "Claude Code talking to the graph," not "agents opening pull requests."
 
 ---
 
 ## Edit timeline
 
-| # | t  | Source            | Composition / SR   | Length | Voiceover (optional)                                                                                |
-|---|----|-------------------|--------------------|--------|-----------------------------------------------------------------------------------------------------|
-| 1 | 0.0  | Remotion          | `cold-open`        | 5.0s   | *silent — let the mark land*                                                                        |
-| 2 | 5.0  | Remotion          | `the-problem`      | 3.0s   | "Claude Code grepped four hundred eighty-seven files to find three affected tests."                 |
-| 3 | 8.0  | Remotion          | `the-pivot`        | 3.0s   | "There's a faster way."                                                                             |
-| 4 | 11.0 | Remotion          | `section-map`      | 3.0s   | "Map any GitHub repo into a typed causal graph."                                                   |
-| 5 | 14.0 | **Screen rec**    | **SR-1: paste-url-and-map** | ~7.0s  | *pause — let the four agents tick across the AgentRail in real time*                       |
-| 6 | 21.0 | Remotion          | `four-agents`      | 3.0s   | "Four Claude Opus 4.7 agents. In parallel."                                                        |
-| 7 | 24.0 | Remotion          | `ast-verified`     | 3.0s   | "Every edge AST-verified. No hallucinated call sites."                                              |
-| 8 | 27.0 | Remotion          | `section-point`    | 3.0s   | "Point an agent at it: select, plan, ship."                                                         |
-| 9 | 30.0 | **Screen rec**    | **SR-2: select-and-run-agent** | ~12.0s | *the agent streams findings; click Open PR*                                            |
-|10 | 42.0 | Remotion          | `pr-opened`        | 3.0s   | "PR opened in forty-seven seconds." *(read whatever number SR-2 actually showed)*                   |
-|11 | 45.0 | **Screen rec**    | **SR-3: real-PR-on-github** | ~5.0s  | *pan slowly down the diff*                                                                |
-|12 | 50.0 | Remotion          | `section-connect`  | 3.0s   | "Two commands. Eleven graph-aware tools."                                                          |
-|13 | 53.0 | **Screen rec**    | **SR-4: claude-code-uses-mcp** | ~10.0s | *Claude Code calls `affected_tests`, returns 3 of 340*                                |
-|14 | 63.0 | Remotion          | `closing`          | 4.0s   | "Causalist. Open source. Built with Claude Opus 4.7."                                              |
+| # | t | Source | Composition / SR | Length | Voiceover (optional) |
+|---|---|---|---|---|---|
+| 1 | 0.0 | Remotion | `cold-open` | 5.0s | *silent — let the mark land* |
+| 2 | 5.0 | Remotion | `logo-draws-as-graph` | 5.0s | "Causalist." |
+| 3 | 10.0 | Remotion | `the-problem` | 3.0s | "Claude Code grepped four hundred eighty-seven files to find three affected tests." |
+| 4 | 13.0 | Remotion | `the-pivot` | 3.0s | "There's a faster way." |
+| 5 | 16.0 | Remotion | `bringing-causality-to-agents` | 4.0s | "Bringing causality closer to agents." |
+| 6 | 20.0 | **Screen rec** | **SR-1: paste-url-and-build** | ~14s | *the live build view: nodes pop in, edges trace, agent chips pulse — this is the headline shot* |
+| 7 | 34.0 | Remotion | `agents-on-graph` | 6.0s | "Four agents in parallel — each with a different model, your choice." |
+| 8 | 40.0 | **Screen rec** | **SR-2: select-and-ask** | ~12s | *select a few nodes, open the Agents tab, ask "trace the blast radius" — the swarm answers in graph terms* |
+| 9 | 52.0 | Remotion | `claude-code-builds-for-you` | 5.0s | "Eleven graph-aware tools, exposed over MCP." |
+|10 | 57.0 | **Screen rec** | **SR-3: claude-code-uses-mcp** | ~9s | *terminal: Claude Code calls a Causalist tool, returns a structured answer* |
+|11 | 66.0 | Remotion | `closing` | 4.0s | "Causalist. Open source. Built with Claude Opus 4.7." |
 
-**Total:** ~67–75s depending on screen-recording pacing. Aim under 75s — winning hackathon demos are tight.
+**Total:** ~70s with the SRs paced as above. Aim under 75s — winning hackathon demos are tight.
+
+`logo-draws-as-graph-alt` is an alternate brand opener (wordmark + horizontal agent row + "see what your code actually means" tagline). Use it as the cold-open replacement if a softer, less geometric mood lands better in the cut.
 
 ---
 
 ## Screen-recording shot list
 
-Record each of these as a separate clip, full 1920×1080. Mouse cursor visible. No browser chrome (use Cmd+Shift+F in Chrome to hide it, or record the inner window only).
+Three clips. Full 1920×1080. Cursor visible. Hide browser chrome (Cmd+Shift+F in Chrome, or record the inner window only).
 
-### SR-1 · paste-url-and-map (~7s)
+### SR-1 · paste-url-and-build (~14s) — the headline shot
 
-1. Empty browser on `causalist.xyz` → focus the URL input in the hero
-2. Paste `vercel/next.js` (or any small repo). Hit ⏎.
-3. Cut to `/app/owner/repo` page. The four-agent rail starts ticking. Graph nodes start populating.
-4. End on the finished 3D galaxy.
+1. Empty browser on `causalist.xyz/app`. Click **New project**.
+2. Paste a small public repo URL (e.g. `vercel/swr` or any ~25–50 file repo). Don't expand Advanced — the default Opus 4.7 across all four agents reads fastest.
+3. Click **Map it**. Land on the LiveBuildView.
+4. Watch nodes pop in (Structure chip pulsing magenta), then edges start tracing (Dependency chip pulsing blue), then summaries land (Semantic chip orange). Oracle finishes the synthesis (green check).
+5. Hold for ~1.5s on the completed graph before cutting away.
 
-### SR-2 · select-and-run-agent (~12s)
+### SR-2 · select-and-ask (~12s)
 
 1. On `/app/preview/causalist`, click 3 magenta hot nodes (multi-select).
 2. ⌘L to open the Agents tab.
-3. Click the suggestion chip "Audit for bugs and propose fixes" — it pre-fills the composer.
-4. Hit ⌘+↵.
-5. Status cards stream in: "Read 3 files", "Reviewed `X`", "Patched `Y`".
-6. Summary bubble appears.
-7. "Open PR" button appears at the bottom — **don't click yet**, hold the frame for 1s.
+3. Click suggestion chip "Trace the blast radius of these nodes" — pre-fills composer.
+4. Raise the swarm picker to ×3 (three causal-lens avatars light up).
+5. Hit ⌘+↵.
+6. Per-agent chips appear and pulse. Findings stream back, attributed by agent color.
+7. Hold for 1.5s on the run summary.
 
-### SR-3 · real-PR-on-github (~5s)
-
-1. Cut to a real GitHub PR page on a repo you own.
-2. Pan slowly down the file changes.
-3. Show the PR description ending with "_Built with Claude Opus 4.7 · Causalist_".
-
-### SR-4 · claude-code-uses-mcp (~10s)
+### SR-3 · claude-code-uses-mcp (~9s)
 
 1. Terminal. Show the prompt: `claude`.
-2. Inside Claude Code, type: `what tests cover src/auth/login.ts in this repo?`
-3. Tool calls fly by: `causalist tests` → JSON in / JSON out
-4. Claude's answer arrives: "**3 tests** are affected: `auth.test.ts`, `session.test.ts`, `middleware.test.ts`."
+2. Inside Claude Code, type: `what's the blast radius of src/lib/auth.ts in this repo?`
+3. Tool calls fly by: `causalist blast_radius` → JSON in / JSON out.
+4. Claude's answer arrives: a paragraph naming the affected files.
 5. Hold for 1s on the answer.
 
 ---
@@ -70,31 +66,29 @@ Record each of these as a separate clip, full 1920×1080. Mouse cursor visible. 
 
 ```bash
 cd video
-npm install                       # ~30 sec, one time
+npm install            # one-time, ~30s
 
-# render all 10 compositions to out/*.mp4
-npm run render:all
+# Render the production cuts in story order to out/final/*.mp4
+npm run render:final
 
-# or one at a time, e.g.:
-npx remotion render src/index.ts cold-open out/01-cold-open.mp4
-npx remotion render src/index.ts the-problem out/02-the-problem.mp4
-# ... etc.
+# Render just the alternate opener if you want to A/B it:
+npm run render:alt-opener
 
-# preview interactively in the browser:
+# Open the preview studio:
 npm run studio
 ```
 
-The renders land in `video/out/`. Stitch them with the screen recordings in any editor (Final Cut, DaVinci Resolve, Premiere, even iMovie). Order them per the table above.
+The production renders land in `video/out/final/`. Stitch them with the screen recordings in any editor (Final Cut, DaVinci Resolve, Premiere, iMovie).
 
 ## Audio
 
-- **Bed:** no music. Optional very-low ambient pad (e.g., `https://pixabay.com/music/ambient-soft-warm-pad`) at -38 dB.
-- **Cut transitions:** a single soft bell hit (e.g., a 220 Hz triangle ping, 150 ms decay) at frame 0 of each Remotion cut. Skip on the screen-recording cuts.
-- **Voiceover:** record dry, no reverb. Drop into the gaps in the table above. If you skip VO entirely, the text in the cuts carries the narrative.
+- **Bed:** no music. Optional very-low ambient pad at -38 dB.
+- **Cut transitions:** a single soft bell hit (220 Hz triangle ping, 150 ms decay) at frame 0 of each Remotion cut. Skip on the screen-recording cuts.
+- **Voiceover:** record dry, no reverb. Drop into the gaps. If you skip VO entirely, the text in the cuts carries the narrative.
 
 ## Brand notes
 
-- **Singleton accent rule:** in any one frame, only one element is magenta. Never two.
-- **No gradients, no glow** (except the very soft halo on the magenta dot in `cold-open` and `closing`).
-- **Hard cuts between cream scenes.** No dissolves or wipes between Remotion compositions. The bell hit + the locked-frame settle handles the rhythm.
+- **Singleton accent rule:** in any one frame, only one element is magenta. Never two — except in `agents-on-graph` and the LiveBuildView SR, where the four builder colors (magenta / blue / orange / green) are the whole point.
+- **No gradients, no glow** (except the very soft halo on the magenta dot in `cold-open` and `closing`, and the brief pulse rings in `agents-on-graph`).
+- **Hard cuts between cream scenes.** No dissolves or wipes between Remotion compositions. The bell hit handles the rhythm.
 - **Don't speed up audio** to fit. Cut a beat from a screen recording instead.

@@ -1,11 +1,12 @@
 {
   "name": "causalist-video",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Demo video cutting scenes for Causalist (Built-with-Opus 4.7 hackathon).",
   "scripts": {
     "studio": "remotion studio",
-    "render:all": "for c in cold-open the-problem the-pivot section-map four-agents ast-verified section-point pr-opened section-connect closing; do remotion render src/index.ts $c out/$c.mp4; done",
+    "render:final": "mkdir -p out/final && for c in cold-open logo-draws-as-graph the-problem the-pivot bringing-causality-to-agents agents-on-graph claude-code-builds-for-you closing; do remotion render src/index.ts $c out/final/$c.mp4; done",
+    "render:alt-opener": "mkdir -p out/final && remotion render src/index.ts logo-draws-as-graph-alt out/final/logo-draws-as-graph-alt.mp4",
     "render": "remotion render src/index.ts",
     "still": "remotion still src/index.ts"
   },
