@@ -1,4 +1,5 @@
 packages/
+video/
 PLAN.md
 DEPLOY.md
 .env.local
