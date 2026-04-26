@@ -59,9 +59,26 @@ When the user wants Causalist to map a new repo:
 causalist project create <github-url-or-owner/repo>
 ```
 
-Returns a viewer URL the user opens in a browser signed in with the
-same GitHub identity. The build runs there. The project is private to
-their account.
+This **registers** the project on the user's account and returns a
+`viewerUrl`. The actual 4-agent build runs **in the user's browser**
+when they open that URL — that's where their Anthropic key and GitHub
+OAuth token live. The agent should:
+
+1. Call `causalist project create` — quick, returns immediately.
+2. Tell the user: *"I created project X. Open `<viewerUrl>` in a
+   browser signed in with the same GitHub account — the build will
+   run there in 20–60 seconds, then you can ask me questions about
+   the graph."*
+3. **Don't claim "I'm building it now."** Nothing is building yet.
+   The build starts when the user opens the URL.
+
+Private repos work fine — the user's GitHub OAuth has `repo` scope,
+so when their browser fetches the tree + files it sees private repos
+the same way they do.
+
+Once the build completes, the project is private to the user's
+account. Sharing happens only through the explicit `/s/[id]`
+share-link feature (opt-in).
 
 ## Decision tree (which graph-query command for which question)
 

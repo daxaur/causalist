@@ -11,25 +11,33 @@
 | # | t | Source | Composition / SR | Length | Voiceover (optional) |
 |---|---|---|---|---|---|
 | 1 | 0.0 | Remotion | `cold-open` | 3.5s | *silent — let the logo draw itself in* |
-| 2 | 3.5 | Remotion | `code-is-causal` | 3.0s | "Every codebase is a graph. Files depend on files. Changes ripple." |
-| 3 | 6.5 | Remotion | `agents-need-graphs` | 3.0s | "Agents work better with the graph." |
-| 4 | 9.5 | Remotion | `bringing-causality-to-agents` | 3.0s | "Bringing causality closer to agents." |
-| 5 | 12.5 | **Screen rec** | **SR-1: paste-url-and-build** | ~14s | *the live build view: nodes pop in, edges trace, agent chips pulse — pay off the thesis with the live demo* |
-| 6 | 26.5 | Remotion | `agents-on-graph` | 4.0s | "Four agents — Structure, Dependency, Semantic, Oracle — one graph." |
-| 7 | 30.5 | **Screen rec** | **SR-2: select-and-ask** | ~12s | *select a few nodes, ask "trace the blast radius" — the swarm answers in graph terms* |
-| 8 | 42.5 | Remotion | `claude-code-builds-for-you` | 3.5s | "Pair it with Claude Code. MCP server, CLI, eleven graph-aware tools." |
-| 9 | 46.0 | **Screen rec** | **SR-3: claude-code-uses-mcp** | ~9s | *terminal: Claude Code calls a Causalist tool, returns a structured answer* |
-|10 | 55.0 | Remotion | `closing` | 3.5s | "Causalist. Built with Claude Opus 4.7." |
+| 2 | 3.5 | Remotion | `see-the-shape` | 3.5s | "See what your code actually does. Not what it looks like in a file tree — the actual graph behind it." |
+| 3 | 7.0 | Remotion | `code-is-causal` | 3.0s | "Every codebase is a graph. Files depend on files. Changes ripple." |
+| 4 | 10.0 | Remotion | `agents-need-graphs` | 3.0s | "Agents work better with the graph." |
+| 5 | 13.0 | Remotion | `bringing-causality-to-agents` | 3.0s | "Bringing causality closer to agents." |
+| 6 | 16.0 | **Screen rec** | **SR-1: paste-url-and-build** | ~14s | *the live build view: nodes pop in, edges trace, agent chips pulse — pay off the thesis with the live demo* |
+| 7 | 30.0 | Remotion | `agents-on-graph` | 4.0s | "Four agents — Structure, Dependency, Semantic, Oracle — one graph." |
+| 8 | 34.0 | **Screen rec** | **SR-2: select-and-ask** | ~12s | *select a few nodes, ask "trace the blast radius" — the swarm answers in graph terms* |
+| 9 | 46.0 | Remotion | `claude-code-builds-for-you` | 3.5s | "Pair it with Claude Code. MCP server, CLI, eleven graph-aware tools." |
+|10 | 49.5 | **Screen rec** | **SR-3: claude-code-uses-mcp** | ~9s | *terminal: Claude Code calls a Causalist tool, returns a structured answer* |
+|11 | 58.5 | Remotion | `closing` | 3.5s | "Causalist. Built with Claude Opus 4.7." |
 
-**Total:** ~58s. Tight, focused, every Remotion cut centered on the absolute middle of the frame.
+**Total:** ~62s. Tight, focused, every Remotion cut centered on the absolute middle of the frame. The new `see-the-shape` cut sits right after the brand opener so the thesis lands before any setup beats.
 
 ### Screen-recording cut points — quick reference
 
 | After cut | Insert | What it pays off |
 |---|---|---|
-| Cut 4 (`bringing-causality-to-agents`) | **SR-1: paste-url-and-build** | The thesis lands with the live build view drawing itself. |
-| Cut 6 (`agents-on-graph`) | **SR-2: select-and-ask** | The "four agents, one graph" headline lands with the live agent swarm answering in graph terms. |
-| Cut 8 (`claude-code-builds-for-you`) | **SR-3: claude-code-uses-mcp** | The "pair it with Claude Code" line lands with the actual terminal demo. |
+| Cut 5 (`bringing-causality-to-agents`) | **SR-1: paste-url-and-build** | The thesis lands with the live build view drawing itself. |
+| Cut 7 (`agents-on-graph`) | **SR-2: select-and-ask** | The "four agents, one graph" headline lands with the live agent swarm answering in graph terms. |
+| Cut 9 (`claude-code-builds-for-you`) | **SR-3: claude-code-uses-mcp** | The "pair it with Claude Code" line lands with the actual terminal demo. |
+
+### Render the v2 cut
+
+```bash
+cd video
+npm run render:v2     # → out/v2/*.mp4 at h264 crf 14
+```
 
 ---
 

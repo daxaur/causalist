@@ -12,6 +12,7 @@ import { Closing } from "./scenes/10-closing";
 import { AgentsOnGraph } from "./scenes/13-agents-on-graph";
 import { BringingCausalityToAgents } from "./scenes/14-bringing-causality-to-agents";
 import { ClaudeCodeBuildsForYou } from "./scenes/15-claude-code-builds-for-you";
+import { SeeTheShape } from "./scenes/16-see-the-shape";
 
 const FPS = 30;
 const W = 1920;
@@ -22,6 +23,14 @@ export const RemotionRoot = () => (
     <Composition
       id="cold-open"
       component={ColdOpen}
+      durationInFrames={105}
+      fps={FPS}
+      width={W}
+      height={H}
+    />
+    <Composition
+      id="see-the-shape"
+      component={SeeTheShape}
       durationInFrames={105}
       fps={FPS}
       width={W}

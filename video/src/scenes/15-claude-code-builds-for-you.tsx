@@ -1,4 +1,4 @@
-import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
+import { AbsoluteFill, interpolate, staticFile, useCurrentFrame } from "remotion";
 import { COLORS, TYPE } from "../lib/tokens";
 import { CausalistLogo, easeOutCubic, FadeUp, MaskUpText } from "../lib/anim";
 import { WithFonts } from "../lib/fonts";
@@ -45,7 +45,9 @@ export function ClaudeCodeBuildsForYou() {
             opacity={0.65}
           />
 
-          {/* Claude mark on the left */}
+          {/* Claude Code mascot on the left — the actual logo, not the
+              Claude mark. Sourced from the user's downloads as
+              public/claude-code-logo.png. */}
           <g
             transform={`translate(-260 -80) scale(${claudeIn})`}
             opacity={claudeIn}
@@ -63,13 +65,12 @@ export function ClaudeCodeBuildsForYou() {
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="/claude-mark.svg"
-                  alt="Claude"
+                  src={staticFile("claude-code-logo.png")}
+                  alt="Claude Code"
                   style={{
-                    width: 110,
-                    height: 110,
-                    filter:
-                      "invert(34%) sepia(93%) saturate(2200%) hue-rotate(298deg) brightness(96%) contrast(94%)",
+                    width: 140,
+                    height: 140,
+                    objectFit: "contain",
                   }}
                 />
               </div>
