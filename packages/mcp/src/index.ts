@@ -231,10 +231,20 @@ async function requireGraph(): Promise<CausalGraph> {
   return CACHED_GRAPH;
 }
 
+// Tools that operate on the user's account, not on a loaded graph.
+// Skip requireGraph() for these — otherwise an agent that just wants
+// to create a new project hits a "no graph loaded" error.
+const ACCOUNT_TOOLS = new Set(["create_project"]);
+
 async function exec(
   name: string,
   args: Record<string, unknown>,
 ): Promise<unknown> {
+  // For non-graph tools, hand off to the create_project branch below
+  // without loading a graph first.
+  if (ACCOUNT_TOOLS.has(name)) {
+    return execAccountTool(name, args);
+  }
   const g = await requireGraph();
   switch (name) {
     case "query_node": {
@@ -443,91 +453,101 @@ async function exec(
         data: matches,
       };
     }
-    case "create_project": {
-      const owner = String(args.owner ?? "").trim();
-      const repo = String(args.repo ?? "").trim();
-      if (!owner || !repo) {
-        return { ok: false, summary: "Both owner and repo are required" };
-      }
-      const webBase = (SESSION_SRC?.web ?? API_WEB).replace(/\/$/, "");
-
-      // Preferred path: Bearer-authed API key (no pair needed). Set
-      // CAUSALIST_API_KEY in the env or pass --api-key on launch.
-      if (API_KEY) {
-        try {
-          const res = await fetch(`${webBase}/api/projects`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${API_KEY}`,
-            },
-            body: JSON.stringify({ owner, repo, nickname: args.nickname }),
-          });
-          const body = (await res.json().catch(() => ({}))) as {
-            error?: string;
-            viewerUrl?: string;
-          };
-          if (!res.ok) {
-            return {
-              ok: false,
-              summary: `Create failed: ${res.status} ${body.error ?? res.statusText}`,
-            };
-          }
-          return {
-            ok: true,
-            summary: `Project "${owner}/${repo}" created. ${body.viewerUrl ?? ""}`.trim(),
-            data: { owner, repo, viewerUrl: body.viewerUrl },
-          };
-        } catch (e) {
-          return {
-            ok: false,
-            summary: `Create error: ${e instanceof Error ? e.message : String(e)}`,
-          };
-        }
-      }
-
-      // Legacy fallback: pair-session push to the live browser tab.
-      if (!SESSION_SRC) {
-        return {
-          ok: false,
-          summary:
-            "No CAUSALIST_API_KEY set and no paired session. Mint a key in causalist.xyz/app/settings (recommended) or run `causalist init`.",
-        };
-      }
-      try {
-        const res = await fetch(`${webBase}/api/projects/push`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            session: SESSION_SRC.session,
-            project: {
-              owner,
-              repo,
-              nickname: args.nickname,
-              addedAt: Date.now(),
-            },
-          }),
-        });
-        if (!res.ok) {
-          return {
-            ok: false,
-            summary: `Push failed: ${res.status} ${res.statusText}`,
-          };
-        }
-        return {
-          ok: true,
-          summary: `Project "${owner}/${repo}" pushed to the paired browser.`,
-          data: { owner, repo },
-        };
-      } catch (e) {
-        return {
-          ok: false,
-          summary: `Push error: ${e instanceof Error ? e.message : String(e)}`,
-        };
-      }
-    }
     default:
       throw new Error(`Unknown tool: ${name}`);
+  }
+}
+
+/** Account-scoped tools — operate on the user's projects, not the
+ *  loaded graph. Skips requireGraph() so unauth'd "no graph loaded"
+ *  errors don't shadow real auth/network failures. */
+async function execAccountTool(
+  name: string,
+  args: Record<string, unknown>,
+): Promise<unknown> {
+  if (name !== "create_project") {
+    throw new Error(`Unknown account tool: ${name}`);
+  }
+  const owner = String(args.owner ?? "").trim();
+  const repo = String(args.repo ?? "").trim();
+  if (!owner || !repo) {
+    return { ok: false, summary: "Both owner and repo are required" };
+  }
+  const webBase = (SESSION_SRC?.web ?? API_WEB).replace(/\/$/, "");
+
+  // Preferred path: Bearer-authed API key (no pair needed). Set
+  // CAUSALIST_API_KEY in the env or pass --api-key on launch.
+  if (API_KEY) {
+    try {
+      const res = await fetch(`${webBase}/api/projects`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${API_KEY}`,
+        },
+        body: JSON.stringify({ owner, repo, nickname: args.nickname }),
+      });
+      const body = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        viewerUrl?: string;
+      };
+      if (!res.ok) {
+        return {
+          ok: false,
+          summary: `Create failed: ${res.status} ${body.error ?? res.statusText}`,
+        };
+      }
+      return {
+        ok: true,
+        summary: `Project "${owner}/${repo}" created. ${body.viewerUrl ?? ""}`.trim(),
+        data: { owner, repo, viewerUrl: body.viewerUrl },
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        summary: `Create error: ${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
+  }
+
+  // Legacy fallback: pair-session push to the live browser tab.
+  if (!SESSION_SRC) {
+    return {
+      ok: false,
+      summary:
+        "No CAUSALIST_API_KEY set and no paired session. Mint a key in causalist.xyz/app/settings (recommended) or run `causalist login --api-key <KEY>`.",
+    };
+  }
+  try {
+    const res = await fetch(`${webBase}/api/projects/push`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session: SESSION_SRC.session,
+        project: {
+          owner,
+          repo,
+          nickname: args.nickname,
+          addedAt: Date.now(),
+        },
+      }),
+    });
+    if (!res.ok) {
+      return {
+        ok: false,
+        summary: `Push failed: ${res.status} ${res.statusText}`,
+      };
+    }
+    return {
+      ok: true,
+      summary: `Project "${owner}/${repo}" pushed to the paired browser.`,
+      data: { owner, repo },
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      summary: `Push error: ${e instanceof Error ? e.message : String(e)}`,
+    };
   }
 }
 
