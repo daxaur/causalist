@@ -381,12 +381,15 @@ function Composer({
 }) {
   const canSend = plan.trim().length > 0 && selectedCount > 0 && isRealRepo;
   return (
-    <div className="shrink-0 border-t border-neutral-200 bg-white p-3">
+    <div className="relative shrink-0 border-t border-neutral-200 bg-white p-3">
+      {/* Magenta accent strip on top — quiet brand presence */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent-magenta/40 to-transparent" />
+
       {/* Context chip — what's attached */}
       <div className="mb-2 flex items-center justify-between text-[10.5px]">
         {selectedCount > 0 ? (
-          <span className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 font-mono text-neutral-600">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent-magenta" />
+          <span className="inline-flex items-center gap-1 rounded-full border border-accent-magenta/30 bg-accent-magenta/[0.06] px-2 py-0.5 font-mono text-accent-magenta">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent-magenta shadow-[0_0_4px_rgba(232,56,164,0.6)]" />
             {selectedCount} node{selectedCount === 1 ? "" : "s"} attached
           </span>
         ) : (
@@ -467,25 +470,30 @@ function Composer({
 /** Replaces the composer entirely when no Anthropic key is set. */
 function KeyGate() {
   return (
-    <div className="shrink-0 border-t border-neutral-200 bg-[#FAFAF8] p-4">
-      <div className="text-[12.5px] font-medium text-neutral-900">
-        Add your Anthropic key
+    <div className="relative shrink-0 overflow-hidden border-t border-accent-magenta/30 bg-gradient-to-br from-accent-magenta/[0.04] via-white to-white p-4">
+      {/* Subtle magenta accent strip on top — signature touch */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent-magenta to-transparent" />
+      <div className="flex items-center gap-2 text-[12.5px] font-medium text-neutral-900">
+        <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-accent-magenta shadow-[0_0_8px_rgba(232,56,164,0.6)]" />
+        Anthropic key required
       </div>
-      <p className="mt-0.5 text-[11.5px] leading-snug text-neutral-500">
-        Agents call Claude Opus 4.7 from your browser. The key stays local.
+      <p className="mt-1 text-[11.5px] leading-snug text-neutral-500">
+        Agents call Claude Opus 4.7 from your browser. Key stays local — never
+        touches our servers.
       </p>
       <a
         href="/app/settings"
-        className="mt-2.5 inline-flex h-8 items-center gap-1.5 rounded-md bg-neutral-900 px-3 text-[12px] font-medium text-white transition-colors hover:bg-neutral-800"
+        className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-md bg-accent-magenta px-3 text-[12px] font-medium text-white transition-all hover:bg-accent-magenta/90 hover:shadow-[0_0_0_3px_rgba(232,56,164,0.15)]"
       >
-        Add key in settings
+        Add your key
         <span aria-hidden>→</span>
       </a>
     </div>
   );
 }
 
-/** Empty-state hero when no runs yet. Suggestion chips pre-fill composer. */
+/** Empty-state hero — concentric magenta rings, Causalist aesthetic.
+ *  No icon clutter; the rings carry the brand. */
 function EmptyChat({
   onPick,
   hasSelection,
@@ -495,21 +503,30 @@ function EmptyChat({
 }) {
   return (
     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-      <div className="font-display text-[15px] font-medium text-neutral-900">
-        Ask the agent.
+      {/* Concentric rings — the Causalist mark in atmosphere form */}
+      <div className="relative mb-6 h-20 w-20">
+        <span className="absolute inset-0 animate-ping rounded-full border border-accent-magenta/30" style={{ animationDuration: "3.5s" }} />
+        <span className="absolute inset-2 rounded-full border border-accent-magenta/40" />
+        <span className="absolute inset-4 rounded-full border border-accent-magenta/60" />
+        <span className="absolute inset-[34px] rounded-full bg-accent-magenta shadow-[0_0_12px_rgba(232,56,164,0.5)]" />
       </div>
-      <p className="mt-1 max-w-[280px] text-[12px] leading-snug text-neutral-500">
+
+      <div className="font-display text-[18px] font-medium tracking-tight text-neutral-900">
+        Point an agent at it.
+      </div>
+      <p className="mt-1.5 max-w-[280px] text-[12.5px] leading-relaxed text-neutral-500">
         {hasSelection
-          ? "Describe a fix or audit. The agent reads the selected files and proposes a real PR."
-          : "Pick nodes in the graph, then describe what to do — audit, fix, refactor, explain."}
+          ? "Describe a fix or audit — Auditor, Security, Performance, Refactor — and Claude reads the selected files, proposes a real PR."
+          : "Multi-select nodes in the graph, then tell the agents what to do. Audit, patch, refactor, explain."}
       </p>
-      <div className="mt-4 flex flex-wrap justify-center gap-1.5">
+
+      <div className="mt-5 flex flex-wrap justify-center gap-1.5">
         {SUGGESTIONS.map((s) => (
           <button
             key={s}
             type="button"
             onClick={() => onPick(s)}
-            className="rounded-full border border-neutral-200 bg-white px-2.5 py-1 text-[11px] text-neutral-600 transition-all hover:border-accent-magenta/50 hover:text-neutral-900"
+            className="rounded-full border border-neutral-200 bg-white px-3 py-1 text-[11px] text-neutral-600 shadow-sm transition-all hover:border-accent-magenta hover:text-accent-magenta hover:shadow-[0_0_0_3px_rgba(232,56,164,0.08)]"
           >
             {s}
           </button>

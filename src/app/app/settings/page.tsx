@@ -56,6 +56,12 @@ export default function SettingsPage() {
 
   return (
     <PageShell width="form">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (hasChanges) onSave();
+        }}
+      >
       <PageHeader
         eyebrow="Settings"
         title="Keys"
@@ -251,6 +257,7 @@ export default function SettingsPage() {
           </p>
         </div>
       </div>
+      </form>
     </PageShell>
   );
 }

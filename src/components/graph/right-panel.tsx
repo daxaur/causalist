@@ -99,7 +99,7 @@ export function RightPanel({
           <TabButton
             active={tab === "agent"}
             onClick={() => setTab("agent")}
-            label="Agent"
+            label="Agents"
             shortcut="⌘L"
             badge={selectedIds.size > 0 ? String(selectedIds.size) : undefined}
           />
