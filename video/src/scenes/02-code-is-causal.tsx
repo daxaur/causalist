@@ -3,10 +3,11 @@ import { FadeUp, MaskUpText } from "../lib/anim";
 import { COLORS, TYPE } from "../lib/tokens";
 import { WithFonts } from "../lib/fonts";
 
-/** THE PROBLEM. 2.5s @ 30fps = 75 frames.
- *  Single centered headline + Satoshi caption. Captions are now in
- *  Satoshi (matches the app), darker, larger — readable at a glance. */
-export function TheProblem() {
+/** Scene — CODE IS CAUSAL. 3s @ 30fps = 90 frames.
+ *  Positive opening thesis. Sets up causality as the natural shape of
+ *  software, no contrast with any specific tool — the next scene turns
+ *  this observation into the value prop for agents. */
+export function CodeIsCausal() {
   return (
     <WithFonts>
       <AbsoluteFill style={{ backgroundColor: COLORS.cream }}>
@@ -16,34 +17,34 @@ export function TheProblem() {
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            gap: 32,
+            gap: 36,
             padding: 80,
           }}
         >
-          <MaskUpText startFrame={4} durationFrames={20}>
+          <MaskUpText startFrame={4} durationFrames={22}>
             <h1
               style={{
                 fontFamily: TYPE.display,
-                fontSize: 108,
+                fontSize: 120,
                 fontWeight: 500,
-                letterSpacing: "-0.035em",
+                letterSpacing: "-0.045em",
                 color: COLORS.ink,
                 margin: 0,
                 lineHeight: 1.05,
                 textAlign: "center",
-                maxWidth: 1300,
+                maxWidth: 1500,
               }}
             >
-              Claude Code grepped{" "}
-              <span style={{ color: COLORS.magenta }}>487 files</span>
+              Every codebase is a{" "}
+              <span style={{ color: COLORS.magenta }}>graph.</span>
             </h1>
           </MaskUpText>
 
-          <FadeUp startFrame={28} durationFrames={20}>
+          <FadeUp startFrame={36} durationFrames={20}>
             <p
               style={{
                 fontFamily: TYPE.body,
-                fontSize: 34,
+                fontSize: 32,
                 fontWeight: 400,
                 color: COLORS.midGray,
                 margin: 0,
@@ -51,11 +52,7 @@ export function TheProblem() {
                 textAlign: "center",
               }}
             >
-              to find{" "}
-              <span style={{ color: COLORS.ink, fontWeight: 500 }}>
-                3 affected tests
-              </span>
-              .
+              Files depend on files. Changes ripple.
             </p>
           </FadeUp>
         </AbsoluteFill>

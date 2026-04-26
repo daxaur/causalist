@@ -1,16 +1,13 @@
 import { Composition } from "remotion";
 
-// 7 production cuts. All centered, all using the actual Causalist
-// brand mark (the C-with-two-dots from public/icon.svg, redrawn in
-// Remotion via the CausalistLogo component in lib/anim.tsx).
-//
-// Order: cold-open · the-problem · the-pivot ·
-//        bringing-causality-to-agents · agents-on-graph ·
-//        claude-code-builds-for-you · closing.
+// 7 production cuts. Positive opening — never names a competing tool;
+// the story is "code is causal → agents work better with the graph →
+// here's our graph → pair it with Claude Code." All cuts centered,
+// brand fonts loaded, the actual Causalist mark used everywhere.
 
 import { ColdOpen } from "./scenes/01-cold-open";
-import { TheProblem } from "./scenes/02-the-problem";
-import { ThePivot } from "./scenes/03-the-pivot";
+import { CodeIsCausal } from "./scenes/02-code-is-causal";
+import { AgentsNeedGraphs } from "./scenes/03-agents-need-graphs";
 import { Closing } from "./scenes/10-closing";
 import { AgentsOnGraph } from "./scenes/13-agents-on-graph";
 import { BringingCausalityToAgents } from "./scenes/14-bringing-causality-to-agents";
@@ -31,17 +28,17 @@ export const RemotionRoot = () => (
       height={H}
     />
     <Composition
-      id="the-problem"
-      component={TheProblem}
-      durationInFrames={75}
+      id="code-is-causal"
+      component={CodeIsCausal}
+      durationInFrames={90}
       fps={FPS}
       width={W}
       height={H}
     />
     <Composition
-      id="the-pivot"
-      component={ThePivot}
-      durationInFrames={75}
+      id="agents-need-graphs"
+      component={AgentsNeedGraphs}
+      durationInFrames={90}
       fps={FPS}
       width={W}
       height={H}

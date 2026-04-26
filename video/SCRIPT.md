@@ -1,10 +1,8 @@
 # Causalist demo video — script + edit list
 
-**Total target:** ~70 seconds. **Aspect:** 1920×1080 @ 30fps. **Style:** Anthropic-clean (cream `#faf9f5` ground, ink `#141413` text, magenta `#D24798` as the only accent). **Render quality:** h264 / crf 14 (visually lossless). **Sound:** ambient pad (very low) + a single soft bell hit on each hard cut. No music bed.
+**Total target:** ~58 seconds. **Aspect:** 1920×1080 @ 30fps. **Style:** Anthropic-clean (cream `#faf9f5` ground, ink `#141413` text, magenta `#D24798` as the only accent). **Render quality:** h264 / crf 14. **Sound:** ambient pad (very low) + a single soft bell hit on each hard cut. No music bed.
 
-The Remotion compositions below are the **cuts**. Between them you slot **screen recordings** of the live product. The headline beat is **the live build view** — judges should see Causalist drawing the graph in real time within the first 15 seconds.
-
-The PR/GitHub cuts from the previous edit are dropped. The story is "agents drawing the graph" + "Claude Code talking to the graph," not "agents opening pull requests."
+**Strategic note:** The video opens with a positive thesis — never frames any specific tool as the problem. The story arc: *code is causal → agents work better with the graph → here's our graph being built → pair it with Claude Code.* Claude Code shows up only in the partnership beat, and Causalist is positioned as "the graph that makes Claude Code more powerful," never the alternative to it.
 
 ---
 
@@ -13,17 +11,25 @@ The PR/GitHub cuts from the previous edit are dropped. The story is "agents draw
 | # | t | Source | Composition / SR | Length | Voiceover (optional) |
 |---|---|---|---|---|---|
 | 1 | 0.0 | Remotion | `cold-open` | 3.5s | *silent — let the logo draw itself in* |
-| 2 | 3.5 | Remotion | `the-problem` | 2.5s | "Claude Code grepped four hundred eighty-seven files to find three affected tests." |
-| 3 | 6.0 | Remotion | `the-pivot` | 2.5s | "There's a faster way." |
-| 4 | 8.5 | Remotion | `bringing-causality-to-agents` | 3.0s | "Bringing causality closer to agents." |
-| 5 | 11.5 | **Screen rec** | **SR-1: paste-url-and-build** | ~14s | *the live build view: nodes pop in, edges trace, agent chips pulse — this is the headline shot* |
-| 6 | 25.5 | Remotion | `agents-on-graph` | 4.0s | "Four agents — Structure, Dependency, Semantic, Oracle — one graph." |
-| 7 | 29.5 | **Screen rec** | **SR-2: select-and-ask** | ~12s | *select a few nodes, open the Agents tab, ask "trace the blast radius" — the swarm answers in graph terms* |
-| 8 | 41.5 | Remotion | `claude-code-builds-for-you` | 3.5s | "Connect Claude Code, let it build for you." |
-| 9 | 45.0 | **Screen rec** | **SR-3: claude-code-uses-mcp** | ~9s | *terminal: Claude Code calls a Causalist tool, returns a structured answer* |
-|10 | 54.0 | Remotion | `closing` | 3.5s | "Causalist. Built with Claude Opus 4.7." |
+| 2 | 3.5 | Remotion | `code-is-causal` | 3.0s | "Every codebase is a graph. Files depend on files. Changes ripple." |
+| 3 | 6.5 | Remotion | `agents-need-graphs` | 3.0s | "Agents work better with the graph." |
+| 4 | 9.5 | Remotion | `bringing-causality-to-agents` | 3.0s | "Bringing causality closer to agents." |
+| 5 | 12.5 | **Screen rec** | **SR-1: paste-url-and-build** | ~14s | *the live build view: nodes pop in, edges trace, agent chips pulse — pay off the thesis with the live demo* |
+| 6 | 26.5 | Remotion | `agents-on-graph` | 4.0s | "Four agents — Structure, Dependency, Semantic, Oracle — one graph." |
+| 7 | 30.5 | **Screen rec** | **SR-2: select-and-ask** | ~12s | *select a few nodes, ask "trace the blast radius" — the swarm answers in graph terms* |
+| 8 | 42.5 | Remotion | `claude-code-builds-for-you` | 3.5s | "Pair it with Claude Code. MCP server, CLI, eleven graph-aware tools." |
+| 9 | 46.0 | **Screen rec** | **SR-3: claude-code-uses-mcp** | ~9s | *terminal: Claude Code calls a Causalist tool, returns a structured answer* |
+|10 | 55.0 | Remotion | `closing` | 3.5s | "Causalist. Built with Claude Opus 4.7." |
 
-**Total:** ~57s with the SRs paced as above. Tight, focused, every Remotion cut centered on the absolute middle of the frame.
+**Total:** ~58s. Tight, focused, every Remotion cut centered on the absolute middle of the frame.
+
+### Screen-recording cut points — quick reference
+
+| After cut | Insert | What it pays off |
+|---|---|---|
+| Cut 4 (`bringing-causality-to-agents`) | **SR-1: paste-url-and-build** | The thesis lands with the live build view drawing itself. |
+| Cut 6 (`agents-on-graph`) | **SR-2: select-and-ask** | The "four agents, one graph" headline lands with the live agent swarm answering in graph terms. |
+| Cut 8 (`claude-code-builds-for-you`) | **SR-3: claude-code-uses-mcp** | The "pair it with Claude Code" line lands with the actual terminal demo. |
 
 ---
 
@@ -34,7 +40,7 @@ Three clips. Full 1920×1080. Cursor visible. Hide browser chrome (Cmd+Shift+F i
 ### SR-1 · paste-url-and-build (~14s) — the headline shot
 
 1. Empty browser on `causalist.xyz/app`. Click **New project**.
-2. Paste a small public repo URL (e.g. `vercel/swr` or any ~25–50 file repo). Don't expand Advanced — the default Opus 4.7 across all four agents reads fastest.
+2. Paste a small public repo URL (e.g. `vercel/swr` or any ~25–50 file repo).
 3. Click **Map it**. Land on the LiveBuildView.
 4. Watch nodes pop in (Structure chip pulsing magenta), then edges start tracing (Dependency chip pulsing blue), then summaries land (Semantic chip orange). Oracle finishes the synthesis (green check).
 5. Hold for ~1.5s on the completed graph before cutting away.
@@ -68,14 +74,11 @@ npm install            # one-time, ~30s
 # Render the production cuts in story order to out/final/*.mp4
 npm run render:final
 
-# Render just the alternate opener if you want to A/B it:
-npm run render:alt-opener
-
 # Open the preview studio:
 npm run studio
 ```
 
-The production renders land in `video/out/final/`. Stitch them with the screen recordings in any editor (Final Cut, DaVinci Resolve, Premiere, iMovie).
+The production renders land in `video/out/final/`. Stitch them with the screen recordings in any editor.
 
 ## Audio
 
@@ -86,6 +89,6 @@ The production renders land in `video/out/final/`. Stitch them with the screen r
 ## Brand notes
 
 - **Singleton accent rule:** in any one frame, only one element is magenta. Never two — except in `agents-on-graph` and the LiveBuildView SR, where the four builder colors (magenta / blue / orange / green) are the whole point.
-- **No gradients, no glow** (except the very soft halo on the magenta dot in `cold-open` and `closing`, and the brief pulse rings in `agents-on-graph`).
+- **No gradients, no glow** (except the very soft halo on the magenta dot in `cold-open` and `closing`).
 - **Hard cuts between cream scenes.** No dissolves or wipes between Remotion compositions. The bell hit handles the rhythm.
-- **Don't speed up audio** to fit. Cut a beat from a screen recording instead.
+- **Strategic positioning:** never name a competing tool. The story is what graphs unlock for agents — not what the absence of graphs costs them.

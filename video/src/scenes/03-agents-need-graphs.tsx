@@ -3,9 +3,12 @@ import { FadeUp, MaskUpText } from "../lib/anim";
 import { COLORS, TYPE } from "../lib/tokens";
 import { WithFonts } from "../lib/fonts";
 
-/** THE PIVOT. 2.5s @ 30fps = 75 frames.
- *  Centered headline + Satoshi tagline. */
-export function ThePivot() {
+/** Scene — AGENTS NEED GRAPHS. 3s @ 30fps = 90 frames.
+ *  Pivot from "code is causal" to the value prop: agents (and people)
+ *  navigate codebases far better when they can see the graph instead
+ *  of grepping a thousand files. Positive frame — never names any
+ *  specific tool. */
+export function AgentsNeedGraphs() {
   return (
     <WithFonts>
       <AbsoluteFill style={{ backgroundColor: COLORS.cream }}>
@@ -28,27 +31,29 @@ export function ThePivot() {
                 letterSpacing: "-0.045em",
                 color: COLORS.ink,
                 margin: 0,
-                lineHeight: 1,
+                lineHeight: 1.05,
                 textAlign: "center",
+                maxWidth: 1500,
               }}
             >
-              There&rsquo;s a{" "}
-              <span style={{ color: COLORS.magenta }}>faster way.</span>
+              Agents work better{" "}
+              <span style={{ color: COLORS.magenta }}>with the graph.</span>
             </h1>
           </MaskUpText>
 
-          <FadeUp startFrame={32} durationFrames={20}>
+          <FadeUp startFrame={36} durationFrames={20}>
             <p
               style={{
                 fontFamily: TYPE.body,
-                fontSize: 28,
-                fontWeight: 500,
+                fontSize: 32,
+                fontWeight: 400,
                 color: COLORS.midGray,
                 margin: 0,
                 letterSpacing: "-0.005em",
+                textAlign: "center",
               }}
             >
-              Give the agent a graph.
+              Less grep. More signal. Fewer files to read.
             </p>
           </FadeUp>
         </AbsoluteFill>

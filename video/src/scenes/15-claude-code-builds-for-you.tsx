@@ -99,18 +99,18 @@ export function ClaudeCodeBuildsForYou() {
           <h1
             style={{
               fontFamily: TYPE.display,
-              fontSize: 100,
+              fontSize: 104,
               fontWeight: 500,
               letterSpacing: "-0.045em",
               color: COLORS.ink,
               lineHeight: 1.05,
               textAlign: "center",
-              maxWidth: 1300,
+              maxWidth: 1400,
               margin: 0,
             }}
           >
-            Connect Claude Code,{" "}
-            <span style={{ color: COLORS.magenta }}>let it build.</span>
+            Pair it with{" "}
+            <span style={{ color: COLORS.magenta }}>Claude Code.</span>
           </h1>
         </MaskUpText>
 

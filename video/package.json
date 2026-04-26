@@ -5,7 +5,7 @@
   "description": "Demo video cutting scenes for Causalist (Built-with-Opus 4.7 hackathon).",
   "scripts": {
     "studio": "remotion studio",
-    "render:final": "mkdir -p out/final && for c in cold-open the-problem the-pivot bringing-causality-to-agents agents-on-graph claude-code-builds-for-you closing; do remotion render src/index.ts $c out/final/$c.mp4; done",
+    "render:final": "mkdir -p out/final && for c in cold-open code-is-causal agents-need-graphs bringing-causality-to-agents agents-on-graph claude-code-builds-for-you closing; do remotion render src/index.ts $c out/final/$c.mp4; done",
     "render": "remotion render src/index.ts",
     "still": "remotion still src/index.ts"
   },
