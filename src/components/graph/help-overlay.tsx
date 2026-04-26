@@ -88,14 +88,14 @@ export function HelpOverlay({
                     {section.items.map((item, i) => (
                       <li
                         key={i}
-                        className="flex items-start justify-between gap-3 text-[12px]"
+                        className="flex flex-col gap-1 text-[12px]"
                       >
                         <span className="text-neutral-600">{item.label}</span>
-                        <span className="flex shrink-0 items-center gap-1">
+                        <span className="flex flex-wrap items-center gap-1">
                           {item.keys.map((k, j) => (
                             <kbd
                               key={j}
-                              className="inline-flex min-w-[18px] items-center justify-center rounded-sm border border-neutral-200 bg-neutral-50 px-1 py-[1px] font-mono text-[10px] text-neutral-700"
+                              className="inline-flex min-w-[18px] items-center justify-center whitespace-nowrap rounded-sm border border-neutral-200 bg-neutral-50 px-1 py-[1px] font-mono text-[10px] text-neutral-700"
                             >
                               {k}
                             </kbd>

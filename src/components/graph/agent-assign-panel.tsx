@@ -311,33 +311,107 @@ export function AgentAssignPanel({
     <div className="flex h-full flex-col">
       {/* Demo banner — preview/reference graphs aren't real repos */}
       {!isRealRepo && (
-        <div className="border-b border-amber-200 bg-amber-50/60 px-4 py-2 text-[11px] text-amber-800">
+        <div className="shrink-0 border-b border-amber-200 bg-amber-50/60 px-4 py-2 text-[11px] text-amber-800">
           <span className="font-medium">Demo mode.</span> Sample graphs aren&rsquo;t
           tied to a real repo, so agents can&rsquo;t fetch files or open PRs.
-          Try this on your own analyzed project.
         </div>
       )}
 
-      {/* Plan composer */}
-      <div className="border-b border-neutral-100 p-4">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
-            <Sparkle size={10} weight="fill" className="text-accent-magenta" />
-            Run an agent
-          </div>
-          <div className="font-mono text-[10px] text-neutral-400">
-            {selectedIds.size > 0 ? (
-              <>
-                <span className="font-medium text-neutral-700">
-                  {selectedIds.size}
-                </span>{" "}
-                node{selectedIds.size === 1 ? "" : "s"} selected
-              </>
-            ) : (
-              <span className="text-amber-600">no selection</span>
-            )}
-          </div>
-        </div>
+      {/* Conversation thread — fills the panel; oldest at top, newest
+          at bottom; auto-scrolls to bottom as runs land. */}
+      <div className="flex-1 overflow-y-auto px-4 py-5">
+        {runs.length === 0 ? (
+          <EmptyChat onPick={(s) => setPlan(s)} hasSelection={selectedIds.size > 0} />
+        ) : (
+          <ul className="space-y-6">
+            <AnimatePresence initial={false}>
+              {runs
+                .slice()
+                .reverse()
+                .map((r) => (
+                  <motion.li
+                    key={r.id}
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                  >
+                    <RunThread
+                      run={r}
+                      nodesById={nodesById}
+                      canPush={auth.authenticated && isRealRepo}
+                      onCancel={() => cancel(r.id)}
+                      onOpenPr={() => openPr(r)}
+                    />
+                  </motion.li>
+                ))}
+            </AnimatePresence>
+          </ul>
+        )}
+      </div>
+
+      {/* Composer or key-gate — sticks to the bottom, single block. */}
+      {settings.anthropicKey ? (
+        <Composer
+          plan={plan}
+          setPlan={setPlan}
+          submit={submit}
+          selectedCount={selectedIds.size}
+          isRealRepo={isRealRepo}
+        />
+      ) : (
+        <KeyGate />
+      )}
+    </div>
+  );
+}
+
+/** Bottom-of-panel chat composer. Cursor / Claude-Desktop pattern. */
+function Composer({
+  plan,
+  setPlan,
+  submit,
+  selectedCount,
+  isRealRepo,
+}: {
+  plan: string;
+  setPlan: (v: string) => void;
+  submit: () => void;
+  selectedCount: number;
+  isRealRepo: boolean;
+}) {
+  const canSend = plan.trim().length > 0 && selectedCount > 0 && isRealRepo;
+  return (
+    <div className="shrink-0 border-t border-neutral-200 bg-white p-3">
+      {/* Context chip — what's attached */}
+      <div className="mb-2 flex items-center justify-between text-[10.5px]">
+        {selectedCount > 0 ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 font-mono text-neutral-600">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent-magenta" />
+            {selectedCount} node{selectedCount === 1 ? "" : "s"} attached
+          </span>
+        ) : (
+          <span className="font-mono text-neutral-400">
+            select nodes in the graph to attach context
+          </span>
+        )}
+        <span className="font-mono text-neutral-400">
+          <kbd className="rounded border border-neutral-200 bg-white px-1 py-px text-[9px]">
+            ⌘
+          </kbd>
+          <span className="mx-0.5">+</span>
+          <kbd className="rounded border border-neutral-200 bg-white px-1 py-px text-[9px]">
+            ↵
+          </kbd>{" "}
+          to send
+        </span>
+      </div>
+
+      <div
+        className={cn(
+          "rounded-xl border bg-white transition-colors focus-within:border-accent-magenta/60 focus-within:ring-2 focus-within:ring-accent-magenta/15",
+          plan.trim() ? "border-neutral-300" : "border-neutral-200",
+        )}
+      >
         <textarea
           value={plan}
           onChange={(e) => setPlan(e.target.value)}
@@ -347,85 +421,99 @@ export function AgentAssignPanel({
               submit();
             }
           }}
-          rows={3}
-          placeholder="What should the agent do? e.g., audit these files for bugs and propose fixes."
-          className="w-full resize-none rounded-md border border-neutral-200 bg-white px-3 py-2 text-[12.5px] leading-snug text-neutral-900 placeholder:text-neutral-400 focus:border-accent-magenta/60 focus:outline-none focus:ring-2 focus:ring-accent-magenta/15"
+          rows={2}
+          placeholder={
+            selectedCount > 0
+              ? "Ask anything about these files, or describe a fix to make…"
+              : "Select nodes in the graph first, then ask…"
+          }
+          className="w-full resize-none rounded-xl bg-transparent px-3 py-2.5 text-[13px] leading-snug text-neutral-900 placeholder:text-neutral-400 focus:outline-none"
         />
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {SUGGESTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setPlan(s)}
-              className="rounded-full border border-neutral-200 bg-white px-2.5 py-1 text-[10.5px] text-neutral-600 transition-all hover:border-accent-magenta/50 hover:text-neutral-900"
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <div className="font-mono text-[10px] text-neutral-400">
-            <kbd className="rounded border border-neutral-200 bg-white px-1 py-px">
-              ⌘
-            </kbd>
-            <span className="mx-0.5">+</span>
-            <kbd className="rounded border border-neutral-200 bg-white px-1 py-px">
-              ↵
-            </kbd>{" "}
-            to run
+
+        {/* Suggestion chips + send button row */}
+        <div className="flex items-end justify-between gap-2 border-t border-neutral-100 px-2 py-1.5">
+          <div className="flex flex-wrap gap-1">
+            {SUGGESTIONS.slice(0, 3).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setPlan(s)}
+                className="rounded-md px-1.5 py-0.5 text-[10.5px] text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+              >
+                {s.split(" ").slice(0, 3).join(" ")}…
+              </button>
+            ))}
           </div>
           <button
             type="button"
             onClick={submit}
-            disabled={!plan.trim() || selectedIds.size === 0 || !isRealRepo}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-neutral-900 px-3 text-[12px] font-medium text-white transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-30"
+            disabled={!canSend}
+            aria-label="Send"
+            className={cn(
+              "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-white transition-all",
+              canSend
+                ? "bg-accent-magenta hover:bg-accent-magenta/90"
+                : "bg-neutral-200 text-neutral-400",
+            )}
           >
-            <PaperPlaneRight size={11} weight="fill" />
-            Run agent
+            <PaperPlaneRight size={12} weight="fill" />
           </button>
         </div>
-        {!settings.anthropicKey && (
-          <div className="mt-3 rounded-md border border-neutral-200 bg-neutral-50 p-2.5 text-[11px] text-neutral-500">
-            Agents call Claude Opus 4.7.{" "}
-            <a
-              href="/app/settings"
-              className="font-medium text-accent-magenta hover:underline"
-            >
-              Add your key
-            </a>{" "}
-            to run them.
-          </div>
-        )}
       </div>
+    </div>
+  );
+}
 
-      {/* Run feed — chat-style thread per run */}
-      <div className="flex-1 overflow-y-auto p-4">
-        {runs.length === 0 ? (
-          <div className="rounded-md border border-dashed border-neutral-200 px-4 py-6 text-center text-[11px] text-neutral-400">
-            Runs will appear here as a thread.
-          </div>
-        ) : (
-          <ul className="space-y-6">
-            <AnimatePresence initial={false}>
-              {runs.map((r) => (
-                <motion.li
-                  key={r.id}
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                >
-                  <RunThread
-                    run={r}
-                    nodesById={nodesById}
-                    canPush={auth.authenticated && isRealRepo}
-                    onCancel={() => cancel(r.id)}
-                    onOpenPr={() => openPr(r)}
-                  />
-                </motion.li>
-              ))}
-            </AnimatePresence>
-          </ul>
-        )}
+/** Replaces the composer entirely when no Anthropic key is set. */
+function KeyGate() {
+  return (
+    <div className="shrink-0 border-t border-neutral-200 bg-[#FAFAF8] p-4">
+      <div className="text-[12.5px] font-medium text-neutral-900">
+        Add your Anthropic key
+      </div>
+      <p className="mt-0.5 text-[11.5px] leading-snug text-neutral-500">
+        Agents call Claude Opus 4.7 from your browser. The key stays local.
+      </p>
+      <a
+        href="/app/settings"
+        className="mt-2.5 inline-flex h-8 items-center gap-1.5 rounded-md bg-neutral-900 px-3 text-[12px] font-medium text-white transition-colors hover:bg-neutral-800"
+      >
+        Add key in settings
+        <span aria-hidden>→</span>
+      </a>
+    </div>
+  );
+}
+
+/** Empty-state hero when no runs yet. Suggestion chips pre-fill composer. */
+function EmptyChat({
+  onPick,
+  hasSelection,
+}: {
+  onPick: (s: string) => void;
+  hasSelection: boolean;
+}) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+      <div className="font-display text-[15px] font-medium text-neutral-900">
+        Ask the agent.
+      </div>
+      <p className="mt-1 max-w-[280px] text-[12px] leading-snug text-neutral-500">
+        {hasSelection
+          ? "Describe a fix or audit. The agent reads the selected files and proposes a real PR."
+          : "Pick nodes in the graph, then describe what to do — audit, fix, refactor, explain."}
+      </p>
+      <div className="mt-4 flex flex-wrap justify-center gap-1.5">
+        {SUGGESTIONS.map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => onPick(s)}
+            className="rounded-full border border-neutral-200 bg-white px-2.5 py-1 text-[11px] text-neutral-600 transition-all hover:border-accent-magenta/50 hover:text-neutral-900"
+          >
+            {s}
+          </button>
+        ))}
       </div>
     </div>
   );
