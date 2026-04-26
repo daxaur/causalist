@@ -516,21 +516,26 @@ function Composer({
       {/* Magenta accent strip on top — quiet brand presence */}
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent-magenta/40 to-transparent" />
 
-      {/* Scope chip + parallel-agent picker. Picker shows the causal
-          names so users see which lenses are about to fire. */}
-      <div className="mb-2 flex items-center justify-between gap-2 text-[12px]">
-        {selectedCount > 0 ? (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-magenta/30 bg-accent-magenta/[0.06] px-2.5 py-0.5 font-mono text-accent-magenta">
-            <CausalThinkingIcon size={11} />
-            {agentCount === 1
-              ? `${selectedCount} file${selectedCount === 1 ? "" : "s"} · 1 agent`
-              : `${selectedCount} file${selectedCount === 1 ? "" : "s"} · ${agentCount} agents`}
-          </span>
-        ) : (
-          <span className="font-mono text-neutral-400">
-            select files in the graph to scope the agent
-          </span>
-        )}
+      {/* Scope chip on its own row (left-aligned, never wraps), then
+          the parallel-agent picker on its own full-width row below.
+          Stacking is required because the right panel is narrow and
+          a single inline row forces the hint text to wrap one word
+          per line. */}
+      <div className="mb-2 space-y-2 text-[12px]">
+        <div className="flex min-h-[20px] items-center">
+          {selectedCount > 0 ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-accent-magenta/30 bg-accent-magenta/[0.06] px-2.5 py-0.5 font-mono text-accent-magenta">
+              <CausalThinkingIcon size={11} />
+              {agentCount === 1
+                ? `${selectedCount} file${selectedCount === 1 ? "" : "s"} · 1 agent`
+                : `${selectedCount} file${selectedCount === 1 ? "" : "s"} · ${agentCount} agents`}
+            </span>
+          ) : (
+            <span className="truncate font-mono text-[11px] text-neutral-400">
+              Select files to scope the agent
+            </span>
+          )}
+        </div>
         <AgentCountPicker value={agentCount} onChange={setAgentCount} />
       </div>
 
@@ -597,49 +602,49 @@ function AgentCountPicker({
 }) {
   return (
     <div
-      className="inline-flex items-end gap-0 rounded-md border border-neutral-200 bg-white px-1.5 py-1.5"
+      className="relative grid w-full grid-cols-5 items-end rounded-md border border-neutral-200 bg-white px-2 pb-1.5 pt-2"
       role="radiogroup"
       aria-label="Parallel agents"
     >
+      {/* Single connector line behind the avatars. Width derived from
+          how many agents are active — N active = line spans (N-1)/4
+          of the grid. One element, one transition, perfectly centered
+          across the dot row. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute left-[10%] right-[10%] top-[16px] h-px bg-neutral-200"
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute left-[10%] top-[16px] h-px bg-accent-magenta/60 transition-[width] duration-300 ease-out"
+        style={{
+          width: `calc((100% - 20%) * ${Math.max(0, value - 1) / 4})`,
+        }}
+      />
+
       {CAUSAL_AGENTS.map((agent, i) => {
         const n = i + 1;
         const active = n <= value;
-        const nextActive = n + 1 <= value;
         return (
-          <div key={agent.id} className="flex items-end">
-            <button
-              type="button"
-              role="radio"
-              aria-checked={value === n}
-              onClick={() => onChange(n)}
-              title={`Run ${n} agent${n === 1 ? "" : "s"} — ${agent.name}: ${agent.lens}`}
-              className="group relative flex flex-col items-center gap-0.5 px-1"
+          <button
+            key={agent.id}
+            type="button"
+            role="radio"
+            aria-checked={value === n}
+            onClick={() => onChange(n)}
+            title={`Run ${n} agent${n === 1 ? "" : "s"} — ${agent.name}: ${agent.lens}`}
+            className="group relative z-10 flex flex-col items-center gap-1 transition-transform"
+          >
+            <AgentNodeGlyph color={agent.color} active={active} />
+            <span
+              className={cn(
+                "font-mono text-[8.5px] uppercase tracking-wider transition-colors",
+                active ? "text-neutral-700" : "text-neutral-300",
+              )}
             >
-              <AgentNodeGlyph color={agent.color} active={active} />
-              <span
-                className={cn(
-                  "font-mono text-[8.5px] uppercase tracking-wider transition-colors",
-                  active ? "text-neutral-700" : "text-neutral-300",
-                )}
-              >
-                {agent.name}
-              </span>
-            </button>
-            {/* Connector edge to the next active avatar — drawn between
-                two avatar buttons so raising the dial visibly extends
-                the chain. */}
-            {i < CAUSAL_AGENTS.length - 1 && (
-              <span
-                aria-hidden
-                className="mb-[16px] h-px w-2 transition-colors"
-                style={{
-                  background: nextActive
-                    ? `linear-gradient(to right, ${agent.color}, ${CAUSAL_AGENTS[i + 1].color})`
-                    : "rgba(120,120,120,0.18)",
-                }}
-              />
-            )}
-          </div>
+              {agent.name}
+            </span>
+          </button>
         );
       })}
     </div>
@@ -656,39 +661,21 @@ function AgentNodeGlyph({
   color: string;
   active: boolean;
 }) {
-  const stroke = active ? color : "#cbd5e1";
-  const fill = active ? color : "transparent";
+  // A single disc, sized to align cleanly with the horizontal
+  // connector line behind the row. Inactive = empty ring; active =
+  // filled in the agent's color. No fan-out lines — they competed
+  // visually with the connector and made every dot look slightly
+  // different at the pixel level.
   return (
-    <svg width={22} height={22} viewBox="0 0 22 22" fill="none">
-      <line
-        x1={11}
-        y1={11}
-        x2={4}
-        y2={4}
-        stroke={stroke}
-        strokeWidth={1}
-        strokeLinecap="round"
-        opacity={active ? 0.7 : 0.4}
-      />
-      <line
-        x1={11}
-        y1={11}
-        x2={18}
-        y2={18}
-        stroke={stroke}
-        strokeWidth={1}
-        strokeLinecap="round"
-        opacity={active ? 0.7 : 0.4}
-      />
-      <circle cx={4} cy={4} r={1.6} fill={stroke} opacity={active ? 0.6 : 0.3} />
-      <circle cx={18} cy={18} r={1.6} fill={stroke} opacity={active ? 0.6 : 0.3} />
+    <svg width={14} height={14} viewBox="0 0 14 14" fill="none">
       <circle
-        cx={11}
-        cy={11}
-        r={4.5}
-        fill={fill}
+        cx={7}
+        cy={7}
+        r={5}
+        fill={active ? color : "#ffffff"}
         stroke={active ? color : "#cbd5e1"}
-        strokeWidth={1.5}
+        strokeWidth={1.4}
+        style={{ transition: "fill 0.18s, stroke 0.18s" }}
       />
     </svg>
   );
