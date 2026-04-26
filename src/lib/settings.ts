@@ -12,24 +12,45 @@ export interface Settings {
 
 const empty: Settings = { anthropicKey: "", githubToken: "" };
 
+// Cache the last result so useSyncExternalStore sees a stable reference
+// when the underlying JSON hasn't changed. Without this React hits #185
+// (Max update depth) because every read() would return a new object.
+let cachedRaw: string | null = null;
+let cachedValue: Settings = empty;
+
 function read(): Settings {
   if (typeof window === "undefined") return empty;
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return empty;
+    if (raw === cachedRaw) return cachedValue;
+    cachedRaw = raw;
+    if (!raw) {
+      cachedValue = empty;
+      return cachedValue;
+    }
     const parsed = JSON.parse(raw);
-    return {
-      anthropicKey: typeof parsed.anthropicKey === "string" ? parsed.anthropicKey : "",
-      githubToken: typeof parsed.githubToken === "string" ? parsed.githubToken : "",
+    cachedValue = {
+      anthropicKey:
+        typeof parsed.anthropicKey === "string" ? parsed.anthropicKey : "",
+      githubToken:
+        typeof parsed.githubToken === "string" ? parsed.githubToken : "",
     };
+    return cachedValue;
   } catch {
-    return empty;
+    cachedValue = empty;
+    cachedRaw = null;
+    return cachedValue;
   }
 }
 
 function write(next: Settings): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  const json = JSON.stringify(next);
+  window.localStorage.setItem(STORAGE_KEY, json);
+  // Invalidate the read cache so the next subscriber call returns the
+  // fresh object (and triggers React's re-render correctly).
+  cachedRaw = json;
+  cachedValue = { ...next };
   window.dispatchEvent(new Event(EVENT));
 }
 
