@@ -138,6 +138,33 @@ export function CausalGraphViewer({
     }
   }, [sidebarOpen, compact]);
   const [panelManuallyOpen, setPanelManuallyOpen] = useState(false);
+  const [panelInitialTab, setPanelInitialTab] = useState<"inspector" | "agent" | null>(null);
+
+  // Cursor-style global shortcuts: ⌘I → inspector, ⌘L → agent chat.
+  // ⌘L works even with the panel closed — opens the panel and switches
+  // to the agent tab. Shortcuts inside the panel are also wired.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const cmd = e.metaKey || e.ctrlKey;
+      if (!cmd) return;
+      const target = e.target as HTMLElement | null;
+      const inField =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target?.isContentEditable;
+      if (e.key === "l" || e.key === "L") {
+        e.preventDefault();
+        setPanelManuallyOpen(true);
+        setPanelInitialTab("agent");
+      } else if ((e.key === "i" || e.key === "I") && !inField) {
+        e.preventDefault();
+        setPanelManuallyOpen(true);
+        setPanelInitialTab("inspector");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   // Multi-select: Set of selected node ids.
   // The "focused" node (for the detail panel) is the most recently clicked.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -1090,19 +1117,21 @@ export function CausalGraphViewer({
           />
         </div>
 
-        {/* Side panel — IDE-style tabs: Inspector · Ask · Agents */}
+        {/* Side panel — Cursor-style two-tab IDE: Inspector + Agent */}
         {panelOpen && (
           <RightPanel
             graph={graph}
             focusedNode={focused}
             selectedIds={selectedIds}
             importance={importance}
+            initialTab={panelInitialTab}
             onSelect={(n) => handleNodeClick(n)}
             onClose={() => {
               setFocusedId(null);
               setSelectedIds(new Set());
               setAgentHighlight(new Set());
               setPanelManuallyOpen(false);
+              setPanelInitialTab(null);
             }}
             onHighlightNodes={(ids) => setAgentHighlight(new Set(ids))}
             onAssign={(ids, kind) => {

@@ -8,7 +8,6 @@ import {
   GithubLogo,
   Key,
   Lightning,
-  Plugs,
   SignOut,
   Warning,
 } from "@phosphor-icons/react";
@@ -94,8 +93,10 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* Status grid */}
-        <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {/* Status grid — three cards. Claude Code pair state lives in
+            the dedicated section below, not here. Keeping it in both
+            spots was redundant. */}
+        <section className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <StatCard
             label="GitHub"
             value={connected ? "Connected" : "Not signed in"}
@@ -119,22 +120,6 @@ export default function ProfilePage() {
               )
             }
             note={hasKey ? "stored locally" : "needed for agents"}
-          />
-          <StatCard
-            label="Claude Code"
-            value={pair.paired ? "Paired" : "Not paired"}
-            icon={
-              pair.paired ? (
-                <CheckCircle size={14} weight="fill" className="text-emerald-500" />
-              ) : (
-                <Plugs size={14} className="text-neutral-400" />
-              )
-            }
-            note={
-              pair.paired
-                ? `session ${pair.sessionId?.slice(0, 8)}…`
-                : "no terminal paired"
-            }
           />
           <StatCard
             label="Projects"
