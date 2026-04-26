@@ -6,13 +6,11 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { usePairStatus } from "@/hooks/use-pair-status";
 import {
-  ArrowRight,
   ArrowUpRight,
   Clock,
   Folders,
   GithubLogo,
   Plus,
-  Sparkle,
   Terminal,
 } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
@@ -21,7 +19,7 @@ import { useSettings } from "@/lib/settings";
 import { useLibrary } from "@/lib/library/store";
 import type { LibraryIndexEntry } from "@/lib/library/types";
 import { NewProjectModal } from "@/components/projects/new-project-modal";
-import { PairWizard } from "@/components/projects/pair-wizard";
+import { ConnectClaudeCard } from "@/components/projects/connect-claude-card";
 
 /**
  * Projects — the central hub. New Project CTA opens a modal; below it
@@ -140,39 +138,11 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        {/* Pair Claude Code — opens a 3-step modal wizard. Click instead
-            of routing so the friction stays low; the full setup guide
-            is one link away if they want it. */}
-        <PairWizard>
-          <button
-            type="button"
-            className="group mb-8 flex w-full items-center gap-4 rounded-xl border border-neutral-200 bg-white p-4 text-left transition-all hover:border-accent-magenta/40 hover:shadow-[0_2px_12px_rgba(0,0,0,0.04)]"
-          >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-white">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/claude-code.png"
-                alt=""
-                width={28}
-                height={28}
-                className="h-7 w-7 object-contain"
-              />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 font-display text-[14px] font-medium text-neutral-900">
-                Pair Claude Code
-                <Sparkle size={10} weight="fill" className="text-accent-magenta" />
-              </div>
-              <div className="mt-0.5 text-[12px] text-neutral-500">
-                Two commands. Eleven graph tools, the SKILL.md, ready in 30 seconds.
-              </div>
-            </div>
-            <ArrowRight
-              size={14}
-              className="shrink-0 text-neutral-400 transition-transform group-hover:translate-x-0.5 group-hover:text-accent-magenta"
-            />
-          </button>
-        </PairWizard>
+        {/* Connect Claude Code — API-key first. The card mints a key on
+            click, then shows a copy-pasteable two-line install snippet. */}
+        <div className="mb-8">
+          <ConnectClaudeCard />
+        </div>
 
         {/* Saved projects */}
         <section className="mb-12">
@@ -218,11 +188,11 @@ export default function ProjectsPage() {
             Retrieval model
           </Link>
           <Link
-            href="/pair"
+            href="/app/settings"
             className="ml-auto inline-flex items-center gap-1 font-mono text-[10px] text-neutral-400 transition-colors hover:text-accent-magenta"
           >
             <Terminal size={10} />
-            Pair terminal
+            API keys
           </Link>
         </div>
       </div>
@@ -276,7 +246,8 @@ function EmptyState({ isConnected }: { isConnected: boolean }) {
       </h3>
       <p className="mx-auto mt-1.5 max-w-sm text-[12px] text-neutral-500">
         Hit <span className="font-mono text-neutral-700">New project</span> to
-        map a repo, or pair Claude Code to push graphs straight into this list.
+        map a repo, or connect Claude Code above to create projects from your
+        terminal.
       </p>
       {!isConnected && (
         <p className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-[#FAFAF8] px-3 py-1 font-mono text-[10px] text-neutral-500">

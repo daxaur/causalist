@@ -17,7 +17,14 @@ import {
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { API_KEYS_CHANGED_EVENT } from "@/hooks/use-api-key-status";
 import { cn } from "@/lib/utils";
+
+function notifyChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(API_KEYS_CHANGED_EVENT));
+  }
+}
 
 interface KeyRecord {
   id: string;
@@ -74,6 +81,7 @@ export function ApiKeysPanel({ authenticated }: { authenticated: boolean }) {
       setRevealedToken(token);
       setName("");
       void refresh();
+      notifyChanged();
     } catch (e) {
       toast.error("Couldn't create key", {
         description: e instanceof Error ? e.message : String(e),
@@ -93,6 +101,7 @@ export function ApiKeysPanel({ authenticated }: { authenticated: boolean }) {
       if (!res.ok) throw new Error(`revoke failed (${res.status})`);
       toast.success("Key revoked");
       void refresh();
+      notifyChanged();
     } catch (e) {
       toast.error("Couldn't revoke", {
         description: e instanceof Error ? e.message : String(e),

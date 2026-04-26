@@ -1,25 +1,26 @@
 import Link from "next/link";
 import { Terminal } from "@phosphor-icons/react/dist/ssr";
 import { PageShell } from "@/components/layout/page-shell";
-import { InitHelpers } from "@/components/projects/init-helpers";
+import { ConnectClaudeCard } from "@/components/projects/connect-claude-card";
 
 export const metadata = {
   title: "Connect Claude Code · Causalist",
   description:
-    "Install the Causalist CLI + Skill so Claude Code can query your causal graph instead of grepping the repo.",
+    "Two commands wire Claude Code to your account. API key in, projects out.",
 };
 
 /**
- * The CLI + Skill is the agent-first path Anthropic recommends
- * (post Nov 2025): code over tool-call JSON, with a SKILL.md that
- * teaches the model when to reach for which command. The MCP server
- * is offered second for non-CLI clients (Cursor, Claude.ai web).
+ * The Claude Code setup page. The interactive `<ConnectClaudeCard>`
+ * up top mints a key + shows the install snippet on the spot — the
+ * step-by-step below is a reference, not the primary CTA. The legacy
+ * pair-code flow gets a small "advanced" disclosure at the bottom for
+ * the live browser-tab streaming case.
  */
 export default function ClaudeCodePage() {
   return (
     <PageShell width="docs">
-      {/* Hero with the Claude Code logo as the visual anchor. */}
-      <header className="mb-10">
+      {/* Hero */}
+      <header className="mb-8">
         <div className="mb-5 flex items-center gap-4">
           <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -41,71 +42,58 @@ export default function ClaudeCodePage() {
           </div>
         </div>
         <p className="max-w-2xl text-sm leading-relaxed text-neutral-500">
-          Install the Causalist CLI + Skill. Claude Code learns when to reach
-          for <code className="font-mono text-[12px]">causalist blast</code>,{" "}
-          <code className="font-mono text-[12px]">causalist tests</code>,{" "}
-          <code className="font-mono text-[12px]">causalist writers</code> — and
-          stops re-grepping your repo.
+          Mint an API key, paste two lines into your terminal. Claude Code can
+          then create projects on your account and query your graphs — without
+          re-grepping the repo.
         </p>
       </header>
 
-      {/* The two steps */}
-      <ol className="mb-8 space-y-3">
-        <Step
-          n={1}
-          title="Install the CLI + Skill"
-          code={"npm i -g causalist-cli\ncausalist install"}
-          body={
-            <>
-              <code className="font-mono text-[12px]">causalist install</code>{" "}
-              drops a <code className="font-mono text-[12px]">SKILL.md</code>{" "}
-              into <code className="font-mono text-[12px]">~/.claude/skills/causalist/</code>{" "}
-              — Claude Code auto-discovers it. The CLI itself ships eleven
-              graph-query subcommands ready to pipe through{" "}
-              <code className="font-mono text-[12px]">jq</code>.
-            </>
-          }
-        />
-        <Step
-          n={2}
-          title="Pair this terminal"
-          code="causalist pair <code>"
-          body={
-            <>
-              Grab a 6-char code from{" "}
-              <Link
-                href="/pair"
-                className="font-medium text-accent-magenta hover:underline"
-              >
-                /pair
-              </Link>
-              . Once paired, Claude Code can query your graph by repo, push
-              new projects to your list, and stream tool-use events into the
-              browser.
-            </>
-          }
-        />
-      </ol>
+      {/* The interactive card — does the work. */}
+      <div className="mb-8">
+        <ConnectClaudeCard variant="tall" />
+      </div>
 
-      {/* What this gets you */}
+      {/* Reference: full step-by-step for the curious */}
+      <section className="mb-8 rounded-2xl border border-neutral-200 bg-white p-6">
+        <h2 className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
+          What the snippet does
+        </h2>
+        <ol className="space-y-3">
+          <ReferenceStep
+            n={1}
+            title="Install the CLI"
+            cmd="npm install -g causalist-cli"
+            note="Ships eleven graph-query subcommands + an optional Skill that teaches Claude Code when to use them."
+          />
+          <ReferenceStep
+            n={2}
+            title="Save your API key"
+            cmd="causalist login --api-key cspl_live_…"
+            note="Writes ~/.causalist/session.json. The MCP server and every CLI command pick it up automatically."
+          />
+          <ReferenceStep
+            n={3}
+            title="Optional — drop the Skill"
+            cmd="causalist install"
+            note="Adds SKILL.md to ~/.claude/skills/causalist/. Claude Code auto-discovers it; the model learns when to reach for `causalist blast`, `causalist tests`, etc."
+          />
+        </ol>
+      </section>
+
+      {/* Tools the agent can call */}
       <section className="mb-8 rounded-2xl border border-neutral-200 bg-white p-6">
         <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-neutral-400">
           <Terminal size={11} />
-          The eleven commands Claude Code learns to use
+          What Claude Code can do once connected
         </div>
         <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
           <CmdRow
-            cmd="causalist blast <id>"
-            desc="what depends on this node"
+            cmd="causalist project create <repo>"
+            desc="map a new repo on your account"
           />
-          <CmdRow
-            cmd="causalist tests <ids...>"
-            desc="3 tests not 300"
-          />
-          <CmdRow
-            cmd="causalist path <a> <b>"
-            desc="shortest causal path"
-          />
+          <CmdRow cmd="causalist blast <id>" desc="what depends on this node" />
+          <CmdRow cmd="causalist tests <ids…>" desc="3 tests not 300" />
+          <CmdRow cmd="causalist path <a> <b>" desc="shortest causal path" />
           <CmdRow
             cmd="causalist writers <id>"
             desc="who writes to this state"
@@ -119,40 +107,27 @@ export default function ClaudeCodePage() {
             desc="structurally similar nodes"
           />
           <CmdRow
-            cmd="causalist topo <ids...>"
+            cmd="causalist topo <ids…>"
             desc="topological build order"
           />
-          <CmdRow
-            cmd="causalist layer <name>"
-            desc="nodes in a layer"
-          />
-          <CmdRow
-            cmd="causalist node <id>"
-            desc="single-node metadata"
-          />
-          <CmdRow
-            cmd="causalist neighbors <id>"
-            desc="direct in/out edges"
-          />
-          <CmdRow
-            cmd="causalist info"
-            desc="capabilities manifest"
-          />
+          <CmdRow cmd="causalist layer <name>" desc="nodes in a layer" />
+          <CmdRow cmd="causalist node <id>" desc="single-node metadata" />
+          <CmdRow cmd="causalist neighbors <id>" desc="direct in/out edges" />
         </div>
       </section>
 
-      {/* MCP fallback */}
+      {/* Advanced — pair code for live browser streaming */}
       <section className="mb-6">
         <details className="group rounded-2xl border border-neutral-200 bg-white">
           <summary className="cursor-pointer list-none px-6 py-5 transition-colors hover:bg-neutral-50">
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-display text-[15px] font-medium text-neutral-900">
-                  Or use the MCP server
+                  Advanced — live browser-tab streaming
                 </div>
                 <div className="mt-0.5 text-[12px] text-neutral-500">
-                  For non-CLI clients (Cursor, Claude.ai web). Same eleven
-                  tools, exposed over stdio.
+                  Optional. Only needed if you want Claude Code&rsquo;s tool-use
+                  events to stream live into a browser tab as it works.
                 </div>
               </div>
               <span className="font-mono text-[10px] text-neutral-400 transition-transform group-open:rotate-180">
@@ -160,21 +135,25 @@ export default function ClaudeCodePage() {
               </span>
             </div>
           </summary>
-          <div className="border-t border-neutral-100 p-6 pt-5">
-            <p className="mb-4 text-[12.5px] text-neutral-600">
-              Anthropic&rsquo;s{" "}
-              <a
-                href="https://www.anthropic.com/engineering/code-execution-with-mcp"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-accent-magenta hover:underline"
+          <div className="space-y-3 border-t border-neutral-100 p-6 pt-5 text-[12.5px] text-neutral-600">
+            <p>
+              Generate a 6-char code at{" "}
+              <Link
+                href="/pair"
+                className="font-medium text-accent-magenta hover:underline"
               >
-                post-Nov 2025 guidance
-              </a>{" "}
-              prefers code/CLI over tool-call JSON for coding agents. We ship
-              both — use the CLI for Claude Code, MCP everywhere else.
+                /pair
+              </Link>
+              , then run{" "}
+              <code className="font-mono text-[12px]">causalist pair &lt;code&gt;</code>{" "}
+              on your machine. The browser tab will flip to{" "}
+              <em className="text-neutral-900">paired</em> and start receiving
+              live events.
             </p>
-            <InitHelpers sessionId="" />
+            <p className="text-neutral-500">
+              You don&rsquo;t need this for normal project creation or graph
+              queries — those run on the API key alone.
+            </p>
           </div>
         </details>
       </section>
@@ -190,50 +169,45 @@ export default function ClaudeCodePage() {
           docs.claude.com/claude-code
         </a>
         <span className="mx-2 text-neutral-300">·</span>
-        Why this stack?{" "}
+        Manage keys in{" "}
         <Link
-          href="/docs/integrations"
+          href="/app/settings"
           className="text-neutral-600 underline underline-offset-2 hover:text-neutral-900"
         >
-          read the docs
+          settings
         </Link>
       </p>
     </PageShell>
   );
 }
 
-function Step({
+function ReferenceStep({
   n,
   title,
-  code,
-  body,
+  cmd,
+  note,
 }: {
   n: number;
   title: string;
-  code: string | null;
-  body: React.ReactNode;
+  cmd: string;
+  note: string;
 }) {
   return (
-    <li className="rounded-xl border border-neutral-200 bg-white p-5">
-      <div className="flex items-center gap-3">
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-neutral-900 font-mono text-[12px] text-white">
-          {n}
-        </span>
-        <div className="font-display text-[15px] font-medium text-neutral-900">
+    <li className="flex items-start gap-3">
+      <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-neutral-50 font-mono text-[10px] text-neutral-500">
+        {n}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[12.5px] font-medium text-neutral-900">
           {title}
         </div>
-      </div>
-      {code && (
-        <pre className="mt-3 overflow-x-auto rounded-md border border-neutral-200 bg-neutral-900 p-3 font-mono text-[12.5px] text-white">
-          {code
-            .split("\n")
-            .map((line) => `$ ${line}`)
-            .join("\n")}
+        <pre className="mt-1 overflow-x-auto rounded-md border border-neutral-200 bg-neutral-900 px-3 py-1.5 font-mono text-[12px] text-neutral-100">
+          $ {cmd}
         </pre>
-      )}
-      <p className="mt-2.5 text-[12.5px] leading-snug text-neutral-600">
-        {body}
-      </p>
+        <p className="mt-1.5 text-[11.5px] leading-snug text-neutral-500">
+          {note}
+        </p>
+      </div>
     </li>
   );
 }

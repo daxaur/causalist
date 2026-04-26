@@ -108,7 +108,7 @@ function Footer() {
           <FooterColumn
             title="Developers"
             links={[
-              { label: "Pair your terminal", href: "/pair" },
+              { label: "Connect Claude Code", href: "/app/claude-code" },
               { label: "Docs", href: "/docs/foundations" },
               { label: "MCP server", href: "https://www.npmjs.com/package/causalist-mcp", external: true },
               { label: "GitHub", href: "https://github.com/daxaur/causalist", external: true },

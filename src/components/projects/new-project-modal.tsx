@@ -79,9 +79,9 @@ type UrlState =
  * New-project modal — single focused form: an optional friendly name
  * up top, then the GitHub URL with live validation (format check on
  * every keystroke, debounced GitHub HEAD lookup confirms the repo
- * exists, surfaces stars + primary language). Pairing lives elsewhere
- * (the dedicated PairWizard on the Projects page) — this modal is
- * single-purpose: spin up a new graph.
+ * exists, surfaces stars + primary language). Connecting Claude Code
+ * lives elsewhere (the ConnectClaudeCard on the Projects page) — this
+ * modal is single-purpose: spin up a new graph from a URL.
  */
 export function NewProjectModal({ children }: { children: ReactElement }) {
   const [open, setOpen] = useState(false);
