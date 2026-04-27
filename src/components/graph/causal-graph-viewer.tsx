@@ -447,13 +447,50 @@ export function CausalGraphViewer({
   // Returns a mesh with emissive material per layer. Selected nodes
   // get a 270° torus halo — the Arc+Terminus logo motif rendered in
   // the graph itself.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nodeThreeObject = useMemo(() => {
-    return (n: VisNode) => {
-      // Heavy import, but ForceGraph3D is already client-only
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const THREE = require("three");
-      const group = new THREE.Group();
+  //
+  // CRITICAL: this factory function MUST have a stable reference for
+  // the entire lifetime of the component. ForceGraph3D treats a new
+  // nodeThreeObject reference as "rebuild all node meshes," which
+  // means every hover / select / focus would flash every node in the
+  // scene. We read live state via refs below so the function body sees
+  // current values without changing reference.
+  const stateRef = useRef({
+    selectedIds,
+    focusedId,
+    hover,
+    externalHighlight,
+    importance,
+    diff,
+    focusChain,
+    hoverChain,
+  });
+  stateRef.current = {
+    selectedIds,
+    focusedId,
+    hover,
+    externalHighlight,
+    importance,
+    diff,
+    focusChain,
+    hoverChain,
+  };
+  const nodeThreeObject = useCallback((n: VisNode) => {
+    const {
+      selectedIds,
+      focusedId,
+      externalHighlight,
+      importance,
+      diff,
+      focusChain,
+      hoverChain,
+    } = stateRef.current;
+    const isSelected = (id: string) => selectedIds.has(id);
+    const isFocused = (id: string) => focusedId === id;
+    const isHighlighted = (id: string) => externalHighlight.has(id);
+    // Heavy import, but ForceGraph3D is already client-only
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const THREE = require("three");
+    const group = new THREE.Group();
 
       const selectedNow = isSelected(n.id);
       const focusedNow = isFocused(n.id);
@@ -562,9 +599,7 @@ export function CausalGraphViewer({
       // no extra glow. Keeps the graph readable.
 
       return group;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIds, focusedId, hover, externalHighlight, importance]);
+  }, []);
 
   // CRITICAL: every accessor MUST be wrapped in useCallback. The lib's
   // README + maintainer comments (issue #518, #341) say re-passing a
@@ -665,6 +700,11 @@ export function CausalGraphViewer({
       onNodeHover: onNodeHoverCb,
       onBackgroundClick: onBgClickCb,
       onNodeDragEnd: onNodeDragEndCb,
+      // Mount-stable 3D node mesh factory. Reads live state via the
+      // stateRef defined above, so hover/select don't change the
+      // function reference (which would rebuild every node mesh).
+      nodeThreeObject,
+      nodeThreeObjectExtend: false,
       backgroundColor: CANVAS_BG,
       // Pinned nodes (fx/fy/fz set in the data memo) + cooldownTicks=0
       // means: warmupTicks runs the simulation invisibly to let any
@@ -686,7 +726,130 @@ export function CausalGraphViewer({
       onNodeHoverCb,
       onBgClickCb,
       onNodeDragEndCb,
+      nodeThreeObject,
     ],
+  );
+
+  // Stable 2D node painter. Reads live state from stateRef so hover/
+  // select don't change the function reference. ForceGraph2D paints
+  // every frame, so the latest stateRef values are picked up
+  // automatically — no re-init, no flicker.
+  const node2DCanvasObject = useCallback(
+    (
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      node: any,
+      ctx: CanvasRenderingContext2D,
+      scale: number,
+    ) => {
+      if (node.x == null || node.y == null) return;
+      const { selectedIds, focusedId, hover, externalHighlight, importance } =
+        stateRef.current;
+      const id = node.id as string;
+      const sel = selectedIds.has(id);
+      const foc = focusedId === id;
+      const hov = hover === id;
+      const ext = externalHighlight.has(id);
+      const imp = importance.byId.get(id);
+      const tier = imp?.tier ?? "leaf";
+      let fillColor: string;
+      let strokeColor: string;
+      if (tier === "hot" || tier === "core") {
+        fillColor = ACCENT;
+        strokeColor = ACCENT;
+      } else if (node.kind === "external") {
+        fillColor = "#FFFFFF";
+        strokeColor = "#BDB6AC";
+      } else {
+        const layerHex = LAYER_HEX[node.layer as SemanticLayer] ?? 0xede9e3;
+        fillColor = `#${layerHex.toString(16).padStart(6, "0")}`;
+        strokeColor = INK;
+      }
+      const r =
+        (node.size ?? 5) +
+        (tier === "hot" ? 3 : tier === "core" ? 1.5 : 0) +
+        (foc ? 2 : 0);
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = fillColor;
+      ctx.fill();
+      ctx.lineWidth = (sel || foc ? 1.8 : hov || ext ? 1.4 : 1.0) / scale;
+      ctx.strokeStyle = sel || foc ? ACCENT : strokeColor;
+      ctx.stroke();
+      const tierVisible =
+        (tier === "hot" && scale >= 1.0) ||
+        (tier === "core" && scale >= 1.6) ||
+        scale >= 2.6;
+      const forceShow = hov || foc || sel || ext;
+      if (!tierVisible && !forceShow) return;
+      const now = Date.now();
+      if (now - labelBucketsRef.current.ts > 50) {
+        labelBucketsRef.current = { ts: now, set: new Set() };
+      } else {
+        labelBucketsRef.current.ts = now;
+      }
+      if (!forceShow && tier !== "hot" && tier !== "core") {
+        const bucketKey = `${Math.round(node.x / 40)}_${Math.round(node.y / 40)}`;
+        if (labelBucketsRef.current.set.has(bucketKey)) return;
+        labelBucketsRef.current.set.add(bucketKey);
+      }
+      const fontSize = scale > 1.5 ? 9 : 11;
+      ctx.font = `500 ${fontSize}px ui-sans-serif, system-ui`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      const rawLabel = (node.label as string) ?? "";
+      const label =
+        rawLabel.length > 18 ? rawLabel.slice(0, 17) + "…" : rawLabel;
+      const padX = 5;
+      const padY = 2.5;
+      const w = ctx.measureText(label).width + padX * 2;
+      const h = fontSize + padY * 2;
+      const ly = node.y + r + 5;
+      ctx.fillStyle = foc
+        ? "rgba(232,56,164,0.95)"
+        : "rgba(255,255,255,0.96)";
+      ctx.strokeStyle = foc
+        ? "rgba(232,56,164,1)"
+        : hov || sel
+          ? "rgba(42,36,32,0.35)"
+          : "rgba(42,36,32,0.15)";
+      ctx.lineWidth = 0.8 / scale;
+      const lx = node.x - w / 2;
+      const radius = h / 2;
+      ctx.beginPath();
+      ctx.moveTo(lx + radius, ly);
+      ctx.arcTo(lx + w, ly, lx + w, ly + h, radius);
+      ctx.arcTo(lx + w, ly + h, lx, ly + h, radius);
+      ctx.arcTo(lx, ly + h, lx, ly, radius);
+      ctx.arcTo(lx, ly, lx + w, ly, radius);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = foc ? "#ffffff" : INK;
+      ctx.fillText(label, node.x, ly + padY);
+    },
+    [],
+  );
+  const node2DCanvasMode = useCallback(() => "replace" as const, []);
+  const node2DPointerArea = useCallback(
+    (
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      node: any,
+      color: string,
+      ctx: CanvasRenderingContext2D,
+    ) => {
+      if (node.x == null || node.y == null) return;
+      const { importance } = stateRef.current;
+      ctx.fillStyle = color;
+      const imp = importance.byId.get(node.id);
+      const r =
+        (node.size ?? 5) +
+        (imp?.tier === "hot" ? 3 : imp?.tier === "core" ? 1.5 : 0) +
+        8;
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    },
+    [],
   );
 
   const paletteActions: PaletteAction[] = useMemo(() => {
@@ -886,17 +1049,25 @@ export function CausalGraphViewer({
             <ForceGraph3D
               ref={graphRef}
               {...sharedProps}
-              nodeThreeObject={nodeThreeObject}
-              nodeThreeObjectExtend={false}
               showNavInfo={false}
             />
           ) : (
             <ForceGraph2D
               ref={graphRef}
               {...sharedProps}
-              /* Replace the default circle with our own pill node so
-                 labels stop stacking on top of each other, and hit
-                 area expands beyond the visible dot. */
+              nodeRelSize={6}
+              nodeCanvasObjectMode={node2DCanvasMode}
+              nodeCanvasObject={node2DCanvasObject}
+              nodePointerAreaPaint={node2DPointerArea}
+            />
+          )}
+        </div>
+      </div>
+      {/* DEAD-DELETE-START */}
+      {false && (
+            <ForceGraph2D
+              ref={graphRef}
+              {...sharedProps}
               nodeRelSize={6}
               nodeCanvasObjectMode={() => "replace"}
               nodeCanvasObject={(
@@ -1026,7 +1197,6 @@ export function CausalGraphViewer({
               }}
             />
           )}
-        </div>
 
         {/* Top overlay — left stack carries chrome (file tree, repo,
             mode, stats); right stack carries the panel toggles. */}
@@ -1237,7 +1407,6 @@ export function CausalGraphViewer({
           onSelectNode={(n) => selectSingle(n.id)}
           actions={paletteActions}
         />
-      </div>
     </div>
   );
 }
