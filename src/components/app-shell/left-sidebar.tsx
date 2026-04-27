@@ -106,7 +106,13 @@ export function LeftSidebar({ children }: { children: ReactNode }) {
         </SidebarBody>
       </Sidebar>
 
-      <main className="relative flex-1 overflow-hidden">{children}</main>
+      {/* overflow-y-auto lets long pages (/docs, /pair, settings) scroll
+          normally. /app routes that need full-bleed canvas behavior
+          render their content in absolute-positioned wrappers, so they
+          stay within the viewport without producing an extra scrollbar. */}
+      <main className="relative flex-1 overflow-y-auto overflow-x-hidden">
+        {children}
+      </main>
     </div>
   );
 }

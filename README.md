@@ -10,7 +10,6 @@
 
 **A causal graph layer for any codebase — for humans, and for the agents writing code on your behalf.**
 
-[![Live demo](https://img.shields.io/badge/demo-causalist.xyz-E838A4?style=flat)](https://causalist.xyz)
 [![CLI on npm](https://img.shields.io/npm/v/causalist-cli?label=causalist-cli&color=cb3837)](https://www.npmjs.com/package/causalist-cli)
 [![MCP on npm](https://img.shields.io/npm/v/causalist-mcp?label=causalist-mcp&color=cb3837)](https://www.npmjs.com/package/causalist-mcp)
 [![Built with Claude Code](https://img.shields.io/badge/Built%20with-Claude%20Code-D97757?logo=anthropic&logoColor=white)](https://claude.com/claude-code)
