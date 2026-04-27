@@ -220,31 +220,27 @@ export function CausalGraphViewer({
       config: 240,
     };
     const nodes: VisNode[] = graph.nodes.map((n, i) => {
-      // Cheap deterministic angle from id so the same node always
-      // lands in the same place across mounts.
+      // Deterministic STARTING position — gives the force engine a
+      // good seed, not a final pin. The actual final layout comes
+      // from the simulation running during warmupTicks (off-screen,
+      // before first paint). Connected nodes will cluster naturally;
+      // edges will be short. We pin everything in onEngineStop so
+      // post-warmup the layout is frozen.
       let h = 0;
       for (let k = 0; k < n.id.length; k++) {
         h = (h * 31 + n.id.charCodeAt(k)) | 0;
       }
       const angle = ((h % 1000) / 1000) * Math.PI * 2;
-      const radius = 80 + ((i * 7) % 40);
-      const y = layerY[n.layer ?? "logic"] ?? 0;
-      const x = Math.cos(angle) * radius;
-      const z = Math.sin(angle) * radius;
+      const radius = 60 + ((i * 7) % 30);
+      // Mild layer-Y bias so we get the infra→config gradient, but
+      // not so strong that it stretches edges across the whole canvas.
+      const y = (layerY[n.layer ?? "logic"] ?? 0) * 0.4;
       return {
         ...n,
         iconUrl: iconUrlForLanguage(n.language) ?? iconUrlForPath(n.path),
-        // Pinned positions. d3-force-3d treats nodes with fx/fy/fz
-        // set as immovable — the simulation can run but it cannot
-        // move these nodes, so no possible re-energizing event (drag,
-        // hover, callback churn) can cause drift or glitch. Nodes
-        // render exactly where we put them, every frame, forever.
-        x,
+        x: Math.cos(angle) * radius,
         y,
-        z,
-        fx: x,
-        fy: y,
-        fz: z,
+        z: Math.sin(angle) * radius,
       } as VisNode;
     });
     const links: GraphLink[] = graph.edges.map((e) => ({
@@ -700,17 +696,43 @@ export function CausalGraphViewer({
       onNodeHover: onNodeHoverCb,
       onBackgroundClick: onBgClickCb,
       onNodeDragEnd: onNodeDragEndCb,
+      // After the off-screen warmup settles, pin every node at its
+      // final position so subsequent drags / re-renders don't disturb
+      // the layout. With cooldownTicks=0 the engine doesn't animate
+      // anyway; this guarantees zero further movement.
+      onEngineStop: () => {
+        const fg = graphRef.current;
+        if (!fg) return;
+        try {
+          const gd = fg.graphData?.();
+          const ns = (gd?.nodes ?? []) as Array<{
+            x?: number;
+            y?: number;
+            z?: number;
+            fx?: number;
+            fy?: number;
+            fz?: number;
+          }>;
+          for (const n of ns) {
+            if (n.x != null) n.fx = n.x;
+            if (n.y != null) n.fy = n.y;
+            if (n.z != null) n.fz = n.z;
+          }
+        } catch {
+          // best-effort
+        }
+      },
       // Mount-stable 3D node mesh factory. Reads live state via the
       // stateRef defined above, so hover/select don't change the
       // function reference (which would rebuild every node mesh).
       nodeThreeObject,
       nodeThreeObjectExtend: false,
       backgroundColor: CANVAS_BG,
-      // Pinned nodes (fx/fy/fz set in the data memo) + cooldownTicks=0
-      // means: warmupTicks runs the simulation invisibly to let any
-      // incidental positions resolve, then NO post-mount animation
-      // ever runs. Drag re-heats are no-ops in zero ticks.
-      warmupTicks: 100,
+      // warmupTicks=300 runs the simulation invisibly off-screen so
+      // connected nodes cluster (short edges, clean shape) before
+      // first paint. cooldownTicks=0 = no animation visible to the
+      // user. Drag re-heats resolve in zero ticks.
+      warmupTicks: 300,
       cooldownTicks: 0,
       enableNodeDrag: true,
     }),
