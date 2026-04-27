@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   Cube,
@@ -566,21 +566,23 @@ export function CausalGraphViewer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIds, focusedId, hover, externalHighlight, importance]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sharedProps: any = {
-    graphData: data,
-    nodeId: "id",
-    // Hover label = filename only. Summary lives in the Inspector tab —
-      // keeping the tooltip short stops mouse-over from blowing up into
-      // a multi-line wall of text.
-    nodeLabel: (n: VisNode) => n.label,
-    nodeVal: (n: VisNode) => (n.size ?? 4) + (n.kind === "external" ? 2 : 0),
-    nodeOpacity: 0.95,
-    nodeResolution: 20,
-    linkColor: (l: GraphLink) => {
+  // CRITICAL: every accessor MUST be wrapped in useCallback. The lib's
+  // README + maintainer comments (issue #518, #341) say re-passing a
+  // new function reference for nodeColor/linkColor/etc. on each render
+  // causes the lib to re-init every node and re-heat the simulation.
+  // Hover/selection state changes in this component re-render the
+  // ForceGraph child constantly — without stable callbacks, every
+  // mouse move would re-tick the layout. That was the persistent
+  // flicker source.
+  const nodeLabelCb = useCallback((n: VisNode) => n.label, []);
+  const nodeValCb = useCallback(
+    (n: VisNode) => (n.size ?? 4) + (n.kind === "external" ? 2 : 0),
+    [],
+  );
+  const linkColorCb = useCallback(
+    (l: GraphLink) => {
       const s = typeof l.source === "string" ? l.source : (l.source as VisNode).id;
       const t = typeof l.target === "string" ? l.target : (l.target as VisNode).id;
-      // Filter: if either endpoint is filtered out, dim the edge too.
       if (visibleIds && (!visibleIds.has(s) || !visibleIds.has(t))) {
         return "rgba(200,200,210,0.05)";
       }
@@ -594,59 +596,98 @@ export function CausalGraphViewer({
       if (selectedIds.has(s) || selectedIds.has(t)) return ACCENT;
       if (hover && (hover === s || hover === t))
         return "rgba(232,56,164,0.55)";
-      // AST-unverified edges render with lower opacity so users can
-      // tell at a glance what's confirmed vs. LLM-inferred.
       const base = KIND_EDGE_COLOR[l.kind] ?? "rgba(200,200,210,0.12)";
       if (l.verified === false) {
         return base.replace(/,\s*0?\.[0-9]+\)$/, ",0.28)");
       }
       return base;
     },
-    linkWidth: (l: GraphLink) => {
+    [visibleIds, diff, selectedIds, hover],
+  );
+  const linkWidthCb = useCallback(
+    (l: GraphLink) => {
       const s = typeof l.source === "string" ? l.source : (l.source as VisNode).id;
       const t = typeof l.target === "string" ? l.target : (l.target as VisNode).id;
       if (selectedIds.has(s) || selectedIds.has(t)) return 2.2;
       return l.verified === false ? 0.4 : 0.6;
     },
-    linkOpacity: 0.85,
-    linkDirectionalParticles: (l: GraphLink) => {
+    [selectedIds],
+  );
+  const linkParticlesCb = useCallback(
+    (l: GraphLink) => {
       const s = typeof l.source === "string" ? l.source : (l.source as VisNode).id;
       const t = typeof l.target === "string" ? l.target : (l.target as VisNode).id;
       return selectedIds.has(s) || selectedIds.has(t) ? 2 : 0;
     },
-    linkDirectionalParticleSpeed: 0.006,
-    linkDirectionalParticleWidth: 1.2,
-    linkDirectionalParticleColor: () => ACCENT,
-    onNodeClick: (
-      n: VisNode,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      event?: any,
-    ) => handleNodeClick(n, event),
-    onNodeHover: (n: VisNode | null) => setHover(n?.id ?? null),
-    onBackgroundClick: () => clearSelection(),
-    backgroundColor: CANVAS_BG,
-    // Aggressive cooldown so the graph SITS STILL after settling.
-    // Small graphs without enough links would drift forever on the
-    // defaults. cooldownTicks ~ first cool, alpha decay drops alpha
-    // quickly, velocity decay = friction. onEngineStop calls
-    // pauseAnimation() so the WebGL renderer stops scheduling rAFs
-    // entirely once equilibrium is reached. User interactions still
-    // work (clicking a node fires onNodeClick because hit-testing
-    // doesn't need an active loop).
-    // Pre-warm the simulation off-screen so the user sees a settled
-    // graph on first paint instead of nodes whirling into place.
-    // warmupTicks runs synchronously before render; cooldownTicks=30
-    // keeps a brief animation only if positions need micro-adjusting.
-    warmupTicks: 100,
-    cooldownTicks: 30,
-    cooldownTime: 1500,
-    d3AlphaDecay: 0.08,
-    d3VelocityDecay: 0.75,
-    // Nodes are pinned from birth via fx/fy/fz in the data memo, so
-    // there's nothing to do on engine stop. Drag stays off so the
-    // cursor doesn't suggest an interaction we don't support.
-    enableNodeDrag: false,
-  };
+    [selectedIds],
+  );
+  const particleColorCb = useCallback(() => ACCENT, []);
+  const onNodeClickCb = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (n: VisNode, event?: any) => handleNodeClick(n, event),
+    [handleNodeClick],
+  );
+  const onNodeHoverCb = useCallback(
+    (n: VisNode | null) => setHover(n?.id ?? null),
+    [],
+  );
+  const onBgClickCb = useCallback(() => clearSelection(), [clearSelection]);
+  // Drag handler: re-pin the node at its drop position so the next
+  // render's data memo doesn't warp it back to the deterministic
+  // computed spot. With cooldownTicks=0 the drag re-heat resolves in
+  // zero ticks — no other node moves, no flicker.
+  const onNodeDragEndCb = useCallback(
+    (n: VisNode & { x?: number; y?: number; z?: number; fx?: number; fy?: number; fz?: number }) => {
+      n.fx = n.x;
+      n.fy = n.y;
+      n.fz = n.z;
+    },
+    [],
+  );
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sharedProps: any = useMemo(
+    () => ({
+      graphData: data,
+      nodeId: "id",
+      nodeLabel: nodeLabelCb,
+      nodeVal: nodeValCb,
+      nodeOpacity: 0.95,
+      nodeResolution: 20,
+      linkColor: linkColorCb,
+      linkWidth: linkWidthCb,
+      linkOpacity: 0.85,
+      linkDirectionalParticles: linkParticlesCb,
+      linkDirectionalParticleSpeed: 0.006,
+      linkDirectionalParticleWidth: 1.2,
+      linkDirectionalParticleColor: particleColorCb,
+      onNodeClick: onNodeClickCb,
+      onNodeHover: onNodeHoverCb,
+      onBackgroundClick: onBgClickCb,
+      onNodeDragEnd: onNodeDragEndCb,
+      backgroundColor: CANVAS_BG,
+      // Pinned nodes (fx/fy/fz set in the data memo) + cooldownTicks=0
+      // means: warmupTicks runs the simulation invisibly to let any
+      // incidental positions resolve, then NO post-mount animation
+      // ever runs. Drag re-heats are no-ops in zero ticks.
+      warmupTicks: 100,
+      cooldownTicks: 0,
+      enableNodeDrag: true,
+    }),
+    [
+      data,
+      nodeLabelCb,
+      nodeValCb,
+      linkColorCb,
+      linkWidthCb,
+      linkParticlesCb,
+      particleColorCb,
+      onNodeClickCb,
+      onNodeHoverCb,
+      onBgClickCb,
+      onNodeDragEndCb,
+    ],
+  );
 
   const paletteActions: PaletteAction[] = useMemo(() => {
     const slug = graph.repo?.replace(/[^a-z0-9-]/gi, "-").toLowerCase() || "graph";

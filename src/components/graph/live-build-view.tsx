@@ -11,7 +11,7 @@
 // CausalGraphViewer — the layout matches so the transition is quiet.
 
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CausalistSpinner } from "@/components/ui/causalist-loader";
 import { ArrowRight, CheckCircle, Sparkle, Warning } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
@@ -145,6 +145,55 @@ export function LiveBuildView({
     [nodes, edges],
   );
 
+  // Stable accessors so ForceGraph2D doesn't see a new function ref
+  // on every parent re-render and re-init the layout. Documented
+  // root cause of "graph re-heats on hover/state change" in the
+  // react-force-graph repo (issue #518).
+  const linkColorCb = useCallback((l: object) => {
+    const link = l as VisEdge;
+    const fresh = link._pulse && Date.now() - link._pulse < PULSE_MS;
+    if (fresh) return ACCENT;
+    return link.verified === false
+      ? "rgba(120,120,130,0.18)"
+      : "rgba(120,120,130,0.35)";
+  }, []);
+  const linkWidthCb = useCallback((l: object) => {
+    const link = l as VisEdge;
+    const fresh = link._pulse && Date.now() - link._pulse < PULSE_MS;
+    return fresh ? 1.6 : 0.6;
+  }, []);
+  const nodeCanvasObjectCb = useCallback(
+    (
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      rawNode: any,
+      ctx: CanvasRenderingContext2D,
+      scale: number,
+    ) => {
+      const node = rawNode as VisNode;
+      if (node.x == null || node.y == null) return;
+      const layer = (node.layer ?? "logic") as SemanticLayer;
+      const fill = LAYER_COLORS[layer] ?? "#cbd5e1";
+      const r = 4.5;
+      const pulseAge = node._pulse ? Date.now() - node._pulse : Infinity;
+      if (pulseAge < PULSE_MS) {
+        const t = 1 - pulseAge / PULSE_MS;
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, r + 5 * (1 - t), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(210,71,152,${0.22 * t})`;
+        ctx.fill();
+      }
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.lineWidth = 1 / scale;
+      ctx.strokeStyle = INK;
+      ctx.stroke();
+    },
+    [],
+  );
+  const nodeCanvasModeCb = useCallback(() => "replace" as const, []);
+
   const anyRunning =
     running ?? Object.values(agents).some((a) => a.status === "running");
   const isError = stage === "error";
@@ -201,50 +250,10 @@ export function LiveBuildView({
               d3AlphaMin={0.05}
               nodeRelSize={5}
               linkDirectionalParticles={0}
-              linkColor={(l) => {
-                const link = l as VisEdge;
-                const fresh =
-                  link._pulse && Date.now() - link._pulse < PULSE_MS;
-                if (fresh) return ACCENT;
-                return link.verified === false
-                  ? "rgba(120,120,130,0.18)"
-                  : "rgba(120,120,130,0.35)";
-              }}
-              linkWidth={(l) => {
-                const link = l as VisEdge;
-                const fresh =
-                  link._pulse && Date.now() - link._pulse < PULSE_MS;
-                return fresh ? 1.6 : 0.6;
-              }}
-              nodeCanvasObjectMode={() => "replace"}
-              nodeCanvasObject={(
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                rawNode: any,
-                ctx: CanvasRenderingContext2D,
-                scale: number,
-              ) => {
-                const node = rawNode as VisNode;
-                if (node.x == null || node.y == null) return;
-                const layer = (node.layer ?? "logic") as SemanticLayer;
-                const fill = LAYER_COLORS[layer] ?? "#cbd5e1";
-                const r = 4.5;
-                // Pulse ring while a node is freshly-emitted.
-                const pulseAge = node._pulse ? Date.now() - node._pulse : Infinity;
-                if (pulseAge < PULSE_MS) {
-                  const t = 1 - pulseAge / PULSE_MS;
-                  ctx.beginPath();
-                  ctx.arc(node.x, node.y, r + 5 * (1 - t), 0, Math.PI * 2);
-                  ctx.fillStyle = `rgba(210,71,152,${0.22 * t})`;
-                  ctx.fill();
-                }
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
-                ctx.fillStyle = fill;
-                ctx.fill();
-                ctx.lineWidth = 1 / scale;
-                ctx.strokeStyle = INK;
-                ctx.stroke();
-              }}
+              linkColor={linkColorCb}
+              linkWidth={linkWidthCb}
+              nodeCanvasObjectMode={nodeCanvasModeCb}
+              nodeCanvasObject={nodeCanvasObjectCb}
               enableNodeDrag={false}
               enablePanInteraction={false}
               enableZoomInteraction={false}
