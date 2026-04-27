@@ -82,7 +82,7 @@ npm run dev -- --port 4141
 - TypeScript, Tailwind v4, shadcn/ui
 - Phosphor icons (duotone) + custom Arc+Terminus logomark
 - Clash Display (display) + Satoshi (body) + JetBrains Mono (code)
-- `react-force-graph-3d` / `-2d` + three.js
+- [`react-force-graph-3d`](https://github.com/vasturiano/react-force-graph) / `-2d` (built on [3d-force-graph](https://github.com/vasturiano/3d-force-graph)) + three.js
 - `@anthropic-ai/claude-agent-sdk` — Opus 4.7 with four parallel subagents
 - `@octokit/rest` for GitHub ingestion
 - Devicon CDN for language/framework node icons

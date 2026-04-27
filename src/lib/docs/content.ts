@@ -185,6 +185,12 @@ The viewer ranks every node by fan-in (how many edges point at it) and bins them
 - \`leaf\` — everything else; nothing depends on these (safe to refactor).
 
 See \`src/lib/graph/importance.ts::rankImportance\`. The Agent tab uses this implicitly — pointing a plan-mode agent at a hot node will surface more downstream impact than picking a leaf.
+
+## Rendering stack
+
+The 3D and 2D viewers are built on Vasco Asturiano's [3d-force-graph](https://github.com/vasturiano/3d-force-graph) and [react-force-graph](https://github.com/vasturiano/react-force-graph) — Three.js + d3-force-3d for the WebGL canvas, with React bindings. Causalist consumes them via \`react-force-graph-3d\` and \`react-force-graph-2d\` (dynamically imported with \`ssr: false\`).
+
+The lib's \`nodeThreeObject\` API caches each node's mesh on \`node.__threeObj\` and only invokes the factory once per node. We exploit that: the factory is \`useCallback([])\` and pre-creates named children (\`core\`, \`stroke\`, \`ring\`, \`arc\`); a \`useEffect\` watches selection / hover / focus state and mutates those cached children directly via \`getObjectByName(...)\`. This is the maintainer's recommended pattern (see [3d-force-graph#61](https://github.com/vasturiano/3d-force-graph/issues/61) and [react-force-graph#204](https://github.com/vasturiano/react-force-graph/issues/204)) — keeps a custom mesh stable while still reflecting React state changes, without re-igniting the simulation on every hover.
 `,
   },
   {
