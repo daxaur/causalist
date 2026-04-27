@@ -606,45 +606,10 @@ export function CausalGraphViewer({
   // mouse move would re-tick the layout. That was the persistent
   // flicker source.
   const nodeLabelCb = useCallback((n: VisNode) => n.label, []);
-  // Per-frame size accessor — bumps on hover/focus/select so users
-  // see clear feedback without needing a custom mesh rebuild. Reads
-  // live state from stateRef; lib evaluates this every frame so
-  // changes show immediately without re-init.
-  const nodeValCb = useCallback((n: VisNode) => {
-    const { selectedIds, focusedId, hover, externalHighlight, importance } =
-      stateRef.current;
-    const imp = importance.byId.get(n.id);
-    const tier = imp?.tier ?? "leaf";
-    const tierBoost = tier === "hot" ? 4 : tier === "core" ? 2 : 0;
-    const base = (n.size ?? 4) + (n.kind === "external" ? 2 : 0) + tierBoost;
-    const isFocused = focusedId === n.id;
-    const isSelected = selectedIds.has(n.id);
-    const isHovered = hover === n.id;
-    const isHighlighted = externalHighlight.has(n.id);
-    if (isFocused) return base + 4;
-    if (isSelected) return base + 2.5;
-    if (isHovered || isHighlighted) return base + 1.5;
-    return base;
-  }, []);
-  // Per-frame color accessor. Selected/focused nodes go magenta;
-  // hot/core nodes are magenta by default; layer fill otherwise.
-  const nodeColorCb = useCallback((n: VisNode) => {
-    const { selectedIds, focusedId, hover, externalHighlight, importance, diff } =
-      stateRef.current;
-    const diffState = diff?.nodes.get(n.id);
-    if (diffState === "added") return DIFF_HEX.added;
-    if (diffState === "removed") return DIFF_HEX.removed;
-    if (diffState === "modified") return DIFF_HEX.modified;
-    if (selectedIds.has(n.id) || focusedId === n.id) return ACCENT;
-    const imp = importance.byId.get(n.id);
-    const tier = imp?.tier ?? "leaf";
-    if (tier === "hot" || tier === "core") return ACCENT;
-    if (hover === n.id || externalHighlight.has(n.id)) return ACCENT;
-    if (n.kind === "external") return "#FFFFFF";
-    const layerHex = LAYER_HEX[n.layer as SemanticLayer] ?? 0xede9e3;
-    return `#${layerHex.toString(16).padStart(6, "0")}`;
-  }, []);
-  const nodeOpacityCb = useCallback(() => 0.95, []);
+  const nodeValCb = useCallback(
+    (n: VisNode) => (n.size ?? 4) + (n.kind === "external" ? 2 : 0),
+    [],
+  );
   const linkColorCb = useCallback(
     (l: GraphLink) => {
       const s = typeof l.source === "string" ? l.source : (l.source as VisNode).id;
@@ -718,8 +683,7 @@ export function CausalGraphViewer({
       nodeId: "id",
       nodeLabel: nodeLabelCb,
       nodeVal: nodeValCb,
-      nodeColor: nodeColorCb,
-      nodeOpacity: nodeOpacityCb,
+      nodeOpacity: 0.95,
       nodeResolution: 20,
       linkColor: linkColorCb,
       linkWidth: linkWidthCb,
@@ -758,10 +722,11 @@ export function CausalGraphViewer({
           // best-effort
         }
       },
-      // No nodeThreeObject — we rely on the lib's built-in sphere
-      // with our per-frame nodeColor + nodeVal accessors. Custom
-      // meshes get cached and never update on hover/select; built-in
-      // accessors run every frame so hover/click feedback is instant.
+      // Mount-stable 3D node mesh factory. Reads live state via the
+      // stateRef defined above, so hover/select don't change the
+      // function reference (which would rebuild every node mesh).
+      nodeThreeObject,
+      nodeThreeObjectExtend: false,
       backgroundColor: CANVAS_BG,
       // warmupTicks=300 runs the simulation invisibly off-screen so
       // connected nodes cluster (short edges, clean shape) before
@@ -783,8 +748,7 @@ export function CausalGraphViewer({
       onNodeHoverCb,
       onBgClickCb,
       onNodeDragEndCb,
-      nodeColorCb,
-      nodeOpacityCb,
+      nodeThreeObject,
     ],
   );
 
