@@ -257,44 +257,46 @@ We don't ship any of this today. The launch verifier is the AST check above. Eve
   {
     slug: "pipeline",
     title: "Pipeline",
-    subtitle: "Four Claude agents, running in parallel",
+    subtitle: "Four Claude agents, sequenced for shared context",
     body: `
 ## Four specialized agents
 
-Causalist generates a graph by calling Claude Opus 4.7 in four parallel roles. Each agent has a dedicated system prompt constraining its output to strict JSON.
+Causalist generates a graph by calling Claude Opus 4.7 in four roles. Each agent has its own system prompt constraining output to strict JSONL — one parseable JSON object per line, so the browser can stream nodes / edges into the live force-graph as they emit. Models are configurable per-agent via the New Project modal (defaults to Opus 4.7 for all four; Sonnet 4.6 / Haiku 4.5 also wired).
 
 ### 1. Structure agent
-Walks the repo tree, classifies every file and module into one of seven layers: \`infra\`, \`data\`, \`logic\`, \`api\`, \`ui\`, \`test\`, \`config\`. Produces \`CausalNode[]\`.
+Walks the repo tree, classifies every file into one of seven layers — \`infra\`, \`data\`, \`logic\`, \`api\`, \`ui\`, \`test\`, \`config\` — and emits one \`CausalNode\` per line.
 
 ### 2. Dependency agent
-Reads sampled file contents and extracts typed edges: \`imports\`, \`calls\`, \`reads\`, \`writes\`, \`extends\`. Produces \`CausalEdge[]\`.
+Receives Structure's node manifest plus up to 80 curated source files (entry-points + index files prioritized). Extracts typed edges — \`imports\`, \`calls\`, \`reads\`, \`writes\`, \`extends\` — and emits one \`CausalEdge\` per line. Edge endpoints are required to be exact node ids from the manifest.
 
 ### 3. Semantic agent
-Writes a one-sentence plain-English summary per node. Rules: starts with a verb, no "this file" preamble, under 140 characters. Produces \`{id, summary}[]\`.
+Receives the same node manifest. Writes a one-sentence plain-English summary per node. Rules: starts with a verb, no "this file" preamble, under 140 characters.
 
 ### 4. Oracle agent
-Receives the three previous outputs, merges them into a final \`CausalGraph\`, drops orphan edges, runs the structural verification pass, and answers any "what-if?" follow-up questions using [extended thinking](https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking) when multi-hop tracing is required.
+Receives all three upstream outputs, merges them into a final \`CausalGraph\`, deduplicates and drops orphan edges, fixes obvious miscategorized layers, and ensures every node has a summary.
 
-## Parallel fan-out, serial merge
+## Sequential, then parallel
 
-Structure, Dependency, and Semantic run in \`Promise.all\` — they only depend on the raw repository tree. Oracle synthesizes after all three return:
+Structure runs first because Dependency and Semantic both reference its node ids. Once Structure completes, Dependency and Semantic run concurrently against that node manifest. Oracle synthesizes after both settle:
 
 $$
-\\text{Graph} \\;=\\; \\text{Oracle}\\big(\\text{Struct}(\\text{tree}),\\; \\text{Dep}(\\text{tree}),\\; \\text{Sem}(\\text{tree})\\big)
+\\text{Graph} \\;=\\; \\text{Oracle}\\big(\\text{Struct}(\\text{tree}),\\; \\text{Dep}(\\text{tree, nodes}),\\; \\text{Sem}(\\text{nodes})\\big)
 $$
 
-Three-way parallelism on the first stage is ~3× wall-clock faster than a sequential pipeline for medium repos, at the cost of no shared context across the three — each agent works blind to the others' outputs. For most codebases this is a good trade. If an agent's output disagrees (e.g. Dependency emits an edge whose endpoints Structure didn't classify), Oracle drops the edge and logs it.
+We tried full three-way parallelism in an early version — Dependency would invent edge endpoints that didn't match Structure's ids, and the orphan-edge filter would drop almost everything. Sequencing Structure first eliminated that whole class of failure. Side benefit: it's a better demo — file structure forms first, then edges trace between the placed nodes.
+
+A fuzzy ID resolver runs after Dependency completes, mapping any model-emitted endpoints (path strings, slashed-id variants, leading "./") back to canonical node ids before the orphan filter applies. AST verification (\`@babel/parser\` for JS/TS, line-scan for Python) then stamps each surviving edge with a \`verified\` boolean.
 
 ## Cost budgeting
 
 | Agent | Input shape | Typical tokens |
 |-------|-------------|----------------|
 | Structure | file tree JSON (paths + sizes) | ~5k in, ~8k out |
-| Dependency | curated file contents, capped at 40KB | ~15k in, ~8k out |
-| Semantic | paths + exports, not full bodies | ~8k in, ~6k out |
+| Dependency | node manifest + ≤80 source files (≤30KB each) | ~30k in, ~10k out |
+| Semantic | node manifest | ~8k in, ~6k out |
 | Oracle | merged outputs + schema | ~25k in, ~16k out |
 
-With [prompt caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching), the shared repo context (tree + sampled contents) is cached at write time and billed at 10% on subsequent "what-if?" queries against the same graph. Net: first analyze of a medium repo is around $0.30 in Opus tokens; follow-up Ask turns are pennies.
+[Prompt caching](https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching) cuts repeat costs to ~10% on subsequent runs against the same repo. First analyze of a medium repo is around $0.30 in Opus tokens; the post-build Ask agent (a [Claude Managed Agent](https://docs.claude.com/en/docs/build-with-claude/managed-agents) with the 11 graph-query tools as custom tools) typically resolves a question in 3–6 tool calls.
 `,
   },
   {
