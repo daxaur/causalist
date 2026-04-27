@@ -102,6 +102,11 @@ export interface AgentRunInput {
   branch: string; // base branch
   files: { path: string; content: string }[];
   selectedNodeIds: string[];
+  /** Optional graph context the agent uses when source files
+   *  couldn't be loaded — id, path, and a one-line summary per
+   *  selected node. Lets the agent answer structural questions
+   *  even with zero file content. */
+  selectedNodeContext?: { id: string; path?: string; summary?: string }[];
 }
 
 export interface AgentRunOutput {
@@ -127,7 +132,23 @@ export function buildUserPrompt(input: AgentRunInput): string {
     )
     .join("\n\n");
 
-  return `Repository: ${input.repo}\nBranch: ${input.branch}\n\n## Plan\n\n${input.plan.trim()}\n\n## Selected files (${input.selectedNodeIds.length} node${input.selectedNodeIds.length === 1 ? "" : "s"})\n\n${fileBlock}\n\nCarry out the plan. Return the JSON envelope.`;
+  // When no files loaded, give the agent enough graph context to
+  // still produce a useful answer.
+  const ctxBlock =
+    input.files.length === 0 && input.selectedNodeContext?.length
+      ? `## Selected nodes (graph metadata — source files unavailable)\n\n${input.selectedNodeContext
+          .map(
+            (n) =>
+              `- \`${n.id}\`${n.path ? ` (${n.path})` : ""}${n.summary ? ` — ${n.summary}` : ""}`,
+          )
+          .join("\n")}\n\nNote: source content for these files could not be fetched. Reason about them from the graph metadata, your general knowledge, and any patterns you can infer from the paths.`
+      : "";
+
+  return `Repository: ${input.repo}\nBranch: ${input.branch}\n\n## Plan\n\n${input.plan.trim()}\n\n${
+    input.files.length > 0
+      ? `## Selected files (${input.selectedNodeIds.length} node${input.selectedNodeIds.length === 1 ? "" : "s"})\n\n${fileBlock}`
+      : ctxBlock
+  }\n\nCarry out the plan. Return the JSON envelope.`;
 }
 
 function truncate(s: string, max: number): string {

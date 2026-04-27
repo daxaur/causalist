@@ -24,6 +24,9 @@ interface RunBody {
   model?: string;
   /** Number of parallel causal-lens agents (1..5). Defaults to 1. */
   agents?: number;
+  /** Optional per-node graph context (path + summary). Used by the
+   *  prompt when source files can't be fetched. */
+  selectedNodeContext?: { id: string; path?: string; summary?: string }[];
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -81,6 +84,7 @@ export async function POST(req: Request): Promise<Response> {
           selectedNodeIds: body.selectedNodeIds,
           nodePathMap: body.nodePathMap,
           githubToken: ghToken,
+          selectedNodeContext: body.selectedNodeContext,
           signal: ac.signal,
         })) {
           send(ev);

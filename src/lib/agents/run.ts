@@ -68,6 +68,8 @@ export interface RunOptions {
   nodePathMap: Record<string, string>;
   /** GitHub access token for fetching file contents. */
   githubToken?: string;
+  /** Optional graph context for the prompt (used when files can't load). */
+  selectedNodeContext?: { id: string; path?: string; summary?: string }[];
   signal?: AbortSignal;
 }
 
@@ -123,13 +125,19 @@ export async function* runAgent(
   // If some files failed but others loaded, that's fine — surface a
   // soft note via the summary at the end, but don't abort.
 
-  if (files.length === 0) {
+  // No source files? Don't abort — the agent can still reason over
+  // the graph metadata (node ids, paths, summaries). Fall through
+  // with an empty `files` array; the prompt template handles it.
+  // Report soft notice so the user sees what's missing without
+  // killing the run.
+  if (files.length === 0 && failedPaths.length > 0) {
+    // Only surface when there were paths to try. Pure-metadata runs
+    // (preview graphs with no real paths) just proceed silently.
     yield {
-      type: "error",
-      message:
-        "Could not load any files. The selected nodes may not map to real paths in this repo (preview/reference graphs run in demo mode).",
+      type: "file_loaded",
+      path: `(skipping ${failedPaths.length} unreachable path${failedPaths.length === 1 ? "" : "s"} — running on graph metadata only)`,
+      bytes: 0,
     };
-    return null;
   }
 
   yield { type: "thinking" };
@@ -140,6 +148,7 @@ export async function* runAgent(
     branch,
     files,
     selectedNodeIds,
+    selectedNodeContext: opts.selectedNodeContext,
   };
 
   const client = new Anthropic({ apiKey: opts.apiKey });

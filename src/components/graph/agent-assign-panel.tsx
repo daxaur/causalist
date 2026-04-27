@@ -127,9 +127,22 @@ export function AgentAssignPanel({
 
     const id = `r_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const nodePathMap: Record<string, string> = {};
+    const selectedNodeContext: {
+      id: string;
+      path?: string;
+      summary?: string;
+    }[] = [];
     for (const nid of nodeIds) {
       const n = nodesById.get(nid);
       if (n?.path) nodePathMap[nid] = n.path;
+      // Always include the node in context — even external packages
+      // without paths still benefit from the agent knowing they're
+      // in scope ("user is asking about react").
+      selectedNodeContext.push({
+        id: nid,
+        path: n?.path,
+        summary: (n as { summary?: string } | undefined)?.summary,
+      });
     }
 
     const run: Run = {
@@ -169,6 +182,7 @@ export function AgentAssignPanel({
           branch: graph.commit || "main",
           selectedNodeIds: nodeIds,
           nodePathMap,
+          selectedNodeContext,
           apiKey: settings.anthropicKey,
         }),
         signal: ac.signal,
