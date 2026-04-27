@@ -136,11 +136,12 @@ export function LiveBuildView({
     return () => window.clearInterval(id);
   }, [nodes.length]);
 
+  // Stable node + link references. Cloning edges every render makes
+  // ForceGraph2D re-resolve source/target on every emit, which
+  // momentarily disconnects existing edges and causes visible flicker.
+  // Pass the same array references and let the lib mutate in place.
   const data = useMemo(
-    () => ({
-      nodes: nodes as VisNode[],
-      links: edges.map((e) => ({ ...e })),
-    }),
+    () => ({ nodes: nodes as VisNode[], links: edges as VisEdge[] }),
     [nodes, edges],
   );
 
@@ -188,30 +189,18 @@ export function LiveBuildView({
               // (velocityDecay 0.78), weak charge so nodes don't
               // explode outward, short link distance so connected
               // pairs sit close. Center force pulls everything to (0,0).
+              // Nodes are pinned at emit time via fx/fy in the live
+              // emit handler, so the simulation can't move them. We
+              // still let it run so link forces compute (for
+              // visual ticks), but with aggressive damping so
+              // nothing animates beyond a frame or two per emit.
               cooldownTicks={Infinity}
-              d3AlphaDecay={0.04}
-              d3VelocityDecay={0.78}
-              warmupTicks={30}
-              d3AlphaMin={0.02}
+              d3AlphaDecay={0.08}
+              d3VelocityDecay={0.85}
+              warmupTicks={5}
+              d3AlphaMin={0.05}
               nodeRelSize={5}
               linkDirectionalParticles={0}
-              onEngineTick={() => {
-                // Soft "gravity to center" so nothing drifts past the
-                // viewport. Cheap per-tick mutation; runs at ~60Hz
-                // while the engine is warm and stops when alpha hits
-                // alphaMin.
-                for (const n of data.nodes as Array<{
-                  x?: number;
-                  y?: number;
-                  vx?: number;
-                  vy?: number;
-                }>) {
-                  if (n.x != null && n.y != null) {
-                    n.vx = (n.vx ?? 0) - n.x * 0.0009;
-                    n.vy = (n.vy ?? 0) - n.y * 0.0009;
-                  }
-                }
-              }}
               linkColor={(l) => {
                 const link = l as VisEdge;
                 const fresh =

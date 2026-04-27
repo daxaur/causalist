@@ -229,12 +229,22 @@ export function CausalGraphViewer({
       const angle = ((h % 1000) / 1000) * Math.PI * 2;
       const radius = 80 + ((i * 7) % 40);
       const y = layerY[n.layer ?? "logic"] ?? 0;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
       return {
         ...n,
         iconUrl: iconUrlForLanguage(n.language) ?? iconUrlForPath(n.path),
-        x: Math.cos(angle) * radius,
+        // Pinned positions. d3-force-3d treats nodes with fx/fy/fz
+        // set as immovable — the simulation can run but it cannot
+        // move these nodes, so no possible re-energizing event (drag,
+        // hover, callback churn) can cause drift or glitch. Nodes
+        // render exactly where we put them, every frame, forever.
+        x,
         y,
-        z: Math.sin(angle) * radius,
+        z,
+        fx: x,
+        fy: y,
+        fz: z,
       } as VisNode;
     });
     const links: GraphLink[] = graph.edges.map((e) => ({
@@ -632,40 +642,9 @@ export function CausalGraphViewer({
     cooldownTime: 1500,
     d3AlphaDecay: 0.08,
     d3VelocityDecay: 0.75,
-    onEngineStop: () => {
-      // Zero out residual velocities AND pin every node at its final
-      // position by writing fx/fy/fz. The d3 force engine treats
-      // nodes with fx/fy/fz set as immovable — even if the user
-      // drags one, the others stay put and the simulation has
-      // nothing to relax. This is what kept the demo glitching when
-      // the user dragged a node: drag re-energized the engine and
-      // every other node would jump.
-      try {
-        for (const n of (data.nodes as unknown) as Array<{
-          x?: number;
-          y?: number;
-          z?: number;
-          vx?: number;
-          vy?: number;
-          vz?: number;
-          fx?: number;
-          fy?: number;
-          fz?: number;
-        }>) {
-          n.vx = 0;
-          n.vy = 0;
-          n.vz = 0;
-          if (n.x != null) n.fx = n.x;
-          if (n.y != null) n.fy = n.y;
-          if (n.z != null) n.fz = n.z;
-        }
-      } catch {
-        // best-effort only
-      }
-    },
-    // Disable drag entirely. With pinned nodes drag would be a no-op
-    // anyway; turning it off also kills the cursor change so the UI
-    // doesn't suggest an interaction we don't support.
+    // Nodes are pinned from birth via fx/fy/fz in the data memo, so
+    // there's nothing to do on engine stop. Drag stays off so the
+    // cursor doesn't suggest an interaction we don't support.
     enableNodeDrag: false,
   };
 

@@ -451,20 +451,22 @@ export function RepoAnalyzePrompt({
         if (!n?.id) return;
         setLiveNodes((prev) => {
           if (prev.some((x) => x.id === n.id)) return prev;
-          // Pre-position the node in a tight ring around origin so the
-          // force layout starts from a coherent shape instead of
-          // scattering 100+ nodes across the canvas. ForceGraph2D
-          // mutates x/y in place, but if the node lacks them on
-          // first paint the lib spawns it at random canvas
-          // coordinates — that's what made the live build look like
-          // "points spreading to wilderness".
+          // Pin each emitted node at a deterministic position on a
+          // golden-angle spiral around origin. fx/fy locks the node
+          // — d3-force-2d won't try to move it, so existing nodes
+          // don't shift when a new one arrives. The graph grows as
+          // a coherent disc with zero ricochet, zero glitch.
           const idx = prev.length;
           const angle = (idx * 137.5 * Math.PI) / 180; // golden angle
-          const r = 8 + Math.sqrt(idx) * 6;
+          const r = 12 + Math.sqrt(idx) * 7;
+          const x = Math.cos(angle) * r;
+          const y = Math.sin(angle) * r;
           const seeded = {
             ...n,
-            x: Math.cos(angle) * r,
-            y: Math.sin(angle) * r,
+            x,
+            y,
+            fx: x,
+            fy: y,
             _pulse: Date.now(),
           } as CausalNode;
           return [...prev, seeded];
