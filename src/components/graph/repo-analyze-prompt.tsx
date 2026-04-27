@@ -88,16 +88,22 @@ export function RepoAnalyzePrompt({
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  // On mount: check the library, then the server, for a previously-
-  // built graph for this owner/repo. If found, render immediately
-  // and skip the analyze prompt. Re-runs whenever the library fires
-  // its changed event so a fresh upload while the page is open also
-  // takes effect.
+  // ONE-SHOT mount-time hydrate. Look in the local library first,
+  // then the server. If found, set the graph once and stop.
+  //
+  // Critically: we do NOT subscribe to causalist:library-changed
+  // here. The build flow itself fires that event when it saves the
+  // result, which would re-enter this effect and call setGraph()
+  // again with a fresh object reference — replacing the in-flight
+  // pinned graph in the viewer with an identical-but-new object,
+  // which ForceGraph treats as a brand-new dataset and re-inits
+  // (visible flicker). The viewer is the source of truth once a
+  // graph is set; library-side updates can wait for the next page
+  // visit.
   useEffect(() => {
     let cancelled = false;
-    const load = async () => {
+    (async () => {
       try {
-        // 1) Local IndexedDB library (fast)
         const idx = await listIndex();
         const match = idx.find(
           (e) =>
@@ -115,9 +121,6 @@ export function RepoAnalyzePrompt({
             return;
           }
         }
-        // 2) Server fallback — graph might exist from a different
-        //    device or terminal session. Costs one HTTP round-trip;
-        //    silent if not signed in / no row.
         try {
           const res = await fetch(
             `/api/projects/get-graph?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`,
@@ -132,8 +135,6 @@ export function RepoAnalyzePrompt({
             if (data.found && data.graph) {
               setGraph(data.graph);
               setStage("done");
-              // Also hydrate the local library so subsequent loads
-              // are instant.
               try {
                 await saveEntry({
                   owner,
@@ -154,17 +155,9 @@ export function RepoAnalyzePrompt({
       } finally {
         if (!cancelled) setHydrating(false);
       }
-    };
-    void load();
-    const onChanged = () => void load();
-    if (typeof window !== "undefined") {
-      window.addEventListener("causalist:library-changed", onChanged);
-    }
+    })();
     return () => {
       cancelled = true;
-      if (typeof window !== "undefined") {
-        window.removeEventListener("causalist:library-changed", onChanged);
-      }
     };
   }, [owner, repo]);
 
