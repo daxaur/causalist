@@ -263,12 +263,29 @@ export function RepoAnalyzePrompt({
           type: (t.type === "tree" ? "dir" : "file") as "file" | "dir",
         }));
 
-      // Curate source files for Dependency.
+      // Curate source files for Dependency. Bumped to 80 files (was
+      // 25) — the previous cap meant edges were only emitted when
+      // BOTH endpoints landed in the 25-file slice, so most repos
+      // showed almost no connections. 80 covers small/medium repos
+      // end-to-end and gives Dependency enough surface area to find
+      // the actual import graph.
+      //
+      // Prioritization: entry-point / route / index files first, then
+      // everything else by shorter-path-first (closer-to-root ≈ more
+      // connected). Keeps the 80 budget focused on high-value files.
+      const isHighValue = (p: string) => {
+        const l = p.toLowerCase();
+        return (
+          /(^|\/)(index|main|app|server|router|routes)\.[a-z]+$/.test(l) ||
+          /(^|\/)__init__\.py$/.test(l) ||
+          /(^|\/)src\/(index|main|app)\.[a-z]+$/.test(l)
+        );
+      };
       const fileCandidates = entries
         .filter((e) => e.type === "file" && !!e.path)
         .filter((e) => {
           const p = e.path.toLowerCase();
-          if (/\.(ts|tsx|js|jsx|py|rs|go|java|rb|kt|swift)$/.test(p))
+          if (/\.(ts|tsx|js|jsx|py|rs|go|java|rb|kt|swift|c|cc|cpp|h|hpp)$/.test(p))
             return true;
           if (/package\.json$|pyproject\.toml$|cargo\.toml$/.test(p))
             return true;
@@ -277,13 +294,22 @@ export function RepoAnalyzePrompt({
         .filter((e) => {
           if (typeof e.size === "number" && e.size > 50_000) return false;
           if (
-            /(^|\/)(node_modules|dist|build|\.next|\.venv|\.git)\//.test(e.path)
+            /(^|\/)(node_modules|dist|build|\.next|\.venv|\.git|vendor)\//.test(
+              e.path,
+            )
           )
             return false;
           if (/(^|\/)__tests__|\.(spec|test)\./.test(e.path)) return false;
           return true;
         })
-        .slice(0, 25);
+        .sort((a, b) => {
+          const ah = isHighValue(a.path) ? 0 : 1;
+          const bh = isHighValue(b.path) ? 0 : 1;
+          if (ah !== bh) return ah - bh;
+          // Shorter path => closer to root => generally more connected
+          return a.path.length - b.path.length;
+        })
+        .slice(0, 80);
 
       const files: { path: string; content: string }[] = [];
       for (const c of fileCandidates) {
