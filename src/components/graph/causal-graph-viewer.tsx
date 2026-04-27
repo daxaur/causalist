@@ -204,47 +204,35 @@ export function CausalGraphViewer({
     focusMode && focusedId ? neighbors.get(focusedId) ?? null : null;
 
   const data = useMemo(() => {
-    // Pre-position each node by layer + a deterministic per-id angle.
-    // The simulation then barely needs to nudge anything — no late
-    // layer-Y force injection, no flicker. Anchored layouts in 3D:
-    //   y-axis: layer stratification (infra at top, config at bottom)
-    //   x/z:    deterministic ring per node id, so identical repos
-    //           yield identical layouts (no random scatter on remount).
+    // FREE force graph — no fx/fy/fz pinning. The d3-force-3d engine
+    // runs and produces a natural clustered layout where connected
+    // nodes sit close. We give a deterministic STARTING position
+    // (id-hash angle, mild layer-Y bias) so the same repo always
+    // converges to a similar shape, but the simulation owns the
+    // final positions.
     const layerY: Record<string, number> = {
-      infra: -180,
-      data: -90,
+      infra: -120,
+      data: -60,
       logic: 0,
-      api: 60,
-      ui: 120,
-      test: 180,
-      config: 240,
+      api: 40,
+      ui: 80,
+      test: 120,
+      config: 160,
     };
     const nodes: VisNode[] = graph.nodes.map((n, i) => {
-      // Cheap deterministic angle from id so the same node always
-      // lands in the same place across mounts.
       let h = 0;
       for (let k = 0; k < n.id.length; k++) {
         h = (h * 31 + n.id.charCodeAt(k)) | 0;
       }
       const angle = ((h % 1000) / 1000) * Math.PI * 2;
-      const radius = 80 + ((i * 7) % 40);
-      const y = layerY[n.layer ?? "logic"] ?? 0;
-      const x = Math.cos(angle) * radius;
-      const z = Math.sin(angle) * radius;
+      const radius = 60 + ((i * 7) % 30);
+      const y = (layerY[n.layer ?? "logic"] ?? 0) * 0.5;
       return {
         ...n,
         iconUrl: iconUrlForLanguage(n.language) ?? iconUrlForPath(n.path),
-        // Pinned positions. d3-force-3d treats nodes with fx/fy/fz
-        // set as immovable — the simulation can run but it cannot
-        // move these nodes, so no possible re-energizing event (drag,
-        // hover, callback churn) can cause drift or glitch. Nodes
-        // render exactly where we put them, every frame, forever.
-        x,
+        x: Math.cos(angle) * radius,
         y,
-        z,
-        fx: x,
-        fy: y,
-        fz: z,
+        z: Math.sin(angle) * radius,
       } as VisNode;
     });
     const links: GraphLink[] = graph.edges.map((e) => ({
@@ -474,132 +462,216 @@ export function CausalGraphViewer({
     focusChain,
     hoverChain,
   };
+  // Stable factory — useCallback with EMPTY deps. Builds each node's
+  // Group once, with NAMED children we can mutate later. The lib
+  // caches the returned Group on node.__threeObj. We never re-create
+  // it; we mutate properties on those cached children whenever
+  // hover/select/focus state changes (see the useEffect below).
+  //
+  // Pattern source: 3d-force-graph#61 + react-force-graph#204 — the
+  // lib calls this once per node and never again unless graphData
+  // reference changes. Mutating __threeObj is the only documented
+  // way to get per-state visual updates without re-init/flicker.
   const nodeThreeObject = useCallback((n: VisNode) => {
-    const {
-      selectedIds,
-      focusedId,
-      externalHighlight,
-      importance,
-      diff,
-      focusChain,
-      hoverChain,
-    } = stateRef.current;
-    const isSelected = (id: string) => selectedIds.has(id);
-    const isFocused = (id: string) => focusedId === id;
-    const isHighlighted = (id: string) => externalHighlight.has(id);
-    // Heavy import, but ForceGraph3D is already client-only
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const THREE = require("three");
     const group = new THREE.Group();
 
-      const selectedNow = isSelected(n.id);
-      const focusedNow = isFocused(n.id);
-      const highlightedNow = isHighlighted(n.id);
-      const diffState: NodeDiffState | undefined = diff?.nodes.get(n.id);
-      const diffHex =
-        diffState === "added"
-          ? 0x3fb950
-          : diffState === "removed"
-            ? 0xf85149
-            : diffState === "modified"
-              ? 0xd29922
-              : null;
+    const imp0 = importanceRef.current?.byId.get(n.id);
+    const tier0 = imp0?.tier ?? "leaf";
+    const tierBoost = tier0 === "hot" ? 3 : tier0 === "core" ? 1.5 : 0;
+    const radius =
+      (n.size ?? 4) + (n.kind === "external" ? 1 : 0) + tierBoost;
+    // Stash on the node so the mutation effect can reuse the radius.
+    (n as VisNode & { _r?: number })._r = radius;
 
-      const imp = importance.byId.get(n.id);
+    const baseFill =
+      tier0 === "hot" || tier0 === "core"
+        ? ACCENT_HEX
+        : n.kind === "external"
+          ? NODE_LEAF_FILL
+          : LAYER_HEX[n.layer as SemanticLayer] ?? NODE_DEFAULT_FILL;
+    const baseStroke =
+      tier0 === "hot" || tier0 === "core"
+        ? null
+        : n.kind === "external"
+          ? NODE_LEAF_STROKE
+          : NODE_DEFAULT_STROKE;
+
+    // Core sphere
+    const core = new THREE.Mesh(
+      new THREE.SphereGeometry(radius, 20, 20),
+      new THREE.MeshLambertMaterial({
+        color: baseFill,
+        transparent: true,
+        opacity: 1,
+      }),
+    );
+    core.name = "core";
+    group.add(core);
+
+    // Hairline back-face stroke — always present (visible toggled below)
+    const stroke = new THREE.Mesh(
+      new THREE.SphereGeometry(radius + 0.25, 20, 20),
+      new THREE.MeshBasicMaterial({
+        color: baseStroke ?? NODE_DEFAULT_STROKE,
+        transparent: true,
+        opacity: 0.85,
+        side: THREE.BackSide,
+      }),
+    );
+    stroke.name = "stroke";
+    stroke.visible = baseStroke !== null;
+    group.add(stroke);
+
+    // Hover ring — pre-created, hidden by default
+    const ring = new THREE.Mesh(
+      new THREE.SphereGeometry(radius + 0.6, 22, 22),
+      new THREE.MeshBasicMaterial({
+        color: ACCENT_HEX,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.BackSide,
+      }),
+    );
+    ring.name = "ring";
+    ring.visible = false;
+    group.add(ring);
+
+    // 270° focus arc — pre-created, hidden by default
+    const arc = new THREE.Mesh(
+      new THREE.TorusGeometry(radius * 2.3, 0.25, 8, 48, Math.PI * 1.5),
+      new THREE.MeshBasicMaterial({
+        color: ACCENT_HEX,
+        transparent: true,
+        opacity: 0.95,
+      }),
+    );
+    arc.name = "arc";
+    arc.rotation.z = Math.PI / 6;
+    arc.visible = false;
+    group.add(arc);
+
+    return group;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Importance ref so the stable factory above can read the current
+  // ranking when a node is created. The factory only fires once per
+  // node so this only matters at first render.
+  const importanceRef = useRef(importance);
+  importanceRef.current = importance;
+
+  // THE per-state visual update. Walks the cached __threeObj on every
+  // node in the current graphData, finds the named child meshes, and
+  // mutates color/visibility/scale based on current selection / hover
+  // / focus / diff state. Three.js renders every frame in the engine
+  // loop, so the change is visible on the very next frame — no
+  // refresh(), no re-init, no flicker.
+  useEffect(() => {
+    const fg = graphRef.current;
+    if (!fg || mode !== "3d") return;
+    const gd = fg.graphData?.();
+    if (!gd?.nodes) return;
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const THREE = require("three");
+
+    for (const node of gd.nodes as Array<
+      VisNode & {
+        __threeObj?: { getObjectByName: (n: string) => unknown };
+        _r?: number;
+      }
+    >) {
+      const obj = node.__threeObj;
+      if (!obj) continue;
+
+      const id = node.id;
+      const sel = selectedIds.has(id);
+      const foc = focusedId === id;
+      const hov = hover === id;
+      const ext = externalHighlight.has(id);
+      const inHoverChain = hoverChain ? hoverChain.has(id) : false;
+      const inFocusChain = focusChain ? focusChain.has(id) : true;
+      const diffState = diff?.nodes.get(id);
+      const imp = importance.byId.get(id);
       const tier = imp?.tier ?? "leaf";
-      // Light-mode rendering rules (from research):
-      //  - hot/core nodes: solid magenta, no stroke
-      //  - default: cream fill + ink hairline
-      //  - leaf (external or low-importance): white fill + grey hairline
-      //  - selected: fill stays, stroke becomes magenta 1.5px
-      //  - hover: stroke thickens; NEVER dims non-neighbors
+      const r = node._r ?? (node.size ?? 4);
+
+      const core = obj.getObjectByName("core") as
+        | { material: { color: { setHex: (h: number) => void }; opacity: number } }
+        | undefined;
+      const stroke = obj.getObjectByName("stroke") as
+        | {
+            visible: boolean;
+            material: { color: { setHex: (h: number) => void }; opacity: number };
+          }
+        | undefined;
+      const ring = obj.getObjectByName("ring") as
+        | {
+            visible: boolean;
+            material: { opacity: number };
+          }
+        | undefined;
+      const arc = obj.getObjectByName("arc") as
+        | { visible: boolean }
+        | undefined;
+
+      // ── Core fill ───────────────────────────────────────────────
       let fillHex: number;
-      let strokeHex: number | null;
-      if (diffHex !== null) {
-        fillHex = diffHex;
-        strokeHex = null;
-      } else if (selectedNow) {
-        fillHex = tier === "hot" ? ACCENT_HEX : (LAYER_HEX[n.layer as SemanticLayer] ?? NODE_DEFAULT_FILL);
-        strokeHex = ACCENT_HEX;
+      if (diffState === "added") fillHex = 0x3fb950;
+      else if (diffState === "removed") fillHex = 0xf85149;
+      else if (diffState === "modified") fillHex = 0xd29922;
+      else if (sel || foc) {
+        fillHex =
+          tier === "hot"
+            ? ACCENT_HEX
+            : LAYER_HEX[node.layer as SemanticLayer] ?? NODE_DEFAULT_FILL;
       } else if (tier === "hot" || tier === "core") {
         fillHex = ACCENT_HEX;
-        strokeHex = null;
-      } else if (n.kind === "external") {
+      } else if (node.kind === "external") {
         fillHex = NODE_LEAF_FILL;
-        strokeHex = NODE_LEAF_STROKE;
       } else {
-        // Use layer tint at low saturation as the fill; ink hairline
-        fillHex = LAYER_HEX[n.layer as SemanticLayer] ?? NODE_DEFAULT_FILL;
-        strokeHex = NODE_DEFAULT_STROKE;
+        fillHex = LAYER_HEX[node.layer as SemanticLayer] ?? NODE_DEFAULT_FILL;
+      }
+      if (core) {
+        core.material.color.setHex(fillHex);
+        core.material.opacity = inFocusChain ? 1 : 0.2;
       }
 
-      const tierBoost = tier === "hot" ? 3 : tier === "core" ? 1.5 : 0;
-      const radius =
-        (n.size ?? 4) + (n.kind === "external" ? 1 : 0) + tierBoost;
-
-      // Focus-mode dimming only; hover leaves alpha alone.
-      const inFocusChain = focusChain ? focusChain.has(n.id) : true;
-      const inHoverChain = hoverChain ? hoverChain.has(n.id) : false;
-
-      // Core sphere — flat fill, no emissive (no bloom, no glow). On a
-      // light canvas the fill alone is enough.
-      const geom = new THREE.SphereGeometry(radius, 20, 20);
-      const mat = new THREE.MeshLambertMaterial({
-        color: fillHex,
-        transparent: true,
-        opacity: inFocusChain ? 1 : 0.2,
-      });
-      group.add(new THREE.Mesh(geom, mat));
-
-      // Hairline stroke: render a slightly larger back-face sphere so
-      // the edge shows as a dark rim. Thin, architectural.
-      if (strokeHex !== null) {
-        const strokeGeom = new THREE.SphereGeometry(radius + 0.25, 20, 20);
-        const strokeMat = new THREE.MeshBasicMaterial({
-          color: strokeHex,
-          transparent: true,
-          opacity: 0.85,
-          side: THREE.BackSide,
-        });
-        group.add(new THREE.Mesh(strokeGeom, strokeMat));
+      // ── Stroke ─────────────────────────────────────────────────
+      let strokeHex: number | null;
+      if (diffState != null) strokeHex = null;
+      else if (sel || foc) strokeHex = ACCENT_HEX;
+      else if (tier === "hot" || tier === "core") strokeHex = null;
+      else if (node.kind === "external") strokeHex = NODE_LEAF_STROKE;
+      else strokeHex = NODE_DEFAULT_STROKE;
+      if (stroke) {
+        stroke.visible = strokeHex !== null;
+        if (strokeHex !== null) stroke.material.color.setHex(strokeHex);
+        stroke.material.opacity = inFocusChain ? 0.85 : 0.2;
       }
 
-      // Hover ring — thickened accent stroke, no fill fade.
-      if (inHoverChain || highlightedNow) {
-        const ringGeom = new THREE.SphereGeometry(radius + 0.6, 22, 22);
-        const ringMat = new THREE.MeshBasicMaterial({
-          color: ACCENT_HEX,
-          transparent: true,
-          opacity: 0.35,
-          side: THREE.BackSide,
-        });
-        group.add(new THREE.Mesh(ringGeom, ringMat));
-      }
+      // ── Hover ring ─────────────────────────────────────────────
+      if (ring) ring.visible = hov || ext || inHoverChain;
 
-      // Focused: 270° torus arc — Arc+Terminus logo motif
-      if (focusedNow) {
-        const arcGeom = new THREE.TorusGeometry(
-          radius * 2.3,
-          0.25,
-          8,
-          48,
-          Math.PI * 1.5,
-        );
-        const arcMat = new THREE.MeshBasicMaterial({
-          color: ACCENT_HEX,
-          transparent: true,
-          opacity: 0.95,
-        });
-        const arc = new THREE.Mesh(arcGeom, arcMat);
-        arc.rotation.z = Math.PI / 6;
-        group.add(arc);
-      }
+      // ── Focus arc ──────────────────────────────────────────────
+      if (arc) arc.visible = foc;
 
-      // Hot nodes (top 10%) signal importance by size alone — no ring,
-      // no extra glow. Keeps the graph readable.
-
-      return group;
-  }, []);
+      void r;
+      void THREE;
+    }
+  }, [
+    selectedIds,
+    focusedId,
+    hover,
+    externalHighlight,
+    importance,
+    diff,
+    focusChain,
+    hoverChain,
+    mode,
+    data,
+  ]);
 
   // CRITICAL: every accessor MUST be wrapped in useCallback. The lib's
   // README + maintainer comments (issue #518, #341) say re-passing a
