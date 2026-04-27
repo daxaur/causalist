@@ -163,7 +163,10 @@ export function AgentAssignPanel({
           model,
           agents: agentCount,
           repo: graph.repo,
-          branch: "main",
+          // Prefer the exact commit SHA the graph was built against —
+          // those files definitely exist. Falls back to "main" then
+          // "master" via server-side retry if no SHA is available.
+          branch: graph.commit || "main",
           selectedNodeIds: nodeIds,
           nodePathMap,
           apiKey: settings.anthropicKey,

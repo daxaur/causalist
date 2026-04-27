@@ -343,17 +343,28 @@ async function fetchFile(
   path: string,
   token?: string,
 ): Promise<string> {
-  const url = `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(path).replace(/%2F/g, "/")}?ref=${encodeURIComponent(branch)}`;
   const headers: Record<string, string> = {
     Accept: "application/vnd.github.raw",
     "User-Agent": "causalist-agents",
   };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(url, { headers });
-  if (!res.ok) {
-    throw new Error(`GitHub ${res.status}`);
+  // Try the requested ref first, then fall back to common defaults.
+  // GitHub returns 404 if the branch name is wrong (which is the
+  // most common cause of "could not load any files" — our client
+  // used to hardcode "main" but plenty of repos use "master").
+  const refs = [branch, "main", "master", "HEAD"].filter(
+    (r, i, a) => r && a.indexOf(r) === i,
+  );
+  let lastStatus = 0;
+  for (const ref of refs) {
+    const url = `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(path).replace(/%2F/g, "/")}?ref=${encodeURIComponent(ref)}`;
+    const res = await fetch(url, { headers });
+    if (res.ok) return res.text();
+    lastStatus = res.status;
+    // Rate limit / auth — no point trying other refs.
+    if (res.status === 401 || res.status === 403) break;
   }
-  return res.text();
+  throw new Error(`GitHub ${lastStatus || 404}`);
 }
 
 function parseAgentJson(text: string): AgentRunOutput | null {
