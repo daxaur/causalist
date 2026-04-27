@@ -204,10 +204,39 @@ export function CausalGraphViewer({
     focusMode && focusedId ? neighbors.get(focusedId) ?? null : null;
 
   const data = useMemo(() => {
-    const nodes: VisNode[] = graph.nodes.map((n) => ({
-      ...n,
-      iconUrl: iconUrlForLanguage(n.language) ?? iconUrlForPath(n.path),
-    }));
+    // Pre-position each node by layer + a deterministic per-id angle.
+    // The simulation then barely needs to nudge anything — no late
+    // layer-Y force injection, no flicker. Anchored layouts in 3D:
+    //   y-axis: layer stratification (infra at top, config at bottom)
+    //   x/z:    deterministic ring per node id, so identical repos
+    //           yield identical layouts (no random scatter on remount).
+    const layerY: Record<string, number> = {
+      infra: -180,
+      data: -90,
+      logic: 0,
+      api: 60,
+      ui: 120,
+      test: 180,
+      config: 240,
+    };
+    const nodes: VisNode[] = graph.nodes.map((n, i) => {
+      // Cheap deterministic angle from id so the same node always
+      // lands in the same place across mounts.
+      let h = 0;
+      for (let k = 0; k < n.id.length; k++) {
+        h = (h * 31 + n.id.charCodeAt(k)) | 0;
+      }
+      const angle = ((h % 1000) / 1000) * Math.PI * 2;
+      const radius = 80 + ((i * 7) % 40);
+      const y = layerY[n.layer ?? "logic"] ?? 0;
+      return {
+        ...n,
+        iconUrl: iconUrlForLanguage(n.language) ?? iconUrlForPath(n.path),
+        x: Math.cos(angle) * radius,
+        y,
+        z: Math.sin(angle) * radius,
+      } as VisNode;
+    });
     const links: GraphLink[] = graph.edges.map((e) => ({
       source: e.source,
       target: e.target,
@@ -232,51 +261,11 @@ export function CausalGraphViewer({
     return () => clearTimeout(t);
   }, [mode, graph, compact]);
 
-  // Spatial layering: push each semantic layer toward a different
-  // y-anchor so the graph reads top-to-bottom as infra → data → logic
-  // → api → ui → test → config. Gives every repo the same shape
-  // identity regardless of size. 3D only.
-  useEffect(() => {
-    if (mode !== "3d") return;
-    let cancelled = false;
-    (async () => {
-      await new Promise((r) => setTimeout(r, 250));
-      if (cancelled) return;
-      const g = graphRef.current;
-      if (!g || typeof g.d3Force !== "function") return;
-      const dForce = await import("d3-force-3d");
-      const layerY: Record<string, number> = {
-        infra: -180,
-        data: -90,
-        logic: 0,
-        api: 60,
-        ui: 120,
-        test: 180,
-        config: 240,
-      };
-      // Cluster each node toward its layer's y anchor
-      g.d3Force(
-        "layerY",
-        dForce
-          .forceY((n: { layer?: string }) => layerY[n.layer ?? "logic"] ?? 0)
-          .strength(0.09),
-      );
-      // Give everything a gentle radial collide so labels don't overlap
-      g.d3Force(
-        "collide",
-        dForce.forceCollide?.((n: { size?: number }) => (n.size ?? 4) + 4),
-      );
-      g.numDimensions(3);
-      // Don't reheat — the simulation is mid-cool from initial mount
-      // and the new forces take effect on the next tick. Reheating
-      // here was the cause of "the graph never stops jiggling" because
-      // it reset the alpha to 1 every time graph data updated.
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, graph]);
+  // Layer stratification is now baked into initial node positions in
+  // the `data` useMemo above — no post-mount d3Force injection. The
+  // old version added forces 250ms after mount, which caused a late
+  // visible swing as nodes snapped to their new y-anchors. Pre-
+  // positioning avoids the reheat entirely.
 
   // Cinematic fly-to on focus change (3D)
   useEffect(() => {
@@ -634,10 +623,15 @@ export function CausalGraphViewer({
     // entirely once equilibrium is reached. User interactions still
     // work (clicking a node fires onNodeClick because hit-testing
     // doesn't need an active loop).
-    cooldownTicks: 60,
-    cooldownTime: 2500,
-    d3AlphaDecay: 0.06,
-    d3VelocityDecay: 0.7,
+    // Pre-warm the simulation off-screen so the user sees a settled
+    // graph on first paint instead of nodes whirling into place.
+    // warmupTicks runs synchronously before render; cooldownTicks=30
+    // keeps a brief animation only if positions need micro-adjusting.
+    warmupTicks: 100,
+    cooldownTicks: 30,
+    cooldownTime: 1500,
+    d3AlphaDecay: 0.08,
+    d3VelocityDecay: 0.75,
     onEngineStop: () => {
       // Zero out residual velocities AND pin every node at its final
       // position by writing fx/fy/fz. The d3 force engine treats
