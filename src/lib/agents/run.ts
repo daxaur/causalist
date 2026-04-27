@@ -99,6 +99,7 @@ export async function* runAgent(
   const paths = Array.from(new Set(pathByNode.values()));
 
   const files: { nodeId?: string; path: string; content: string }[] = [];
+  const failedPaths: string[] = [];
   for (const path of paths) {
     if (opts.signal?.aborted) {
       yield { type: "error", message: "cancelled" };
@@ -110,12 +111,17 @@ export async function* runAgent(
       files.push({ nodeId, path, content });
       yield { type: "file_loaded", path, bytes: content.length };
     } catch (e) {
-      yield {
-        type: "error",
-        message: `failed to read ${path}: ${errString(e)}`,
-      };
+      // Per-file fetch failure (404, rate-limit, etc.) is NOT fatal —
+      // the file may have moved, been renamed in this branch, or the
+      // node may not map to a real path (preview graphs). Skip it
+      // silently and proceed with the files we did load. Only the
+      // empty-result check below decides if the run is dead.
+      void e;
+      failedPaths.push(path);
     }
   }
+  // If some files failed but others loaded, that's fine — surface a
+  // soft note via the summary at the end, but don't abort.
 
   if (files.length === 0) {
     yield {

@@ -568,7 +568,12 @@ function Composer({
             the empty-state hero only, which keeps the active-thread
             composer uncluttered. */}
         <div className="flex items-center justify-between gap-2 border-t border-neutral-100 px-2 py-1.5">
-          <ModelPill size="sm" value={model} onChange={setModel} />
+          <ModelPill
+            size="sm"
+            direction="up"
+            value={model}
+            onChange={setModel}
+          />
           <button
             type="button"
             onClick={submit}

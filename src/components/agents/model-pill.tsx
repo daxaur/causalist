@@ -33,6 +33,9 @@ interface Props {
   size?: "sm" | "md";
   /** Disable interaction (e.g. mid-stream when restart isn't supported). */
   disabled?: boolean;
+  /** Pop UP instead of down. Use when the pill sits at the bottom of
+   *  a panel and a downward popover would clip / leave the viewport. */
+  direction?: "down" | "up";
   className?: string;
 }
 
@@ -42,6 +45,7 @@ export function ModelPill({
   options = DEFAULT_MODELS,
   size = "sm",
   disabled,
+  direction = "down",
   className,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -106,7 +110,12 @@ export function ModelPill({
       {open && (
         <ul
           role="listbox"
-          className="absolute right-0 top-[calc(100%+4px)] z-50 min-w-[180px] overflow-hidden rounded-lg border border-neutral-200 bg-white py-1 shadow-lg shadow-black/5"
+          className={cn(
+            "absolute right-0 z-50 min-w-[180px] overflow-hidden rounded-lg border border-neutral-200 bg-white py-1 shadow-lg shadow-black/5",
+            direction === "up"
+              ? "bottom-[calc(100%+4px)]"
+              : "top-[calc(100%+4px)]",
+          )}
         >
           {options.map((o) => {
             const active = o.id === value;
