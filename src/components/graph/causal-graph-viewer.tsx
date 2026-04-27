@@ -1271,8 +1271,13 @@ export function CausalGraphViewer({
           )}
 
         {/* Top overlay — left stack carries chrome (file tree, repo,
-            mode, stats); right stack carries the panel toggles. */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between p-4">
+            mode, stats); right stack carries the panel toggles. The
+            left edge shifts to clear the file-tree sidebar when it's
+            open (w-64 = 256px) so the chips don't overlap the tree. */}
+        <div
+          className="pointer-events-none absolute right-0 top-0 z-10 flex items-start justify-between p-4 transition-[left] duration-300"
+          style={{ left: !compact && sidebarOpen ? 256 : 0 }}
+        >
           {!compact ? (
             <div className="pointer-events-auto flex flex-col items-start gap-2">
               {/* Row 1 — file-tree toggle + repo pill */}
