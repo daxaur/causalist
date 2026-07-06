@@ -163,6 +163,6 @@ In-app at [`causalist.xyz/docs`](https://causalist.xyz/docs):
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+MIT.
 
 Claude and Anthropic are trademarks of Anthropic PBC. This project is independent and unaffiliated.
